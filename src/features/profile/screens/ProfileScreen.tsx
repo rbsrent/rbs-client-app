@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { COLORS } from '@/shared/colors';
+import { ScreenHeader } from '@/shared/components/ScreenHeader';
 import { useAuthStore } from '@/store/useAuthStore';
 
 import { MenuItem, MenuRow } from '../components/MenuRow';
@@ -43,10 +44,8 @@ export const ProfileScreen = memo(function ProfileScreen() {
 
   if (!session) {
     return (
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Профиль</Text>
-        </View>
+      <View style={styles.root}>
+        <ScreenHeader title="Профиль" />
         <View style={styles.emptyBox}>
           <View style={styles.emptyAvatar}>
             <User size={40} color={COLORS.text3} strokeWidth={1.5} />
@@ -124,16 +123,12 @@ export const ProfileScreen = memo(function ProfileScreen() {
   ];
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <View style={styles.root}>
+      <ScreenHeader title="Профиль" />
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
       >
-        {/* TopBar */}
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>Профиль</Text>
-        </View>
-
         {/* User info */}
         <View style={styles.userRow}>
           <View style={styles.avatar}>
@@ -190,16 +185,6 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: COLORS.white,
-  },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.text1,
-    letterSpacing: 0.2,
   },
 
   // User info
