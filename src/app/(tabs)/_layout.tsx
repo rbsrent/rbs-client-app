@@ -4,7 +4,6 @@ import {
   Home,
   MapPin,
   Route,
-  User,
 } from 'lucide-react-native';
 
 import { TabBar } from '@/shared/components/TabBar';
@@ -12,11 +11,10 @@ import { VisualTab } from '@/shared/components/TabItem';
 
 // ── Visual tab definitions ──────────────────────────────────
 const VISUAL_TABS: VisualTab[] = [
-  { key: 'index',   label: 'Главная',  Icon: Home },
-  { key: 'routes',  label: 'Маршруты', Icon: Route },
-  { key: 'piers',   label: 'Причалы',  Icon: MapPin },
-  { key: 'bookings',label: 'Брони',    Icon: CalendarCheck },
-  { key: 'profile', label: 'Профиль',  Icon: User },
+  { key: 'index',    label: 'Главная',  Icon: Home },
+  { key: 'routes',   label: 'Маршруты', Icon: Route },
+  { key: 'piers',    label: 'Причалы',  Icon: MapPin },
+  { key: 'bookings', label: 'Брони',    Icon: CalendarCheck },
 ];
 
 // ── Layout ────────────────────────────────────────────────────
@@ -29,7 +27,9 @@ export default function TabLayout() {
       <Tabs.Screen name="index" />
       <Tabs.Screen name="routes" />
       <Tabs.Screen name="bookings" />
-      <Tabs.Screen name="profile" />
+
+      {/* Accessible via stack push, not tab bar */}
+      <Tabs.Screen name="profile" options={{ href: null }} />
 
       {/* Hidden — accessible from home service grid */}
       <Tabs.Screen name="catalog" options={{ href: null }} />
