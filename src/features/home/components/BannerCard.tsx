@@ -4,21 +4,22 @@ import { useRouter } from 'expo-router';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
-import { SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { HeroSlide } from '@/store/useCatalogStore';
 
 const CARD_W = 287;
 const CARD_H = 139;
+const WEB_BASE = 'https://rbs.rent';
 
-function resolveImageUrl(raw: string): string {
+function resolveUrl(raw: string): string {
   if (!raw) return '';
   if (raw.startsWith('http')) return raw;
-  return `${SUPABASE_URL}/storage/v1/object/public/hero-slides/${raw}`;
+  if (raw.startsWith('/')) return `${WEB_BASE}${raw}`;
+  return raw;
 }
 
 export function BannerCard({ slide }: { slide: HeroSlide }) {
   const router = useRouter();
-  const imageUrl = resolveImageUrl(slide.image_url);
+  const imageUrl = resolveUrl(slide.image_url ?? '');
   const ctaUrl = slide.cta_primary_url || slide.cta_secondary_url;
 
   const hasText = !!(slide.title || slide.description);
@@ -38,6 +39,7 @@ export function BannerCard({ slide }: { slide: HeroSlide }) {
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.brandNavy }]} />
       )}
+      <View style={[StyleSheet.absoluteFill, styles.dimOverlay]} />
 
       {hasText && (
         <LinearGradient
@@ -69,7 +71,9 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: COLORS.muted,
     justifyContent: 'flex-end',
-    padding: 14,
+  },
+  dimOverlay: {
+    backgroundColor: 'rgba(0,0,0,0.38)',
   },
   overlay: {
     ...StyleSheet.absoluteFill,

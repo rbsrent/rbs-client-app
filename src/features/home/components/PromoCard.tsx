@@ -1,6 +1,7 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import { MapPin, Ruler, Star, Users } from 'lucide-react-native';
 import {
   Pressable,
   StyleSheet,
@@ -13,12 +14,17 @@ import { Boat } from '@/store/useCatalogStore';
 
 export function PromoCard({ boat }: { boat: Boat }) {
   const router = useRouter();
+  const dest = `/catalog/${boat.id}` as any;
+
+  const hasRating = boat.rating !== null && boat.rating > 0;
+
   return (
     <Pressable
-      style={styles.promoCard}
-      onPress={() => router.push(`/catalog/${boat.id}` as any)}
+      style={({ pressed }) => [styles.card, pressed && { opacity: 0.95 }]}
+      onPress={() => router.push(dest)}
     >
-      <View style={styles.promoImageWrap}>
+      {/* Image */}
+      <View style={styles.imageWrap}>
         {boat.cover_image_url ? (
           <Image
             source={{ uri: boat.cover_image_url }}
@@ -33,29 +39,65 @@ export function PromoCard({ boat }: { boat: Boat }) {
           />
         )}
         <LinearGradient
-          colors={['transparent', 'rgba(11,17,32,0.25)']}
+          colors={['transparent', 'rgba(0,0,0,0.22)']}
           style={StyleSheet.absoluteFill}
         />
       </View>
-      <View style={styles.promoCardBody}>
-        <View style={styles.promoCardTop}>
-          <View style={styles.promoTypeBadge}>
-            <Text style={styles.promoTypeText}>{boat.type}</Text>
-          </View>
+
+      {/* Body */}
+      <View style={styles.body}>
+        {/* Name + rating */}
+        <Text style={styles.name} numberOfLines={1}>{boat.name}</Text>
+        <View style={styles.ratingRow}>
+          <Star size={13} color={hasRating ? '#F5A623' : COLORS.text3} fill={hasRating ? '#F5A623' : 'none'} strokeWidth={1.8} />
+          {hasRating ? (
+            <Text style={styles.ratingText}>
+              {boat.rating!.toFixed(1)}
+              {boat.review_count > 0 ? ` · ${boat.review_count} отзыва` : ''}
+            </Text>
+          ) : (
+            <Text style={styles.ratingEmpty}>Пока нет отзывов</Text>
+          )}
         </View>
-        <Text style={styles.promoTitle} numberOfLines={1}>{boat.name}</Text>
-        <Text style={styles.promoSub} numberOfLines={1}>
-          {boat.pier_name ?? 'Санкт-Петербург'}
-        </Text>
-        <View style={styles.promoFooter}>
-          <Text style={styles.promoPrice}>
-            от {new Intl.NumberFormat('ru-RU').format(boat.price_per_hour)} ₽/ч
+
+        {/* Specs row */}
+        <View style={styles.specsRow}>
+          {boat.length_meters ? (
+            <View style={styles.spec}>
+              <Ruler size={12} color={COLORS.text3} strokeWidth={1.8} />
+              <Text style={styles.specText}>{boat.length_meters} м</Text>
+            </View>
+          ) : null}
+          {boat.capacity ? (
+            <View style={styles.spec}>
+              <Users size={12} color={COLORS.text3} strokeWidth={1.8} />
+              <Text style={styles.specText}>{boat.capacity} чел.</Text>
+            </View>
+          ) : null}
+          {boat.type ? (
+            <Text style={styles.typeText}>Тип: {boat.type}</Text>
+          ) : null}
+        </View>
+
+        {/* Pier */}
+        {boat.pier_name ? (
+          <View style={styles.pierRow}>
+            <MapPin size={12} color={COLORS.text3} strokeWidth={1.8} />
+            <Text style={styles.pierText} numberOfLines={2}>{boat.pier_name}</Text>
+          </View>
+        ) : null}
+
+        {/* Footer: price + button */}
+        <View style={styles.footer}>
+          <Text style={styles.price}>
+            {new Intl.NumberFormat('ru-RU').format(boat.price_per_hour)} ₽/час
           </Text>
           <Pressable
-            style={styles.promoBtn}
-            onPress={() => router.push(`/catalog/${boat.id}` as any)}
+            style={({ pressed }) => [styles.bookBtn, pressed && { opacity: 0.85 }]}
+            onPress={() => router.push(dest)}
+            hitSlop={4}
           >
-            <Text style={styles.promoBtnText}>Смотреть</Text>
+            <Text style={styles.bookBtnText}>Бронь</Text>
           </Pressable>
         </View>
       </View>
@@ -64,75 +106,100 @@ export function PromoCard({ boat }: { boat: Boat }) {
 }
 
 const styles = StyleSheet.create({
-  promoCard: {
+  card: {
     backgroundColor: COLORS.white,
-    borderRadius: 15,
+    borderRadius: 16,
     overflow: 'hidden',
     borderWidth: 1,
-    borderColor: '#E8E8E8',
-    shadowColor: '#BBBBBB',
-    shadowOffset: { width: 1, height: 0 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.07,
+    shadowRadius: 10,
+    elevation: 3,
   },
-  promoImageWrap: {
-    height: 170,
-    backgroundColor: '#7C7C7C',
+  imageWrap: {
+    height: 180,
+    backgroundColor: COLORS.muted,
     overflow: 'hidden',
   },
-  promoCardBody: {
-    padding: 16,
+  body: {
+    padding: 14,
+    gap: 6,
+  },
+  name: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: COLORS.text1,
+    letterSpacing: 0.1,
+  },
+  ratingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+  },
+  ratingText: {
+    fontSize: 12,
+    color: COLORS.text2,
+    fontWeight: '500',
+  },
+  ratingEmpty: {
+    fontSize: 12,
+    color: COLORS.text3,
+  },
+  specsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  spec: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 4,
   },
-  promoCardTop: {
+  specText: {
+    fontSize: 12,
+    color: COLORS.text2,
+  },
+  typeText: {
+    fontSize: 12,
+    color: COLORS.text2,
+  },
+  pierRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
+    alignItems: 'flex-start',
+    gap: 4,
   },
-  promoTypeBadge: {
-    backgroundColor: COLORS.brandCyan + '20',
-    borderRadius: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  promoTypeText: {
-    fontSize: 11,
-    color: COLORS.brandCyan,
-    fontWeight: '600',
-  },
-  promoTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#1D1D1D',
-    letterSpacing: 0.001,
-  },
-  promoSub: {
-    fontSize: 14,
-    color: '#4A4A4A',
+  pierText: {
+    fontSize: 12,
+    color: COLORS.text3,
+    flex: 1,
     lineHeight: 17,
-    letterSpacing: 0.4,
   },
-  promoFooter: {
+  footer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    justifyContent: 'space-between',
+    marginTop: 4,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
-  promoPrice: {
-    fontSize: 14,
-    fontWeight: '700',
+  price: {
+    fontSize: 16,
+    fontWeight: '800',
     color: COLORS.brandNavy,
   },
-  promoBtn: {
+  bookBtn: {
     backgroundColor: COLORS.brandNavy,
-    borderRadius: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
+    borderRadius: 10,
+    paddingHorizontal: 20,
+    paddingVertical: 9,
   },
-  promoBtnText: {
+  bookBtnText: {
     color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

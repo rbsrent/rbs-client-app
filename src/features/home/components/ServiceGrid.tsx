@@ -43,14 +43,14 @@ const SERVICES: ServiceItem[] = [
     label: 'Катер',
     icon: <Anchor size={22} color="#1A5C72" strokeWidth={2} />,
     bg: '#D0F2FB',
-    route: '/catalog?type=Катер',
+    route: '/services/boat',
   },
   {
     key: 'yacht',
     label: 'Яхта',
     icon: <Sailboat size={22} color="#4B2CA0" strokeWidth={2} />,
     bg: '#E8E3FF',
-    route: '/catalog?type=Яхта',
+    route: '/services/yacht',
     badge: 'Хит',
   },
   {
@@ -58,14 +58,15 @@ const SERVICES: ServiceItem[] = [
     label: 'Теплоход',
     icon: <Ship size={22} color="#8B1A60" strokeWidth={2} />,
     bg: '#FAE3F5',
-    route: '/cruises',
+    route: '/services/cruise',
+    badge: 'Скоро',
   },
   {
     key: 'routes',
     label: 'Маршруты',
     icon: <Map size={22} color="#155A38" strokeWidth={2} />,
     bg: '#D4F5E7',
-    route: '/routes',
+    route: '/(tabs)/routes',
   },
   {
     key: 'cert',
@@ -79,7 +80,7 @@ const SERVICES: ServiceItem[] = [
     label: 'Акции',
     icon: <Zap size={22} color="#7A4500" strokeWidth={2} />,
     bg: '#FFF0D6',
-    route: '/catalog',
+    route: '/services/boat',
   },
   {
     key: 'profile',
@@ -90,10 +91,10 @@ const SERVICES: ServiceItem[] = [
   },
   {
     key: 'more',
-    label: 'Ещё',
+    label: 'Брони',
     icon: <MoreHorizontal size={22} color="#4A4A4A" strokeWidth={2} />,
     bg: '#EDEDED',
-    route: '/catalog',
+    route: '/(tabs)/bookings',
   },
 ];
 
@@ -141,17 +142,17 @@ const styles = StyleSheet.create({
   },
   serviceRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    gap: 8,
   },
   serviceItem: {
-    width: (W - 32 - 48) / 4,
+    flex: 1,
     alignItems: 'center',
     gap: 6,
   },
   serviceIconBox: {
-    width: 52,
-    height: 52,
-    borderRadius: 14,
+    width: 62,
+    height: 62,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
   },
