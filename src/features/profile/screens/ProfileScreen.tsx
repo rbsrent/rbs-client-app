@@ -16,6 +16,7 @@ import {
   Trash2,
   User,
 } from 'lucide-react-native';
+import Constants from 'expo-constants';
 import { memo } from 'react';
 import {
   Alert,
@@ -211,6 +212,10 @@ export const ProfileScreen = memo(function ProfileScreen() {
           {group2.map((item) => <MenuRow key={item.key} item={item} />)}
         </View>
 
+        <Text style={s.versionText}>
+          Версия {Constants.expoConfig?.version ?? '2.0.0'}
+        </Text>
+
       </ScrollView>
     </View>
   );
@@ -364,4 +369,12 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   loginBtnText: { fontSize: 16, fontWeight: '600', color: '#FFF' },
+
+  versionText: {
+    textAlign: 'center',
+    fontSize: 12,
+    color: '#AAAAAA',
+    marginTop: 24,
+    marginBottom: 8,
+  },
 });
