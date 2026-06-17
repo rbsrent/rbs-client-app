@@ -4,11 +4,11 @@
     "slug": "rbs-client-app",
     "version": "2.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
+    "icon": "./assets/images/icon-rbs.png",
     "scheme": "rbsrent",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon",
+      "icon": "./assets/images/icon-rbs.png",
       "bundleIdentifier": "com.rbsrent.app",
       "buildNumber": "2"
     },
