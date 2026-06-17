@@ -10,7 +10,8 @@
     "ios": {
       "icon": "./assets/images/icon-rbs.png",
       "bundleIdentifier": "com.rbsrent.app",
-      "buildNumber": "2"
+      "buildNumber": "2",
+      "supportsTablet": true
     },
     "android": {
       "adaptiveIcon": {
