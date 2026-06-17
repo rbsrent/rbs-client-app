@@ -1,4 +1,4 @@
-import { useRef } from 'react';
+import { memo, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
@@ -16,7 +16,7 @@ interface Props {
   slides: HeroSlide[];
 }
 
-export function PromoBanner({ slides }: Props) {
+export const PromoBanner = memo(function PromoBanner({ slides }: Props) {
   const scrollX = useRef(new Animated.Value(0)).current;
 
   if (!slides.length) {
@@ -61,7 +61,7 @@ export function PromoBanner({ slides }: Props) {
         decelerationRate="fast"
         snapToInterval={INTERVAL}
         snapToAlignment="start"
-        scrollEventThrottle={1}
+        scrollEventThrottle={16}
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: false },
@@ -76,7 +76,7 @@ export function PromoBanner({ slides }: Props) {
       </View>
     </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   strip: {

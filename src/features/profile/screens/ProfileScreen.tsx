@@ -1,10 +1,15 @@
 import { useRouter } from 'expo-router';
 import {
+  Bell,
   CalendarCheck,
+  ChevronRight,
+  FileText,
   Gift,
+  Heart,
   HelpCircle,
+  Info,
   LogOut,
-  Pencil,
+  MapPin,
   Send,
   Settings,
   Tag,
@@ -24,10 +29,44 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { COLORS } from '@/shared/colors';
-import { ScreenHeader } from '@/shared/components/ScreenHeader';
 import { useAuthStore } from '@/store/useAuthStore';
 
-import { MenuItem, MenuRow } from '../components/MenuRow';
+// ─── Types ────────────────────────────────────────────────────────────────────
+
+interface MenuItem {
+  key: string;
+  Icon: React.ComponentType<any>;
+  label: string;
+  sub?: string;
+  onPress: () => void;
+  danger?: boolean;
+  badge?: string;
+}
+
+// ─── Menu item row ────────────────────────────────────────────────────────────
+
+function MenuRow({ item }: { item: MenuItem }) {
+  return (
+    <Pressable
+      style={({ pressed }) => [s.menuItem, pressed && { opacity: 0.6 }]}
+      onPress={item.onPress}
+    >
+      <View style={s.menuIconWrap}>
+        <item.Icon
+          size={22}
+          color={item.danger ? '#E63946' : '#000'}
+          strokeWidth={1.8}
+        />
+      </View>
+      <Text style={[s.menuLabel, item.danger && s.menuLabelDanger]}>
+        {item.label}
+      </Text>
+      <ChevronRight size={18} color="#999" strokeWidth={2} />
+    </Pressable>
+  );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
 
 export const ProfileScreen = memo(function ProfileScreen() {
   const insets = useSafeAreaInsets();
@@ -42,266 +81,287 @@ export const ProfileScreen = memo(function ProfileScreen() {
     ]);
   };
 
+  // ── Not logged in ──────────────────────────────────────────────────────────
   if (!session) {
     return (
-      <View style={styles.root}>
-        <ScreenHeader title="Профиль" />
-        <View style={styles.emptyBox}>
-          <View style={styles.emptyAvatar}>
-            <User size={40} color={COLORS.text3} strokeWidth={1.5} />
+      <View style={[s.root, { paddingTop: insets.top }]}>
+        <View style={s.topBar}>
+          <Text style={s.pageTitle}>Профиль</Text>
+        </View>
+        <View style={s.emptyBox}>
+          <View style={s.emptyAvatar}>
+            <User size={44} color="#aaa" strokeWidth={1.2} />
           </View>
-          <Text style={styles.emptyName}>Войдите в аккаунт</Text>
-          <Text style={styles.emptySub}>Управляйте бронями, сертификатами и настройками</Text>
+          <Text style={s.emptyName}>Войдите в аккаунт</Text>
+          <Text style={s.emptySub}>Управляйте бронями, сертификатами и настройками</Text>
           <Pressable
-            style={({ pressed }) => [styles.loginBtn, pressed && { opacity: 0.8 }]}
+            style={({ pressed }) => [s.loginBtn, pressed && { opacity: 0.85 }]}
             onPress={() => router.push('/auth' as any)}
           >
-            <Text style={styles.loginBtnText}>Войти</Text>
+            <Text style={s.loginBtnText}>Войти</Text>
           </Pressable>
         </View>
       </View>
     );
   }
 
+  // ── User data ──────────────────────────────────────────────────────────────
   const rawPhone = session.user?.phone ?? session.user?.user_metadata?.phone_number ?? '';
   const displayPhone = rawPhone
     ? `+7 ${rawPhone.slice(1, 4)} ${rawPhone.slice(4, 7)}-${rawPhone.slice(7, 9)}-${rawPhone.slice(9)}`
     : '';
-  const name = smsUser?.full_name ?? 'Пользователь';
+  const name    = smsUser?.full_name ?? 'Пользователь';
   const initial = name.charAt(0).toUpperCase();
-  const tgUsername = smsUser?.telegram_username;
 
-  const mainItems: MenuItem[] = [
-    {
-      key: 'bookings',
-      Icon: CalendarCheck,
-      label: 'Мои брони',
-      sub: 'История и активные бронирования',
-      onPress: () => router.push('/(tabs)/bookings' as any),
-    },
-    {
-      key: 'cert',
-      Icon: Gift,
-      label: 'Подарочные сертификаты',
-      onPress: () => router.push('/certificates' as any),
-    },
-    {
-      key: 'promo',
-      Icon: Tag,
-      label: 'Промокоды',
-      onPress: () => {},
-    },
-    {
-      key: 'settings',
-      Icon: Settings,
-      label: 'Настройки профиля',
-      onPress: () => router.push('/profile/settings' as any),
-    },
-    {
-      key: 'help',
-      Icon: HelpCircle,
-      label: 'Помощь',
-      onPress: () => {},
-    },
+  const group1: MenuItem[] = [
+    { key: 'settings', Icon: Settings,      label: 'Личные данные',      onPress: () => router.push('/profile/settings' as any) },
+    { key: 'notif',    Icon: Bell,           label: 'Уведомления',        onPress: () => {} },
+    { key: 'cert',     Icon: Gift,           label: 'Подарочные сертификаты', onPress: () => router.push('/certificates' as any) },
+    { key: 'promo',    Icon: Tag,            label: 'Промокоды',          onPress: () => {} },
   ];
 
-  const dangerItems: MenuItem[] = [
-    {
-      key: 'signout',
-      Icon: LogOut,
-      label: 'Выйти',
-      onPress: handleSignOut,
-      danger: true,
-    },
-    {
-      key: 'delete',
-      Icon: Trash2,
-      label: 'Удалить аккаунт',
-      onPress: () => {},
-      danger: true,
-    },
+  const group2: MenuItem[] = [
+    { key: 'piers',    Icon: MapPin,      label: 'Причалы',          onPress: () => router.push('/(tabs)/piers' as any) },
+    { key: 'docs',     Icon: FileText,    label: 'Документы',        onPress: () => {} },
+    { key: 'help',     Icon: HelpCircle,  label: 'Помощь',           onPress: () => {} },
+    { key: 'about',    Icon: Info,        label: 'О приложении',     onPress: () => {} },
+    { key: 'signout',  Icon: LogOut,      label: 'Выйти',            onPress: handleSignOut,  danger: true },
+    { key: 'delete',   Icon: Trash2,      label: 'Удалить аккаунт',  onPress: () => {},       danger: true },
   ];
 
+  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <View style={styles.root}>
-      <ScreenHeader title="Профиль" />
-      <ScrollView
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 80 }}
-      >
-        {/* User info */}
-        <View style={styles.userRow}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initial}</Text>
-          </View>
+    <View style={[s.root, { paddingTop: insets.top }]}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}>
 
-          <View style={styles.userInfo}>
-            <Text style={styles.userName} numberOfLines={1}>{name}</Text>
-            {displayPhone ? <Text style={styles.userPhone}>{displayPhone}</Text> : null}
-            {tgUsername ? (
-              <View style={styles.tgRow}>
-                <Send size={11} color="#229ED9" strokeWidth={2} />
-                <Text style={styles.tgText}>@{tgUsername}</Text>
-              </View>
-            ) : null}
+        {/* Top bar: title + action buttons */}
+        <View style={s.topBar}>
+          <Text style={s.pageTitle}>Профиль</Text>
+          <View style={s.topActions}>
+            <Pressable style={({ pressed }) => [s.actionBtn, pressed && { opacity: 0.6 }]} onPress={() => router.push('/profile/settings' as any)}>
+              <Settings size={18} color="#000" strokeWidth={1.8} />
+            </Pressable>
+            <Pressable style={({ pressed }) => [s.actionBtn, pressed && { opacity: 0.6 }]} onPress={() => {}}>
+              <Send size={18} color="#000" strokeWidth={1.8} />
+            </Pressable>
           </View>
+        </View>
 
+        {/* ── Profile card ───────────────────────────────────────────────── */}
+        <View style={[s.card, s.profileCard]}>
+          <View style={s.avatarWrap}>
+            <Text style={s.avatarInitial}>{initial}</Text>
+          </View>
+          <View style={s.profileInfo}>
+            <Text style={s.profileName}>{name}</Text>
+            {displayPhone ? <Text style={s.profileSub}>{displayPhone}</Text> : null}
+          </View>
+        </View>
+
+        {/* ── Two feature cards ──────────────────────────────────────────── */}
+        <View style={s.featureRow}>
+          {/* Card: Мои брони */}
           <Pressable
-            style={({ pressed }) => [styles.editBtn, pressed && { opacity: 0.6 }]}
-            onPress={() => router.push('/profile/settings' as any)}
-            hitSlop={8}
+            style={({ pressed }) => [s.card, s.featureCard, pressed && { opacity: 0.88 }]}
+            onPress={() => router.push('/(tabs)/bookings' as any)}
           >
-            <Pencil size={18} color={COLORS.text2} strokeWidth={1.8} />
+            <View style={[s.featureImgWrap, { backgroundColor: '#EAF2FF' }]}>
+              <CalendarCheck size={48} color={COLORS.brandNavy} strokeWidth={1.4} />
+            </View>
+            <Text style={s.featureLabel}>Мои брони</Text>
+          </Pressable>
+
+          {/* Card: Избранное (NEW badge — just added) */}
+          <Pressable
+            style={({ pressed }) => [s.card, s.featureCard, pressed && { opacity: 0.88 }]}
+            onPress={() => router.push('/(tabs)/wishlist' as any)}
+          >
+            <View style={s.newBadge}>
+              <Text style={s.newBadgeTxt}>NEW</Text>
+            </View>
+            <View style={[s.featureImgWrap, { backgroundColor: '#FFEEF0' }]}>
+              <Heart size={48} color="#E63946" strokeWidth={1.4} />
+            </View>
+            <Text style={s.featureLabel}>Избранное</Text>
           </Pressable>
         </View>
 
-        <View style={styles.divider} />
+        {/* ── Wide support card ──────────────────────────────────────────── */}
+        <Pressable style={({ pressed }) => [s.card, s.wideCard, pressed && { opacity: 0.88 }]} onPress={() => {}}>
+          <View style={s.wideIconWrap}>
+            <Send size={26} color="#229ED9" strokeWidth={1.6} />
+          </View>
+          <View style={s.wideTextWrap}>
+            <Text style={s.wideTitle}>Написать в поддержку</Text>
+            <Text style={s.wideSub}>Telegram — быстрый ответ</Text>
+          </View>
+          <ChevronRight size={18} color="#999" strokeWidth={2} />
+        </Pressable>
 
-        {/* Main menu */}
-        {mainItems.map((item, idx) => (
-          <MenuRow
-            key={item.key}
-            item={item}
-            last={idx === mainItems.length - 1}
-          />
-        ))}
+        {/* ── Menu group 1 ───────────────────────────────────────────────── */}
+        <View style={s.menuSection}>
+          {group1.map((item) => <MenuRow key={item.key} item={item} />)}
+        </View>
 
-        <View style={styles.sectionGap} />
+        {/* Divider */}
+        <View style={s.divider} />
 
-        {/* Danger menu */}
-        {dangerItems.map((item, idx) => (
-          <MenuRow
-            key={item.key}
-            item={item}
-            last={idx === dangerItems.length - 1}
-          />
-        ))}
+        {/* ── Menu group 2 ───────────────────────────────────────────────── */}
+        <View style={s.menuSection}>
+          {group2.map((item) => <MenuRow key={item.key} item={item} />)}
+        </View>
+
       </ScrollView>
     </View>
   );
 });
 
-const styles = StyleSheet.create({
-  root: {
-    flex: 1,
-    backgroundColor: COLORS.white,
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const CARD_SHADOW = {
+  shadowColor: '#000',
+  shadowOffset: { width: 0, height: 4 },
+  shadowOpacity: 0.12,
+  shadowRadius: 24,
+  elevation: 6,
+};
+
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#FFFFFF' },
+
+  // Top bar
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 24,
+    paddingTop: 16,
+    paddingBottom: 8,
+  },
+  pageTitle: { fontSize: 32, fontWeight: '500', color: '#000' },
+  topActions: { flexDirection: 'row', gap: 8 },
+  actionBtn: {
+    width: 40, height: 40, borderRadius: 20,
+    backgroundColor: '#F2F2F2',
+    alignItems: 'center', justifyContent: 'center',
   },
 
-  // User info
-  userRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    gap: 14,
-  },
-  avatar: {
-    width: 48,
-    height: 48,
+  // Card base
+  card: {
+    backgroundColor: '#FFFFFF',
     borderRadius: 24,
-    backgroundColor: COLORS.brandNavy,
+    ...CARD_SHADOW,
+  },
+
+  // Profile card
+  profileCard: {
     alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 8,
-    elevation: 4,
+    marginHorizontal: 24,
+    marginTop: 16,
+    paddingVertical: 40,
+    paddingHorizontal: 24,
+    gap: 16,
   },
-  avatarText: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.white,
+  avatarWrap: {
+    width: 110, height: 110, borderRadius: 55,
+    backgroundColor: '#232323',
+    alignItems: 'center', justifyContent: 'center',
   },
-  userInfo: {
+  avatarInitial: { fontSize: 48, fontWeight: '500', color: '#FFF' },
+  profileInfo:   { alignItems: 'center', gap: 4 },
+  profileName:   { fontSize: 28, fontWeight: '500', color: '#000', textAlign: 'center' },
+  profileSub:    { fontSize: 14, fontWeight: '400', color: '#666', textAlign: 'center' },
+
+  // Feature cards row
+  featureRow: {
+    flexDirection: 'row',
+    marginHorizontal: 24,
+    marginTop: 16,
+    gap: 16,
+  },
+  featureCard: {
     flex: 1,
-    gap: 3,
+    alignItems: 'center',
+    paddingTop: 24,
+    paddingBottom: 16,
+    paddingHorizontal: 8,
+    gap: 24,
   },
-  userName: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: COLORS.text1,
-    letterSpacing: 0.1,
+  featureImgWrap: {
+    width: 112, height: 112, borderRadius: 28,
+    alignItems: 'center', justifyContent: 'center',
   },
-  userPhone: {
-    fontSize: 13,
-    color: COLORS.text2,
-    fontWeight: '300',
-    letterSpacing: 0.1,
+  featureLabel: { fontSize: 16, fontWeight: '500', color: '#000', textAlign: 'center' },
+  newBadge: {
+    position: 'absolute', top: 10, right: 10,
+    paddingHorizontal: 8, paddingVertical: 2,
+    borderRadius: 8,
+    // navy gradient approximated as solid
+    backgroundColor: '#354668',
   },
-  tgRow: {
+  newBadgeTxt: { fontSize: 8, fontWeight: '500', color: '#FFF' },
+
+  // Wide card
+  wideCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    marginTop: 1,
+    marginHorizontal: 24,
+    marginTop: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    gap: 16,
   },
-  tgText: {
-    fontSize: 12,
-    color: '#229ED9',
-    fontWeight: '500',
+  wideIconWrap: {
+    width: 48, height: 48, borderRadius: 24,
+    backgroundColor: '#E8F6FD',
+    alignItems: 'center', justifyContent: 'center',
   },
-  editBtn: {
-    width: 36,
-    height: 36,
+  wideTextWrap: { flex: 1 },
+  wideTitle:    { fontSize: 16, fontWeight: '500', color: '#000' },
+  wideSub:      { fontSize: 12, fontWeight: '400', color: '#666', marginTop: 2 },
+
+  // Menu
+  menuSection: {
+    marginHorizontal: 24,
+    marginTop: 24,
+    gap: 16,
+  },
+  menuItem: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    height: 40,
+    gap: 16,
   },
+  menuIconWrap: {
+    width: 40, height: 40,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  menuLabel:       { flex: 1, fontSize: 16, fontWeight: '400', color: '#222' },
+  menuLabelDanger: { color: '#E63946' },
 
   divider: {
-    height: 0.5,
-    backgroundColor: 'rgba(0,0,0,0.15)',
-    marginHorizontal: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 2,
-  },
-
-  sectionGap: {
-    height: 8,
-    backgroundColor: COLORS.backgroundAlt,
+    height: 1,
+    backgroundColor: '#DDDDDD',
+    marginHorizontal: 24,
+    marginTop: 24,
   },
 
   // Empty state
   emptyBox: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 10,
-    paddingHorizontal: 32,
+    flex: 1, alignItems: 'center', justifyContent: 'center',
+    gap: 12, paddingHorizontal: 32,
   },
   emptyAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.muted,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
+    width: 100, height: 100, borderRadius: 50,
+    backgroundColor: '#F2F2F2',
+    alignItems: 'center', justifyContent: 'center',
   },
-  emptyName: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.text1,
-  },
-  emptySub: {
-    fontSize: 14,
-    color: COLORS.text2,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
+  emptyName:  { fontSize: 22, fontWeight: '600', color: '#000' },
+  emptySub:   { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 21 },
   loginBtn: {
-    marginTop: 8,
-    height: 48,
-    paddingHorizontal: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.brandNavy,
-    alignItems: 'center',
-    justifyContent: 'center',
+    marginTop: 8, height: 52, paddingHorizontal: 40,
+    borderRadius: 16, backgroundColor: '#232323',
+    alignItems: 'center', justifyContent: 'center',
   },
-  loginBtnText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '700',
-  },
+  loginBtnText: { fontSize: 16, fontWeight: '600', color: '#FFF' },
 });

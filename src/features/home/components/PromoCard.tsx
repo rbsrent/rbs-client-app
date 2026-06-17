@@ -1,30 +1,27 @@
 import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { MapPin, Ruler, Star, Users } from 'lucide-react-native';
-import {
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
+import { Star } from 'lucide-react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
+import { HeartButton } from '@/shared/components/HeartButton';
 import { Boat } from '@/store/useCatalogStore';
 
-export function PromoCard({ boat }: { boat: Boat }) {
-  const router = useRouter();
-  const dest = `/catalog/${boat.id}` as any;
+const CARD_W = (Dimensions.get('window').width - 16 * 2 - 12) / 2;
+const IMG_H  = Math.round(CARD_W * 1.05);
 
-  const hasRating = boat.rating !== null && boat.rating > 0;
+export function PromoCard({ boat }: { boat: Boat }) {
+  const router  = useRouter();
+  const hasRate = boat.rating !== null && boat.rating > 0;
+  const ruNum   = (n: number) => new Intl.NumberFormat('ru-RU').format(Math.round(n));
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && { opacity: 0.95 }]}
-      onPress={() => router.push(dest)}
+      style={({ pressed }) => [s.card, pressed && { opacity: 0.92 }]}
+      onPress={() => router.push(`/booking/${boat.id}` as any)}
     >
-      {/* Image */}
-      <View style={styles.imageWrap}>
+      {/* Image with its own radius */}
+      <View style={s.imgWrap}>
         {boat.cover_image_url ? (
           <Image
             source={{ uri: boat.cover_image_url }}
@@ -33,173 +30,79 @@ export function PromoCard({ boat }: { boat: Boat }) {
             cachePolicy="memory-disk"
           />
         ) : (
-          <LinearGradient
-            colors={[COLORS.brandNavy, COLORS.brandCyan]}
-            style={StyleSheet.absoluteFill}
-          />
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.muted }]} />
         )}
-        <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.22)']}
-          style={StyleSheet.absoluteFill}
-        />
-      </View>
-
-      {/* Body */}
-      <View style={styles.body}>
-        {/* Name + rating */}
-        <Text style={styles.name} numberOfLines={1}>{boat.name}</Text>
-        <View style={styles.ratingRow}>
-          <Star size={13} color={hasRating ? '#F5A623' : COLORS.text3} fill={hasRating ? '#F5A623' : 'none'} strokeWidth={1.8} />
-          {hasRating ? (
-            <Text style={styles.ratingText}>
-              {boat.rating!.toFixed(1)}
-              {boat.review_count > 0 ? ` · ${boat.review_count} отзыва` : ''}
-            </Text>
-          ) : (
-            <Text style={styles.ratingEmpty}>Пока нет отзывов</Text>
-          )}
-        </View>
-
-        {/* Specs row */}
-        <View style={styles.specsRow}>
-          {boat.length_meters ? (
-            <View style={styles.spec}>
-              <Ruler size={12} color={COLORS.text3} strokeWidth={1.8} />
-              <Text style={styles.specText}>{boat.length_meters} м</Text>
-            </View>
-          ) : null}
-          {boat.capacity ? (
-            <View style={styles.spec}>
-              <Users size={12} color={COLORS.text3} strokeWidth={1.8} />
-              <Text style={styles.specText}>{boat.capacity} чел.</Text>
-            </View>
-          ) : null}
-          {boat.type ? (
-            <Text style={styles.typeText}>Тип: {boat.type}</Text>
-          ) : null}
-        </View>
-
-        {/* Pier */}
-        {boat.pier_name ? (
-          <View style={styles.pierRow}>
-            <MapPin size={12} color={COLORS.text3} strokeWidth={1.8} />
-            <Text style={styles.pierText} numberOfLines={2}>{boat.pier_name}</Text>
+        {boat.type ? (
+          <View style={s.badge}>
+            <Text style={s.badgeTxt}>{boat.type}</Text>
           </View>
         ) : null}
+        <HeartButton boat={{
+          boat_id: boat.id,
+          name: boat.name,
+          type: boat.type,
+          cover_image_url: boat.cover_image_url,
+          price_per_hour: boat.price_per_hour,
+          capacity: boat.capacity,
+          length_meters: boat.length_meters,
+          pier_name: boat.pier_name,
+          rating: boat.rating,
+        }} />
+      </View>
 
-        {/* Footer: price + button */}
-        <View style={styles.footer}>
-          <Text style={styles.price}>
-            {new Intl.NumberFormat('ru-RU').format(boat.price_per_hour)} ₽/час
-          </Text>
-          <Pressable
-            style={({ pressed }) => [styles.bookBtn, pressed && { opacity: 0.85 }]}
-            onPress={() => router.push(dest)}
-            hitSlop={4}
-          >
-            <Text style={styles.bookBtnText}>Бронь</Text>
-          </Pressable>
+      {/* Text sits on page bg, no card container */}
+      <View style={s.info}>
+        <View style={s.nameRow}>
+          <Text style={s.name} numberOfLines={2}>{boat.name}</Text>
+          {hasRate ? (
+            <View style={s.ratingRow}>
+              <Star size={11} color="#F5A623" fill="#F5A623" strokeWidth={0} />
+              <Text style={s.ratingTxt}>{boat.rating!.toFixed(2)}</Text>
+            </View>
+          ) : null}
         </View>
+
+        <Text style={s.sub} numberOfLines={1}>
+          {[
+            boat.capacity ? `до ${boat.capacity} чел.` : null,
+            boat.length_meters ? `${boat.length_meters} м` : null,
+          ].filter(Boolean).join(' · ')}
+        </Text>
+
+        <Text style={s.price}>
+          <Text style={s.priceBold}>{ruNum(boat.price_per_hour)} ₽</Text>
+          <Text style={s.priceUnit}> / час</Text>
+        </Text>
       </View>
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.07,
-    shadowRadius: 10,
-    elevation: 3,
+    flex: 1,
   },
-  imageWrap: {
-    height: 180,
+  imgWrap: {
+    height: IMG_H,
+    borderRadius: 12,
     backgroundColor: COLORS.muted,
     overflow: 'hidden',
   },
-  body: {
-    padding: 14,
-    gap: 6,
+  badge: {
+    position: 'absolute', top: 8, left: 8,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 20,
+    paddingHorizontal: 9, paddingVertical: 4,
   },
-  name: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: COLORS.text1,
-    letterSpacing: 0.1,
-  },
-  ratingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-  },
-  ratingText: {
-    fontSize: 12,
-    color: COLORS.text2,
-    fontWeight: '500',
-  },
-  ratingEmpty: {
-    fontSize: 12,
-    color: COLORS.text3,
-  },
-  specsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  spec: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  specText: {
-    fontSize: 12,
-    color: COLORS.text2,
-  },
-  typeText: {
-    fontSize: 12,
-    color: COLORS.text2,
-  },
-  pierRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 4,
-  },
-  pierText: {
-    fontSize: 12,
-    color: COLORS.text3,
-    flex: 1,
-    lineHeight: 17,
-  },
-  footer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: 4,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-  },
-  price: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: COLORS.brandNavy,
-  },
-  bookBtn: {
-    backgroundColor: COLORS.brandNavy,
-    borderRadius: 10,
-    paddingHorizontal: 20,
-    paddingVertical: 9,
-  },
-  bookBtnText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '700',
-  },
+  badgeTxt: { fontSize: 10, fontWeight: '600', color: COLORS.text1 },
+
+  info:      { paddingTop: 8, gap: 2 },
+  nameRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  name:      { fontSize: 13, fontWeight: '700', color: COLORS.text1, flex: 1, marginRight: 6, lineHeight: 18 },
+  ratingRow: { flexDirection: 'row', alignItems: 'center', gap: 2, marginTop: 1 },
+  ratingTxt: { fontSize: 12, fontWeight: '600', color: COLORS.text1 },
+  sub:       { fontSize: 12, color: COLORS.text3, lineHeight: 17 },
+  price:     { marginTop: 1 },
+  priceBold: { fontSize: 12, fontWeight: '700', color: COLORS.text1 },
+  priceUnit: { fontSize: 12, color: COLORS.text3 },
 });

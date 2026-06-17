@@ -1,234 +1,294 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Anchor, Users, Ruler, MapPin, Star, Wifi, Wind } from 'lucide-react-native';
-import React, { useEffect, useState } from 'react';
+import { MapPin, Ruler, Users } from 'lucide-react-native';
+import React, { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Pressable,
+  KeyboardAvoidingView,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
-import { formatRub } from '@/shared/utils/currency';
+import { addToRecentlyViewed } from '@/shared/wishlist';
+
+import BoatBookingBar from '@/features/catalog/components/BoatBookingBar';
+import BoatImageSwiper from '@/features/catalog/components/BoatImageSwiper';
+import BoatReviews from '@/features/catalog/components/BoatReviews';
+import BoatSpecs from '@/features/catalog/components/BoatSpecs';
+import SimilarBoats from '@/features/catalog/components/SimilarBoats';
 
 export default function BoatDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
   const [boat, setBoat] = useState<any>(null);
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
+  const [similar, setSimilar] = useState<any[]>([]);
+  const [reviews, setReviews] = useState<any[]>([]);
+  const [reviewRating, setReviewRating] = useState({ avg: 0, total: 0 });
+
+  /* main data fetch */
   useEffect(() => {
-    const fetch = async () => {
+    let cancelled = false;
+    const load = async () => {
       setIsLoading(true);
       try {
         const { data } = await publicSupabase
           .from('boats')
-          .select(`*, boat_images(image_path, position), piers(name, address)`)
+          .select('*, boat_images(image_path, position), piers(name, address)')
           .eq('id', id)
           .single();
-        if (data) {
-          setBoat(data);
-          const sorted = (data.boat_images ?? []).sort((a: any, b: any) => a.position - b.position);
-          setImages(sorted.map((i: any) => `${SUPABASE_URL}/storage/v1/object/public/boat_images/${i.image_path}`));
-        }
+        if (cancelled || !data) return;
+        setBoat(data);
+        const sorted = [...(data.boat_images ?? [])].sort(
+          (a: any, b: any) => a.position - b.position,
+        );
+        const coverPath = sorted[0]?.image_path;
+        setImages(
+          sorted.map(
+            (img: any) =>
+              `${SUPABASE_URL}/storage/v1/object/public/boat_images/${img.image_path}`,
+          ),
+        );
+        addToRecentlyViewed({
+          boat_id: data.id,
+          name: data.name,
+          type: data.type ?? null,
+          cover_image_url: coverPath
+            ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${coverPath}`
+            : null,
+          price_per_hour: data.price_per_hour,
+          capacity: data.capacity ?? null,
+          length_meters: data.length_meters ?? null,
+          pier_name: data.piers?.name ?? null,
+          rating: null,
+        });
       } finally {
-        setIsLoading(false);
+        if (!cancelled) setIsLoading(false);
       }
     };
-    fetch();
+    load();
+    return () => { cancelled = true; };
   }, [id]);
 
-  if (isLoading) {
-    return (
-      <View style={[styles.loading, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={COLORS.brandCyan} size="large" />
-      </View>
-    );
-  }
+  /* secondary fetches — run once after boat loads */
+  useEffect(() => {
+    if (!boat) return;
+    let cancelled = false;
 
-  if (!boat) return null;
+    const fetchReviews = async () => {
+      const { data } = await publicSupabase
+        .from('boat_reviews')
+        .select('id, user_name, rating, comment, created_at')
+        .eq('boat_id', boat.id)
+        .eq('moderation_status', 'approved')
+        .order('created_at', { ascending: false })
+        .limit(20);
+      if (!cancelled && data) setReviews(data);
 
-  const amenities = [
-    { key: 'has_tarp', label: 'Тент', icon: Wind },
-    { key: 'has_heating', label: 'Отопление', icon: Wind },
-    { key: 'has_toilet', label: 'Туалет', icon: Wind },
-    { key: 'has_covered_saloon', label: 'Салон', icon: Wind },
-    { key: 'has_bluetooth', label: 'Bluetooth', icon: Wifi },
-  ].filter((a) => boat[a.key]);
+      const { data: rpc } = await publicSupabase.rpc('get_boat_average_rating', {
+        p_boat_id: boat.id,
+      });
+      if (!cancelled && rpc?.[0]) {
+        setReviewRating({
+          avg: rpc[0].average_rating ?? 0,
+          total: rpc[0].total_reviews ?? 0,
+        });
+      }
+    };
 
+    const fetchSimilar = async () => {
+      const price = boat.price_per_hour;
+      let { data } = await publicSupabase
+        .from('boats')
+        .select('id, name, price_per_hour, capacity, boat_images(image_path, position)')
+        .neq('id', boat.id)
+        .eq('is_hidden', false)
+        .eq('moderation_status', 'approved')
+        .gte('price_per_hour', Math.max(0, price - 5000))
+        .lte('price_per_hour', price + 5000)
+        .order('price_per_hour', { ascending: true })
+        .limit(10);
+
+      if (!data || data.length < 4) {
+        const { data: fallback } = await publicSupabase
+          .from('boats')
+          .select('id, name, price_per_hour, capacity, boat_images(image_path, position)')
+          .neq('id', boat.id)
+          .eq('is_hidden', false)
+          .eq('moderation_status', 'approved')
+          .order('created_at', { ascending: false })
+          .limit(10);
+        data = fallback;
+      }
+
+      if (!cancelled && data) {
+        const processed = data.map((b: any) => {
+          const imgs = [...(b.boat_images ?? [])].sort(
+            (a: any, b2: any) => a.position - b2.position,
+          );
+          const _cover = imgs[0]
+            ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${imgs[0].image_path}`
+            : null;
+          return { ...b, _cover };
+        });
+        setSimilar(processed);
+      }
+    };
+
+    fetchReviews();
+    fetchSimilar();
+    return () => { cancelled = true; };
+  }, [boat?.id]);
+
+  const handleSimilarPress = useCallback(
+    (boatId: string) => {
+      router.push(`/catalog/${boatId}` as any);
+    },
+    [router],
+  );
+
+  const handleReviewSubmitted = useCallback(() => {
+    // Review is pending moderation — no immediate list refresh needed
+  }, []);
+
+  /* ── render ── */
   return (
-    <View style={styles.container}>
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}>
-        <View style={styles.imageSection}>
-          {images[0] ? (
-            <Image source={{ uri: images[0] }} style={styles.mainImage} contentFit="cover" />
-          ) : (
-            <LinearGradient colors={[COLORS.brandNavy, COLORS.brandCyan]} style={styles.mainImage} />
-          )}
-          <LinearGradient colors={['rgba(0,0,0,0.4)', 'transparent', 'transparent', 'rgba(0,0,0,0.3)']} style={StyleSheet.absoluteFill} />
-          <Pressable
-            style={[styles.backBtn, { top: insets.top + 8 }]}
-            onPress={() => router.back()}
-            hitSlop={8}
-          >
-            <ArrowLeft size={22} color={COLORS.white} strokeWidth={2} />
-          </Pressable>
+    <View style={s.root}>
+      {isLoading ? (
+        <View style={[s.loading, { paddingTop: insets.top }]}>
+          <ActivityIndicator color={COLORS.brandCyan} size="large" />
         </View>
+      ) : boat ? (
+        <Animated.View entering={FadeIn.duration(250)} style={{ flex: 1 }}>
+          <KeyboardAvoidingView
+            style={{ flex: 1 }}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          >
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={{ paddingBottom: insets.bottom + 100 }}
+            >
+              {/* IMAGE SWIPER */}
+              <BoatImageSwiper
+                images={images}
+                boatName={boat.name}
+                onBack={() => router.back()}
+                boat={{
+                  boat_id: boat.id,
+                  name: boat.name,
+                  type: boat.type ?? null,
+                  cover_image_url: images[0] ?? null,
+                  price_per_hour: boat.price_per_hour,
+                  capacity: boat.capacity ?? null,
+                  length_meters: boat.length_meters ?? null,
+                  pier_name: boat.piers?.name ?? null,
+                  rating: null,
+                }}
+              />
 
-        <View style={styles.content}>
-          <View style={styles.headerRow}>
-            <View style={styles.typeBadge}>
-              <Text style={styles.typeText}>{boat.type}</Text>
-            </View>
-          </View>
-
-          <Text style={styles.name}>{boat.name}</Text>
-
-          <View style={styles.statsRow}>
-            <View style={styles.stat}>
-              <Users size={16} color={COLORS.brandCyan} strokeWidth={2} />
-              <Text style={styles.statText}>{boat.capacity} чел.</Text>
-            </View>
-            {boat.length_meters ? (
-              <View style={styles.stat}>
-                <Ruler size={16} color={COLORS.brandCyan} strokeWidth={2} />
-                <Text style={styles.statText}>{boat.length_meters} м</Text>
-              </View>
-            ) : null}
-            {boat.piers?.name ? (
-              <View style={styles.stat}>
-                <MapPin size={16} color={COLORS.brandCyan} strokeWidth={2} />
-                <Text style={styles.statText} numberOfLines={1}>{boat.piers.name}</Text>
-              </View>
-            ) : null}
-          </View>
-
-          {boat.description ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Описание</Text>
-              <Text style={styles.description}>{boat.description}</Text>
-            </View>
-          ) : null}
-
-          {amenities.length > 0 ? (
-            <View style={styles.section}>
-              <Text style={styles.sectionTitle}>Удобства</Text>
-              <View style={styles.amenitiesGrid}>
-                {amenities.map((a) => (
-                  <View key={a.key} style={styles.amenityItem}>
-                    <Text style={styles.amenityText}>{a.label}</Text>
+              {/* MAIN CONTENT */}
+              <View style={s.content}>
+                {boat.type ? (
+                  <View style={s.typeBadge}>
+                    <Text style={s.typeText}>{boat.type}</Text>
                   </View>
-                ))}
+                ) : null}
+
+                <Text style={s.name}>{boat.name}</Text>
+
+                {/* quick stats */}
+                <View style={s.statsRow}>
+                  {boat.capacity ? (
+                    <View style={s.stat}>
+                      <Users size={15} color={COLORS.brandCyan} strokeWidth={2} />
+                      <Text style={s.statText}>{boat.capacity} чел.</Text>
+                    </View>
+                  ) : null}
+                  {boat.length_meters ? (
+                    <View style={s.stat}>
+                      <Ruler size={15} color={COLORS.brandCyan} strokeWidth={2} />
+                      <Text style={s.statText}>{boat.length_meters} м</Text>
+                    </View>
+                  ) : null}
+                  {boat.piers?.name ? (
+                    <View style={s.stat}>
+                      <MapPin size={15} color={COLORS.brandCyan} strokeWidth={2} />
+                      <Text style={s.statText} numberOfLines={1}>{boat.piers.name}</Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* Описание */}
+                {boat.description ? (
+                  <View style={s.section}>
+                    <Text style={s.sectionTitle}>Описание</Text>
+                    <Text style={s.description}>{boat.description}</Text>
+                  </View>
+                ) : null}
+
+                {/* Характеристики */}
+                <BoatSpecs boat={boat} />
               </View>
-            </View>
-          ) : null}
 
-          <View style={styles.priceSection}>
-            <View>
-              <Text style={styles.priceLabel}>Стоимость аренды</Text>
-              <Text style={styles.price}>{formatRub(boat.price_per_hour)}/час</Text>
-              {boat.public_price_per_hour_night ? (
-                <Text style={styles.priceNight}>Ночью: {formatRub(boat.public_price_per_hour_night)}/час</Text>
-              ) : null}
-            </View>
-          </View>
-        </View>
-      </ScrollView>
+              {/* ПОХОЖИЕ КАТЕРА */}
+              <SimilarBoats boats={similar} onPress={handleSimilarPress} />
 
-      <View style={[styles.bookingBar, { paddingBottom: insets.bottom + 8 }]}>
-        <View>
-          <Text style={styles.bookingPrice}>{formatRub(boat.price_per_hour)}</Text>
-          <Text style={styles.bookingUnit}>за час</Text>
-        </View>
-        <Pressable
-          style={styles.bookBtn}
-          onPress={() => router.push(`/booking/${boat.id}` as any)}
-        >
-          <LinearGradient
-            colors={[COLORS.brandCyan, COLORS.brandViolet]}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 0 }}
-            style={styles.bookBtnGrad}
-          >
-            <Text style={styles.bookBtnText}>Забронировать</Text>
-          </LinearGradient>
-        </Pressable>
-      </View>
+              {/* ОТЗЫВЫ */}
+              <View style={s.content}>
+                <BoatReviews
+                  boatId={id as string}
+                  averageRating={reviewRating.avg}
+                  totalReviews={reviewRating.total}
+                  reviews={reviews}
+                  onReviewSubmitted={handleReviewSubmitted}
+                />
+              </View>
+            </ScrollView>
+          </KeyboardAvoidingView>
+
+          {/* BOOKING BAR */}
+          <BoatBookingBar
+            pricePerHour={boat.price_per_hour}
+            priceNight={boat.public_price_per_hour_night}
+            onBook={() => router.push(`/booking/${boat.id}` as any)}
+            paddingBottom={insets.bottom + 8}
+          />
+        </Animated.View>
+      ) : null}
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white },
-  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white },
-  imageSection: { height: 280, position: 'relative' },
-  mainImage: { width: '100%', height: 280 },
-  backBtn: {
-    position: 'absolute',
-    left: 16,
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: COLORS.white },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+
   content: { padding: 20, gap: 16 },
-  headerRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   typeBadge: {
-    backgroundColor: COLORS.brandCyan + '20',
+    alignSelf: 'flex-start',
+    backgroundColor: COLORS.brandCyan + '1A',
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   typeText: { fontSize: 12, color: COLORS.brandCyan, fontWeight: '600' },
-  name: { fontSize: 24, fontWeight: '800', color: COLORS.text1 },
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 16 },
+  name: { fontSize: 24, fontWeight: '800', color: COLORS.text1, lineHeight: 30 },
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 14 },
   stat: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   statText: { fontSize: 14, color: COLORS.text2 },
-  section: { gap: 10 },
-  sectionTitle: { fontSize: 16, fontWeight: '700', color: COLORS.text1 },
-  description: { fontSize: 14, color: COLORS.text2, lineHeight: 20 },
-  amenitiesGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  amenityItem: {
-    backgroundColor: COLORS.backgroundAlt,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  amenityText: { fontSize: 13, color: COLORS.text2 },
-  priceSection: { backgroundColor: COLORS.backgroundAlt, borderRadius: 14, padding: 16 },
-  priceLabel: { fontSize: 12, color: COLORS.text3, marginBottom: 4 },
-  price: { fontSize: 22, fontWeight: '800', color: COLORS.brandNavy },
-  priceNight: { fontSize: 12, color: COLORS.text2, marginTop: 2 },
-  bookingBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 12,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  bookingPrice: { fontSize: 20, fontWeight: '800', color: COLORS.brandNavy },
-  bookingUnit: { fontSize: 12, color: COLORS.text3 },
-  bookBtn: { flex: 1, marginLeft: 16, borderRadius: 14, overflow: 'hidden' },
-  bookBtnGrad: { paddingVertical: 14, alignItems: 'center' },
-  bookBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
+
+  section: { gap: 12 },
+  sectionTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text1 },
+  description: { fontSize: 14, color: COLORS.text2, lineHeight: 21 },
 });

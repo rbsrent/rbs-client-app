@@ -1,14 +1,16 @@
 {
   "expo": {
-    "name": "rbs-client-app",
+    "name": "Аренда яхт",
     "slug": "rbs-client-app",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "rbsclientapp",
+    "scheme": "rbsrent",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "bundleIdentifier": "com.rbsrent.app",
+      "buildNumber": "2"
     },
     "android": {
       "adaptiveIcon": {
@@ -17,7 +19,14 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "package": "com.rbsrent.app",
+      "versionCode": 2,
+      "minSdkVersion": 26,
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
     },
     "web": {
       "output": "static",
@@ -25,6 +34,13 @@
     },
     "plugins": [
       "expo-router",
+      "./plugins/withYamapFix",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Приложение использует геолокацию для отображения вашего положения на карте причалов."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -34,7 +50,8 @@
             "imageWidth": 76
           }
         }
-      ]
+      ],
+      "expo-sqlite"
     ],
     "experiments": {
       "typedRoutes": true,

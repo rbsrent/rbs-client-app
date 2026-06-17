@@ -5,6 +5,8 @@ export const COLORS = {
   brandMagenta: '#E260C0',
   brandBlue: '#2086D9',
 
+  grey: '#8E8E8E',
+
   gradientStart: '#2BC4E5',
   gradientMid: '#7B5CE6',
   gradientEnd: '#E260C0',

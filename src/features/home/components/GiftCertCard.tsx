@@ -1,9 +1,10 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { ChevronRight, Gift } from 'lucide-react-native';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export function GiftCertCard() {
+export const GiftCertCard = memo(function GiftCertCard() {
   const router = useRouter();
   return (
     <Pressable
@@ -32,7 +33,7 @@ export function GiftCertCard() {
       </LinearGradient>
     </Pressable>
   );
-}
+});
 
 const styles = StyleSheet.create({
   wrap: {

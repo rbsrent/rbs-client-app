@@ -48,7 +48,7 @@ export function TabItem({
       <Animated.View style={[styles.tabInner, animStyle]}>
         <tab.Icon
           size={22}
-          color={active ? COLORS.brandNavy : COLORS.text3}
+          color={active ? COLORS.brandNavy : COLORS.text2}
           strokeWidth={active ? 2.2 : 1.7}
         />
         <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>

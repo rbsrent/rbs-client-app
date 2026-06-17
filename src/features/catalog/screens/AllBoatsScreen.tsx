@@ -9,6 +9,7 @@ import {
   SlidersHorizontal,
   X,
 } from 'lucide-react-native';
+import { useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -222,19 +223,26 @@ const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.Com
 
 export function AllBoatsScreen() {
   const insets    = useSafeAreaInsets();
+  const params    = useLocalSearchParams<{ type?: string }>();
   const filterRef = useRef<BottomSheetModal>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const scrollY   = useRef(new Animated.Value(0)).current;
   // ref for native pointer-events toggle — no React re-render needed
   const overlayRef = useRef<View>(null);
 
+  const initialFilters = useMemo<Filters>(() => {
+    const chip = TYPE_CHIPS.find((c) => c.id === params.type);
+    if (!chip || chip.id === 'all') return DEFAULT;
+    return { ...DEFAULT, typeId: chip.id };
+  }, []);
+
   const [allBoats, setAll]      = useState<Boat[]>([]);
   const [total, setTotal]       = useState(0);
   const [loading, setLoading]   = useState(true);
   const [refreshing, setRef]    = useState(false);
   const [viewMode, setView]     = useState<'list' | 'map'>('list');
-  const [filters, setFilters]   = useState<Filters>(DEFAULT);
-  const [draft, setDraft]       = useState<Filters>(DEFAULT);
+  const [filters, setFilters]   = useState<Filters>(initialFilters);
+  const [draft, setDraft]       = useState<Filters>(initialFilters);
   const [searchText, setSearch] = useState('');
   const fetched = useRef(false);
 
@@ -361,7 +369,9 @@ export function AllBoatsScreen() {
         <AnimatedFlatList
           data={filtered}
           keyExtractor={(b: Boat) => b.id}
+          numColumns={2}
           renderItem={({ item }: { item: Boat }) => <PromoCard boat={item} />}
+          columnWrapperStyle={s.row}
           contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
@@ -771,6 +781,7 @@ const s = StyleSheet.create({
 
   loader:      { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list:        { gap: 12, paddingHorizontal: 16 },
+  row:         { gap: 12 },
   empty:       { paddingTop: 80, alignItems: 'center', gap: 12 },
   emptyTxt:    { fontSize: 15, color: COLORS.text3 },
   emptyBtn:    { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: COLORS.brandNavy },

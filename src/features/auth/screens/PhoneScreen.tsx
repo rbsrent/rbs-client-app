@@ -1,7 +1,9 @@
-import { ArrowLeft, Phone } from 'lucide-react-native';
+import { ArrowLeft } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   StyleSheet,
   Text,
@@ -10,8 +12,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PhoneInput } from '@/shared/components/PhoneInput';
 import { COLORS } from '@/shared/colors';
-import { isValidRuPhone, normalizePhone } from '@/shared/utils/phone';
+import { digitsToE164, isValidDigits, normalizePhone } from '@/shared/utils/phone';
 
 import { useAuth } from '../hooks/useAuth';
 
@@ -23,29 +26,22 @@ interface Props {
 export function PhoneScreen({ onBack, onCodeSent }: Props) {
   const insets = useSafeAreaInsets();
   const { sendCode, isLoading, error } = useAuth();
-  const [phone, setPhone] = useState('');
+  const [digits, setDigits] = useState('');
   const [channel, setChannel] = useState<'sms' | 'max'>('sms');
   const inputRef = useRef<TextInput>(null);
 
   const handleSend = async () => {
-    if (!isValidRuPhone(phone)) return;
-    const normalized = normalizePhone(phone).replace(/^8/, '7');
-    const res = await sendCode(phone, channel);
-    if (res.success) onCodeSent(normalized);
-  };
-
-  const formatPhone = (raw: string) => {
-    const digits = raw.replace(/\D/g, '').slice(0, 11);
-    if (digits.length === 0) return '';
-    if (digits.length <= 1) return '+7';
-    if (digits.length <= 4) return `+7 (${digits.slice(1)}`;
-    if (digits.length <= 7) return `+7 (${digits.slice(1, 4)}) ${digits.slice(4)}`;
-    if (digits.length <= 9) return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7)}`;
-    return `+7 (${digits.slice(1, 4)}) ${digits.slice(4, 7)}-${digits.slice(7, 9)}-${digits.slice(9, 11)}`;
+    if (!isValidDigits(digits)) return;
+    const e164 = digitsToE164(digits);
+    const res = await sendCode(e164, channel);
+    if (res.success) onCodeSent(normalizePhone(e164).replace(/^8/, '7'));
   };
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top }]}>
+    <KeyboardAvoidingView
+      style={[styles.root, { paddingTop: insets.top }]}
+      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+    >
       <View style={styles.header}>
         <Pressable onPress={onBack} hitSlop={10} style={styles.backBtn}>
           <ArrowLeft size={22} color={COLORS.brandNavy} strokeWidth={2} />
@@ -73,18 +69,13 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
         </View>
 
         <Pressable style={styles.inputWrap} onPress={() => inputRef.current?.focus()}>
-          <Phone size={18} color={COLORS.text3} strokeWidth={1.8} />
-          <TextInput
+          <PhoneInput
             ref={inputRef}
+            digits={digits}
+            onChangeDigits={setDigits}
             style={styles.input}
-            value={formatPhone(phone)}
-            onChangeText={(t) => setPhone(t.replace(/\D/g, ''))}
-            placeholder="+7 (___) ___-__-__"
-            placeholderTextColor={COLORS.text3}
-            keyboardType="phone-pad"
             returnKeyType="done"
             onSubmitEditing={handleSend}
-            maxLength={18}
           />
         </Pressable>
 
@@ -93,10 +84,10 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
         <Pressable
           style={[
             styles.sendBtn,
-            (!isValidRuPhone(phone) || isLoading) && styles.sendBtnDisabled,
+            (!isValidDigits(digits) || isLoading) && styles.sendBtnDisabled,
           ]}
           onPress={handleSend}
-          disabled={!isValidRuPhone(phone) || isLoading}
+          disabled={!isValidDigits(digits) || isLoading}
         >
           {isLoading ? (
             <ActivityIndicator color={COLORS.white} />
@@ -110,7 +101,7 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
           <Text style={styles.termsLink}>условиями использования</Text>
         </Text>
       </View>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 

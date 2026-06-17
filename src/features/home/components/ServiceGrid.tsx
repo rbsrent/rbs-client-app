@@ -1,34 +1,25 @@
+import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { useRouter } from 'expo-router';
 import {
   Anchor,
   Gift,
+  Grid2x2,
   Map,
+  MapPin,
   MoreHorizontal,
   Sailboat,
   Ship,
-  User,
-  Zap,
 } from 'lucide-react-native';
-import React from 'react';
-import {
-  Dimensions,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import Animated, {
-  useAnimatedStyle,
-  useSharedValue,
-  withSpring,
-} from 'react-native-reanimated';
+import React, { memo, useCallback, useMemo, useRef } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
+import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 
-const { width: W } = Dimensions.get('window');
-const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+// ─── Types ────────────────────────────────────────────────────────────────────
 
-interface ServiceItem {
+interface Service {
   key: string;
   label: string;
   icon: React.ReactNode;
@@ -37,20 +28,27 @@ interface ServiceItem {
   badge?: string;
 }
 
-const SERVICES: ServiceItem[] = [
+interface ServiceGroup {
+  title: string;
+  items: Service[];
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
+
+const ALL: Service[] = [
   {
     key: 'boat',
     label: 'Катер',
     icon: <Anchor size={22} color="#1A5C72" strokeWidth={2} />,
     bg: '#D0F2FB',
-    route: '/services/boat',
+    route: '/boats?type=boat',
   },
   {
     key: 'yacht',
     label: 'Яхта',
     icon: <Sailboat size={22} color="#4B2CA0" strokeWidth={2} />,
     bg: '#E8E3FF',
-    route: '/services/yacht',
+    route: '/boats?type=yacht',
     badge: 'Хит',
   },
   {
@@ -58,15 +56,14 @@ const SERVICES: ServiceItem[] = [
     label: 'Теплоход',
     icon: <Ship size={22} color="#8B1A60" strokeWidth={2} />,
     bg: '#FAE3F5',
-    route: '/services/cruise',
-    badge: 'Скоро',
+    route: '/cruises',
   },
   {
     key: 'routes',
     label: 'Маршруты',
     icon: <Map size={22} color="#155A38" strokeWidth={2} />,
     bg: '#D4F5E7',
-    route: '/(tabs)/routes',
+    route: '/routes',
   },
   {
     key: 'cert',
@@ -76,104 +73,179 @@ const SERVICES: ServiceItem[] = [
     route: '/certificates',
   },
   {
-    key: 'promo',
-    label: 'Акции',
-    icon: <Zap size={22} color="#7A4500" strokeWidth={2} />,
-    bg: '#FFF0D6',
-    route: '/services/boat',
+    key: 'piers',
+    label: 'Причалы',
+    icon: <MapPin size={22} color="#7A3500" strokeWidth={2} />,
+    bg: '#FFE8D6',
+    route: '/(tabs)/piers',
   },
   {
-    key: 'profile',
-    label: 'Профиль',
-    icon: <User size={22} color="#1A4A6B" strokeWidth={2} />,
-    bg: '#DAEEFA',
-    route: '/profile',
-  },
-  {
-    key: 'more',
-    label: 'Брони',
-    icon: <MoreHorizontal size={22} color="#4A4A4A" strokeWidth={2} />,
-    bg: '#EDEDED',
-    route: '/(tabs)/bookings',
+    key: 'catalog',
+    label: 'Каталог',
+    icon: <Grid2x2 size={22} color="#1B2A41" strokeWidth={2} />,
+    bg: '#DDE3EC',
+    route: '/boats',
   },
 ];
 
-function ServiceGridItem({ item }: { item: ServiceItem }) {
-  const router = useRouter();
+// 4 per row × 2 rows = 8 slots; last slot = "Ещё"
+const HOME_ITEMS = ALL.slice(0, 7);
+
+const GROUPS: ServiceGroup[] = [
+  {
+    title: 'Аренда судов',
+    items: ALL.filter((s) => ['boat', 'yacht'].includes(s.key)),
+  },
+  {
+    title: 'Круизы и прогулки',
+    items: ALL.filter((s) => ['ship', 'routes'].includes(s.key)),
+  },
+  {
+    title: 'Карта и причалы',
+    items: ALL.filter((s) => ['piers', 'catalog'].includes(s.key)),
+  },
+  {
+    title: 'Подарки',
+    items: ALL.filter((s) => s.key === 'cert'),
+  },
+];
+
+// ─── ServiceItem ──────────────────────────────────────────────────────────────
+
+const AnimPressable = Animated.createAnimatedComponent(Pressable);
+
+function ServiceItem({
+  item,
+  iconSize = 62,
+  onPress,
+}: {
+  item: Service;
+  iconSize?: number;
+  onPress: (route: string) => void;
+}) {
   const scale = useSharedValue(1);
-  const animStyle = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  const anim  = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
   return (
-    <AnimatedPressable
-      style={[styles.serviceItem, animStyle]}
-      onPressIn={() => { scale.value = withSpring(0.92, { damping: 18 }); }}
-      onPressOut={() => { scale.value = withSpring(1, { damping: 18 }); }}
-      onPress={() => router.push(item.route as any)}
+    <AnimPressable
+      style={[s.item, anim]}
+      onPressIn={() => { scale.value = withSpring(0.91, { damping: 14 }); }}
+      onPressOut={() => { scale.value = withSpring(1,    { damping: 14 }); }}
+      onPress={() => onPress(item.route)}
     >
-      <View style={[styles.serviceIconBox, { backgroundColor: item.bg }]}>
+      <View style={[s.iconBox, { width: iconSize, height: iconSize, borderRadius: iconSize * 0.26, backgroundColor: item.bg }]}>
         {item.icon}
         {item.badge ? (
-          <View style={styles.serviceBadge}>
-            <Text style={styles.serviceBadgeText}>{item.badge}</Text>
-          </View>
+          <View style={s.badge}><Text style={s.badgeTxt}>{item.badge}</Text></View>
         ) : null}
       </View>
-      <Text style={styles.serviceLabel} numberOfLines={1}>{item.label}</Text>
-    </AnimatedPressable>
+      <Text style={s.label} numberOfLines={2}>{item.label}</Text>
+    </AnimPressable>
   );
 }
 
-export function ServiceGrid() {
+// ─── ServiceGrid ──────────────────────────────────────────────────────────────
+
+export const ServiceGrid = memo(function ServiceGrid() {
+  const router   = useRouter();
+  const sheetRef = useRef<BottomSheetModal>(null);
+  const snaps    = useMemo(() => ['80%'], []);
+
+  const navigate = useCallback((route: string) => {
+    sheetRef.current?.dismiss();
+    router.push(route as any);
+  }, [router]);
+
   return (
-    <View style={styles.serviceGrid}>
-      <View style={styles.serviceRow}>
-        {SERVICES.slice(0, 4).map((s) => <ServiceGridItem key={s.key} item={s} />)}
-      </View>
-      <View style={styles.serviceRow}>
-        {SERVICES.slice(4, 8).map((s) => <ServiceGridItem key={s.key} item={s} />)}
-      </View>
-    </View>
-  );
-}
+    <>
+      <View style={s.grid}>
+        {HOME_ITEMS.map((item) => (
+          <ServiceItem key={item.key} item={item} onPress={navigate} />
+        ))}
 
-const styles = StyleSheet.create({
-  serviceGrid: {
-    gap: 14,
-  },
-  serviceRow: {
+        {/* Ещё */}
+        <Pressable style={s.item} onPress={() => sheetRef.current?.present()}>
+          <View style={[s.iconBox, s.moreBox, { width: 60, height: 60, borderRadius: 17 }]}>
+            <MoreHorizontal size={24} color={COLORS.text2} strokeWidth={2} />
+          </View>
+          <Text style={s.label}>Ещё</Text>
+        </Pressable>
+      </View>
+
+      {/* ── All services sheet ── */}
+      <BottomSheetModal
+        ref={sheetRef}
+        snapPoints={snaps}
+        enablePanDownToClose
+        backdropComponent={SheetBackdrop}
+        backgroundStyle={s.sheetBg}
+        handleComponent={() => (
+          <View style={s.handleWrap}>
+            <View style={s.handle} />
+          </View>
+        )}
+      >
+        <BottomSheetScrollView
+          contentContainerStyle={s.sheetContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <Text style={s.sheetTitle}>Все услуги</Text>
+          {GROUPS.map((group) => (
+            <View key={group.title} style={s.group}>
+              <Text style={s.groupTitle}>{group.title}</Text>
+              <View style={s.groupGrid}>
+                {group.items.map((item) => (
+                  <ServiceItem key={item.key} item={item} iconSize={52} onPress={navigate} />
+                ))}
+              </View>
+            </View>
+          ))}
+        </BottomSheetScrollView>
+      </BottomSheetModal>
+    </>
+  );
+});
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
+const s = StyleSheet.create({
+  grid: {
     flexDirection: 'row',
-    gap: 8,
+    flexWrap: 'wrap',
+    rowGap: 16,
   },
-  serviceItem: {
-    flex: 1,
+  item: {
+    width: '25%',
     alignItems: 'center',
     gap: 6,
+    paddingHorizontal: 2,
   },
-  serviceIconBox: {
-    width: 62,
-    height: 62,
-    borderRadius: 16,
+  iconBox: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  serviceBadge: {
-    position: 'absolute',
-    top: -4,
-    right: -4,
-    backgroundColor: '#FF4500',
-    borderRadius: 5,
-    paddingHorizontal: 4,
-    paddingVertical: 1,
+  moreBox: {
+    backgroundColor: COLORS.muted,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
-  serviceBadgeText: {
-    color: COLORS.white,
-    fontSize: 8,
-    fontWeight: '800',
+  badge: {
+    position: 'absolute', top: -4, right: -4,
+    backgroundColor: COLORS.warning,
+    borderRadius: 6, paddingHorizontal: 5, paddingVertical: 1,
   },
-  serviceLabel: {
-    fontSize: 11,
-    color: '#4A4A4A',
-    fontWeight: '400',
-    textAlign: 'center',
+  badgeTxt: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  label: {
+    fontSize: 11, color: COLORS.text1,
+    fontWeight: '500', textAlign: 'center', lineHeight: 15,
   },
+
+  sheetBg:      { backgroundColor: COLORS.white, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
+  handleWrap:   { alignItems: 'center', paddingTop: 10, paddingBottom: 2 },
+  handle:       { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },
+  sheetContent: { paddingHorizontal: 20, paddingBottom: 48 },
+  sheetTitle:   { fontSize: 20, fontWeight: '800', color: COLORS.text1, marginBottom: 20, marginTop: 6 },
+  group:        { marginBottom: 24 },
+  groupTitle:   { fontSize: 13, fontWeight: '700', color: COLORS.text2, marginBottom: 14 },
+  groupGrid:    { flexDirection: 'row', flexWrap: 'wrap', rowGap: 16 },
 });

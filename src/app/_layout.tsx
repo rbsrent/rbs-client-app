@@ -6,6 +6,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PersistGate } from 'redux-persist/integration/react';
 
 import { authSupabase } from '@/shared/supabase/authClient';
+import { WishlistPickerProvider } from '@/shared/components/WishlistPickerContext';
 import { offlineReduxStore, persistor } from '@/store/offlineStore';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -53,22 +54,25 @@ export default function RootLayout() {
       <Provider store={offlineReduxStore}>
         <PersistGate loading={null} persistor={persistor}>
           <BottomSheetModalProvider>
+            <WishlistPickerProvider>
             <AuthListener />
             <AuthRedirect />
             <Stack screenOptions={{ headerShown: false }}>
-              <Stack.Screen name="onboarding" options={{ animation: 'fade' }} />
-              <Stack.Screen name="(tabs)" />
-              <Stack.Screen name="auth" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
+              <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
+              <Stack.Screen name="auth" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
               <Stack.Screen name="catalog/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="booking/[boatId]" options={{ presentation: 'card' }} />
               <Stack.Screen name="bookings/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="profile/settings" options={{ presentation: 'card' }} />
               <Stack.Screen name="certificates" options={{ presentation: 'card' }} />
               <Stack.Screen name="boats/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="routes/[slug]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/boat" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/yacht" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/cruise" options={{ presentation: 'card', animation: 'slide_from_right' }} />
             </Stack>
+            </WishlistPickerProvider>
           </BottomSheetModalProvider>
         </PersistGate>
       </Provider>
