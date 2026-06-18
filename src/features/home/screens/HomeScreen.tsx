@@ -26,7 +26,9 @@ export const HomeScreen = memo(function HomeScreen() {
   const insets  = useSafeAreaInsets();
   const router  = useRouter();
   const { popular, katera, yakhty, routes, slides, loading } = useHomePageData();
-  const setLoading = useHomeStore((s) => s.setLoading);
+  const setLoading  = useHomeStore((s) => s.setLoading);
+  const lastFetch   = useHomeStore((s) => s.lastFetch);
+  const isFirstLoad = loading && lastFetch === null;
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -107,11 +109,11 @@ export const HomeScreen = memo(function HomeScreen() {
         </View>
 
         {/* Куда отправиться */}
-        <RoutesPreviewSection routes={routes} />
+        <RoutesPreviewSection routes={routes} loading={isFirstLoad} />
 
         {/* Популярные суда */}
         <View style={s.popularSection}>
-          <PopularBoatsSection popular={popular} katera={katera} yakhty={yakhty} />
+          <PopularBoatsSection popular={popular} katera={katera} yakhty={yakhty} loading={isFirstLoad} />
         </View>
       </ScrollView>
     </View>

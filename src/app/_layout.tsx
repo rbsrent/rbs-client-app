@@ -61,7 +61,7 @@ export default function RootLayout() {
               <Stack.Screen name="onboarding" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
               <Stack.Screen name="auth" options={{ presentation: 'fullScreenModal', gestureEnabled: false }} />
-              <Stack.Screen name="catalog/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="catalog" options={{ animation: 'slide_from_bottom', headerShown: false }} />
               <Stack.Screen name="booking/[boatId]" options={{ presentation: 'card' }} />
               <Stack.Screen name="bookings/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="profile/settings" options={{ presentation: 'card' }} />

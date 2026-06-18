@@ -1,6 +1,6 @@
 import { ArrowRight } from 'lucide-react-native';
-import { memo, useCallback } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { memo, useCallback, useEffect, useRef } from 'react';
+import { Animated, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useRouter } from 'expo-router';
 
 import { COLORS } from '@/shared/colors';
@@ -8,14 +8,51 @@ import { HomeBoat } from '@/store/useHomeStore';
 import { CARD_W, PopularBoatCard } from '../cards/PopularBoatCard';
 import { PopularSeeAllCard } from '../cards/PopularSeeAllCard';
 
+function SkeletonCard() {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 750, useNativeDriver: true }),
+      ]),
+    ).start();
+  }, []);
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
+  return (
+    <View style={sk.card}>
+      <Animated.View style={[sk.img, { opacity }]} />
+      <Animated.View style={[sk.line1, { opacity }]} />
+      <Animated.View style={[sk.line2, { opacity }]} />
+    </View>
+  );
+}
+
+const SkeletonRow = memo(function SkeletonRow() {
+  return (
+    <View style={s.rowRoot}>
+      <View style={s.header}>
+        <View style={{ gap: 6 }}>
+          <View style={sk.titleBar} />
+          <View style={sk.subBar} />
+        </View>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.scrollContent} scrollEnabled={false}>
+        {[0, 1, 2].map((i) => <SkeletonCard key={i} />)}
+      </ScrollView>
+    </View>
+  );
+});
+
 interface RowProps {
   title:     string;
   subtitle:  string;
   typeRoute: string;
   boats:     HomeBoat[];
+  badge?:    string;
 }
 
-const PopularRow = memo(function PopularRow({ title, subtitle, typeRoute, boats }: RowProps) {
+const PopularRow = memo(function PopularRow({ title, subtitle, typeRoute, boats, badge }: RowProps) {
   const router   = useRouter();
   const previews = boats.slice(0, 3).map((b) => b.cover_image_url).filter(Boolean) as string[];
 
@@ -47,7 +84,7 @@ const PopularRow = memo(function PopularRow({ title, subtitle, typeRoute, boats 
         removeClippedSubviews
       >
         {boats.map((b) => (
-          <PopularBoatCard key={b.boat_id} boat={b} />
+          <PopularBoatCard key={b.boat_id} boat={b} badge={badge} />
         ))}
         <PopularSeeAllCard
           previews={previews}
@@ -59,12 +96,22 @@ const PopularRow = memo(function PopularRow({ title, subtitle, typeRoute, boats 
 });
 
 interface Props {
-  popular: HomeBoat[];
-  katera:  HomeBoat[];
-  yakhty:  HomeBoat[];
+  popular:  HomeBoat[];
+  katera:   HomeBoat[];
+  yakhty:   HomeBoat[];
+  loading?: boolean;
 }
 
-export const PopularBoatsSection = memo(function PopularBoatsSection({ popular, katera, yakhty }: Props) {
+export const PopularBoatsSection = memo(function PopularBoatsSection({ popular, katera, yakhty, loading }: Props) {
+  if (loading && popular.length === 0 && katera.length === 0 && yakhty.length === 0) {
+    return (
+      <View>
+        <SkeletonRow />
+        <SkeletonRow />
+        <SkeletonRow />
+      </View>
+    );
+  }
   return (
     <View>
       <PopularRow
@@ -72,18 +119,21 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({ popular, 
         subtitle="На основе бронирований за 30 дней"
         typeRoute="/boats"
         boats={popular}
+        badge="Топ выбор"
       />
       <PopularRow
         title="Катера"
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=boat"
         boats={katera}
+        badge="Катер"
       />
       <PopularRow
         title="Яхты"
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=yacht"
         boats={yakhty}
+        badge="Яхта"
       />
     </View>
   );
@@ -104,4 +154,14 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
   scrollContent: { paddingHorizontal: 16, gap: 12, paddingRight: 32 },
+});
+
+const SKEL = '#E8E8E8';
+const sk = StyleSheet.create({
+  card:     { width: 148, gap: 0 },
+  img:      { width: 148, height: 110, borderRadius: 12, backgroundColor: SKEL },
+  line1:    { width: 100, height: 12, borderRadius: 5, backgroundColor: SKEL, marginTop: 8 },
+  line2:    { width: 70,  height: 10, borderRadius: 5, backgroundColor: SKEL, marginTop: 5 },
+  titleBar: { width: 150, height: 14, borderRadius: 5, backgroundColor: SKEL },
+  subBar:   { width: 100, height: 10, borderRadius: 5, backgroundColor: SKEL },
 });

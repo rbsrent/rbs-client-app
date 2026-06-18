@@ -1,6 +1,6 @@
 import { useRouter } from 'expo-router';
-import { memo, useRef } from 'react';
-import { Animated, StyleSheet, View } from 'react-native';
+import { memo, useEffect, useRef } from 'react';
+import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 
 import { SectionHeader } from '@/shared/components/SectionHeader';
 import { ScrollDots } from '@/shared/components/ScrollDots';
@@ -9,14 +9,46 @@ import { HomeRouteCard, ROUTE_CARD_H, ROUTE_CARD_W } from '../cards/HomeRouteCar
 
 const GAP      = 10;
 const INTERVAL = ROUTE_CARD_W + GAP;
+const SKEL     = '#E8E8E8';
 
-interface Props {
-  routes: HomeRoute[];
+function SkeletonRouteCard() {
+  const anim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
+        Animated.timing(anim, { toValue: 0, duration: 750, useNativeDriver: true }),
+      ]),
+    ).start();
+  }, []);
+  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
+  return (
+    <Animated.View style={[sk.card, { opacity }]} />
+  );
 }
 
-export const RoutesPreviewSection = memo(function RoutesPreviewSection({ routes }: Props) {
+interface Props {
+  routes:   HomeRoute[];
+  loading?: boolean;
+}
+
+export const RoutesPreviewSection = memo(function RoutesPreviewSection({ routes, loading }: Props) {
   const router  = useRouter();
   const scrollX = useRef(new Animated.Value(0)).current;
+
+  if (loading && routes.length === 0) {
+    return (
+      <View style={s.root}>
+        <View style={s.headerWrap}>
+          <View style={sk.titleBar} />
+          <View style={[sk.subBar, { marginTop: 6 }]} />
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={s.strip} scrollEnabled={false}>
+          {[0, 1, 2].map((i) => <SkeletonRouteCard key={i} />)}
+        </ScrollView>
+      </View>
+    );
+  }
 
   if (routes.length === 0) return null;
 
@@ -62,4 +94,10 @@ const s = StyleSheet.create({
   headerWrap: { paddingHorizontal: 16, marginBottom: 12 },
   strip:      { paddingLeft: 16, paddingRight: 8, gap: GAP },
   dotsWrap:   { paddingLeft: 16, paddingTop: 10 },
+});
+
+const sk = StyleSheet.create({
+  card:     { width: ROUTE_CARD_W, height: ROUTE_CARD_H, borderRadius: 16, backgroundColor: SKEL },
+  titleBar: { width: 160, height: 16, borderRadius: 6, backgroundColor: SKEL },
+  subBar:   { width: 100, height: 12, borderRadius: 5, backgroundColor: SKEL },
 });

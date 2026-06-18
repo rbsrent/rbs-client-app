@@ -1,4 +1,3 @@
-import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import {
   Calendar,
   ChevronLeft,
@@ -17,6 +16,7 @@ import {
   Dimensions,
   FlatList,
   FlatListProps,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -30,7 +30,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 import { ScreenHeader } from '@/shared/components/ScreenHeader';
-import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { Boat } from '@/store/useCatalogStore';
 
@@ -65,6 +64,7 @@ const DEFAULT: Filters = {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SCREEN_W    = Dimensions.get('window').width;
+const SCREEN_H    = Dimensions.get('window').height;
 // scrollY threshold where the collapsed overlay is fully visible
 const COLLAPSE_AT = 110;
 
@@ -91,7 +91,7 @@ const AMENITIES = [
   { key: 'hasHeating' as const, label: 'Отопление' },
 ];
 
-const TIME_OPTS     = Array.from({ length: 24 }, (_, i) => i);
+const TIME_OPTS     = Array.from({ length: 16 }, (_, i) => i + 7); // 07:00 – 22:00
 const DURATION_OPTS = [1, 2, 3, 4, 6, 8, 12];
 
 const MONTHS_RU     = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
@@ -104,6 +104,14 @@ function fmtShort(d: Date)   { return `${d.getDate()} ${MONTHS_S_RU[d.getMonth()
 function fmtFull(d: Date)    { return `${d.getDate()} ${MONTHS_GEN_RU[d.getMonth()]} ${d.getFullYear()}`; }
 function fmtHour(h: number)  { return `${String(h).padStart(2,'0')}:00`; }
 function ruFmt(n: number)    { return new Intl.NumberFormat('ru-RU').format(n); }
+
+type AvailStatus = 'fully_available' | 'partially_available' | 'not_available';
+
+function toIsoMsk(date: Date, extraHours = 0): string {
+  const d = new Date(date.getTime() + extraHours * 3600_000);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:00:00+03:00`;
+}
 
 function countActive(f: Filters): number {
   return [
@@ -213,6 +221,55 @@ const cs = StyleSheet.create({
   collapsedDate:  { fontSize: 16, fontWeight: '700', color: COLORS.brandNavy },
 });
 
+// ─── TimeScroll ───────────────────────────────────────────────────────────────
+
+const TIME_CHIP_W = 68;
+const TIME_CHIP_GAP = 8;
+
+function TimeScroll({ selected, onSelect }: { selected: number; onSelect: (h: number) => void }) {
+  const ref = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    const idx = TIME_OPTS.indexOf(selected);
+    if (idx < 0) return;
+    // small delay so the ScrollView has laid out
+    const t = setTimeout(() => {
+      ref.current?.scrollTo({ x: idx * (TIME_CHIP_W + TIME_CHIP_GAP), animated: true });
+    }, 80);
+    return () => clearTimeout(t);
+  }, [selected]);
+
+  return (
+    <ScrollView
+      ref={ref}
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={{ gap: TIME_CHIP_GAP, paddingBottom: 4 }}
+      decelerationRate="fast"
+    >
+      {TIME_OPTS.map((h) => {
+        const on = selected === h;
+        return (
+          <Pressable
+            key={h}
+            style={[ts.chip, on && ts.chipOn]}
+            onPress={() => onSelect(h)}
+          >
+            <Text style={[ts.txt, on && ts.txtOn]}>{fmtHour(h)}</Text>
+          </Pressable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
+const ts = StyleSheet.create({
+  chip:  { width: TIME_CHIP_W, paddingVertical: 10, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border },
+  chipOn:{ backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
+  txt:   { fontSize: 14, fontWeight: '600', color: COLORS.text2 },
+  txtOn: { color: COLORS.white },
+});
+
 // ─── Animated FlatList ────────────────────────────────────────────────────────
 
 const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.ComponentType<
@@ -224,8 +281,6 @@ const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.Com
 export function AllBoatsScreen() {
   const insets    = useSafeAreaInsets();
   const params    = useLocalSearchParams<{ type?: string }>();
-  const filterRef = useRef<BottomSheetModal>(null);
-  const slideAnim = useRef(new Animated.Value(0)).current;
   const scrollY   = useRef(new Animated.Value(0)).current;
   // ref for native pointer-events toggle — no React re-render needed
   const overlayRef = useRef<View>(null);
@@ -244,6 +299,9 @@ export function AllBoatsScreen() {
   const [filters, setFilters]   = useState<Filters>(initialFilters);
   const [draft, setDraft]       = useState<Filters>(initialFilters);
   const [searchText, setSearch] = useState('');
+  const [availMap, setAvailMap]         = useState<Record<string, AvailStatus>>({});
+  const [availLoading, setAvailLoading] = useState(false);
+  const [filterVisible, setFilterVisible] = useState(false);
   const fetched = useRef(false);
 
   // Toggle overlay pointer-events via setNativeProps — zero React re-renders
@@ -308,35 +366,64 @@ export function AllBoatsScreen() {
 
   useEffect(() => { if (!fetched.current) { fetched.current = true; fetchBoats(); } }, []);
 
+  // ── Availability check via RPC when date filter active ────────────────────
+  useEffect(() => {
+    const dt = filters.dateTime;
+    if (!dt.date) { setAvailMap({}); return; }
+
+    const startDate = new Date(dt.date.getFullYear(), dt.date.getMonth(), dt.date.getDate(), dt.startHour);
+    const pStart = toIsoMsk(startDate);
+    const pEnd   = toIsoMsk(startDate, dt.durationHours);
+
+    let cancelled = false;
+    setAvailLoading(true);
+    (async () => {
+      try {
+        const { data } = await publicSupabase
+          .rpc('get_boats_with_availability', { p_start_datetime: pStart, p_end_datetime: pEnd });
+        if (cancelled || !data) return;
+        const map: Record<string, AvailStatus> = {};
+        (data as any[]).forEach((row) => { map[row.boat_id] = row.availability_status; });
+        setAvailMap(map);
+      } finally {
+        if (!cancelled) setAvailLoading(false);
+      }
+    })();
+
+    return () => { cancelled = true; };
+  }, [filters.dateTime]);
+
   // ── Client filter ──────────────────────────────────────────────────────────
-  const filtered = useMemo(() => {
-    const chip = TYPE_CHIPS.find((c) => c.id === filters.typeId);
-    const q    = searchText.trim().toLowerCase();
+  const renderBoat = useCallback(({ item }: { item: Boat }) => <PromoCard boat={item} />, []);
+
+  const applyBoatFilter = useCallback((f: Filters, q: string) => {
+    const chip         = TYPE_CHIPS.find((c) => c.id === f.typeId);
+    const hasAvailData = f.dateTime.date !== null && Object.keys(availMap).length > 0;
     return allBoats.filter((b) => {
       const t = (b.type ?? '').toLowerCase();
-      if (chip?.boatType && !t.includes(chip.boatType)) return false;
-      if (q && !b.name.toLowerCase().includes(q))        return false;
-      if (filters.capacityMin !== null && (b.capacity ?? 0) < filters.capacityMin) return false;
-      if (filters.priceMin    !== null && b.price_per_hour < filters.priceMin)      return false;
-      if (filters.priceMax    !== null && b.price_per_hour > filters.priceMax)      return false;
-      if (filters.hasTarp    && !b.has_tarp)    return false;
-      if (filters.hasToilet  && !b.has_toilet)  return false;
-      if (filters.hasHeating && !b.has_heating) return false;
+      if (chip?.boatType && t !== chip.boatType) return false;
+      if (q && !b.name.toLowerCase().includes(q))           return false;
+      if (f.capacityMin !== null && (b.capacity ?? 0) < f.capacityMin) return false;
+      if (f.priceMin    !== null && b.price_per_hour < f.priceMin)      return false;
+      if (f.priceMax    !== null && b.price_per_hour > f.priceMax)      return false;
+      if (f.hasTarp    && !b.has_tarp)    return false;
+      if (f.hasToilet  && !b.has_toilet)  return false;
+      if (f.hasHeating && !b.has_heating) return false;
+      if (hasAvailData && availMap[b.id] === 'not_available') return false;
       return true;
     });
-  }, [allBoats, filters, searchText]);
+  }, [allBoats, availMap]);
+
+  const filtered      = useMemo(() => applyBoatFilter(filters, searchText.trim().toLowerCase()), [applyBoatFilter, filters, searchText]);
+  const draftFiltered = useMemo(() => applyBoatFilter(draft,   searchText.trim().toLowerCase()), [applyBoatFilter, draft,    searchText]);
 
   const badge     = countActive(filters);
   const hasActive = badge > 0 || searchText.trim() !== '';
 
   // ── Sheet ──────────────────────────────────────────────────────────────────
-  const goToDateTime = () =>
-    Animated.spring(slideAnim, { toValue: -SCREEN_W, useNativeDriver: true, tension: 68, friction: 12 }).start();
-  const goToMain = () =>
-    Animated.spring(slideAnim, { toValue: 0, useNativeDriver: true, tension: 68, friction: 12 }).start();
-
-  const openSheet  = () => { setDraft(filters); slideAnim.setValue(0); filterRef.current?.present(); };
-  const applyDraft = () => { setFilters(draft); filterRef.current?.dismiss(); };
+  const openSheet  = () => { setDraft(filters); setFilterVisible(true); };
+  const closeSheet = () => setFilterVisible(false);
+  const applyDraft = () => { setFilters(draft); closeSheet(); };
   const removeTag  = (key: keyof Filters, def: any) => setFilters((f) => ({ ...f, [key]: def }));
 
   const setPricePreset = (min: number | null, max: number | null) =>
@@ -370,11 +457,15 @@ export function AllBoatsScreen() {
           data={filtered}
           keyExtractor={(b: Boat) => b.id}
           numColumns={2}
-          renderItem={({ item }: { item: Boat }) => <PromoCard boat={item} />}
+          renderItem={renderBoat}
           columnWrapperStyle={s.row}
           contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
           scrollEventThrottle={16}
+          removeClippedSubviews
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          windowSize={5}
           onScroll={Animated.event(
             [{ nativeEvent: { contentOffset: { y: scrollY } } }],
             { useNativeDriver: true },
@@ -479,9 +570,12 @@ export function AllBoatsScreen() {
 
               {/* Counter + toggle */}
               <View style={s.barRow}>
-                <Text style={s.counter}>
-                  {hasActive ? `${filtered.length} из ${ruFmt(total)} судов` : `${ruFmt(total)} судов найдено`}
-                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text style={s.counter}>
+                    {hasActive ? `${filtered.length} из ${ruFmt(total)} судов` : `${ruFmt(total)} судов найдено`}
+                  </Text>
+                  {availLoading && <ActivityIndicator size="small" color={COLORS.brandNavy} />}
+                </View>
                 <View style={s.toggle}>
                   {(['list', 'map'] as const).map((m) => (
                     <Pressable key={m} style={[s.tBtn, viewMode === m && s.tBtnOn]} onPress={() => setView(m)}>
@@ -546,162 +640,131 @@ export function AllBoatsScreen() {
         </Animated.View>
       </View>
 
-      {/* ── Filter Bottom Sheet ───────────────────────────────────────────── */}
-      <BottomSheetModal
-        ref={filterRef}
-        snapPoints={['75%', '95%']}
-        enablePanDownToClose
-        backdropComponent={SheetBackdrop}
-        backgroundStyle={s.sheetBg}
-        handleComponent={() => <View style={s.handleWrap}><View style={s.handle} /></View>}
-        onDismiss={() => slideAnim.setValue(0)}
+      {/* ── Filter Modal ─────────────────────────────────────────────────── */}
+      <Modal
+        visible={filterVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={closeSheet}
       >
-        <BottomSheetScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-          <View style={{ overflow: 'hidden', width: SCREEN_W }}>
-            <Animated.View style={{ flexDirection: 'row', width: SCREEN_W * 2, transform: [{ translateX: slideAnim }] }}>
+        <View style={s.modalOverlay}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} />
+          <View style={[s.modalSheet, { paddingBottom: insets.bottom + 8 }]}>
+            {/* Handle */}
+            <View style={s.handleWrap}><View style={s.handle} /></View>
 
-              {/* ── Panel 0: Main ─────────────────────────────────────────── */}
-              <View style={[s.panel, { paddingBottom: insets.bottom + 16 }]}>
-                <View style={s.sheetHeader}>
-                  <Text style={s.sheetTitle}>Фильтры</Text>
-                  <Pressable onPress={() => setDraft(DEFAULT)} hitSlop={8}>
-                    <Text style={s.sheetResetTxt}>Сбросить</Text>
-                  </Pressable>
-                </View>
+            {/* Header */}
+            <View style={s.sheetHeader}>
+              <Text style={s.sheetTitle}>Фильтры</Text>
+              <Pressable onPress={() => setDraft(DEFAULT)} hitSlop={8}>
+                <Text style={s.sheetResetTxt}>Сбросить всё</Text>
+              </Pressable>
+            </View>
 
-                <Text style={s.sheetSec}>Дата и время</Text>
-                <Pressable style={s.dtRow} onPress={goToDateTime}>
-                  <View style={s.dtLeft}>
-                    <View style={s.dtIconWrap}>
-                      <Calendar size={18} color={COLORS.brandNavy} strokeWidth={1.8} />
-                    </View>
-                    <View>
-                      <Text style={s.dtMain}>{dtSummary(draft.dateTime)}</Text>
-                      <Text style={s.dtSub}>Нажмите для выбора</Text>
-                    </View>
-                  </View>
-                  <ChevronRight size={18} color={COLORS.text3} strokeWidth={2} />
-                </Pressable>
+            {/* Content */}
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={s.sheetScroll}
+            >
+              {/* ── Дата ── */}
+              <Text style={s.sheetSec}>Дата</Text>
+              <CalendarPicker
+                selected={draft.dateTime.date}
+                onSelect={(d) => setDraft((prev) => ({ ...prev, dateTime: { ...prev.dateTime, date: d } }))}
+              />
 
-                <Text style={s.sheetSec}>Мин. вместимость (гостей)</Text>
-                <View style={s.optRow}>
-                  {CAPACITY_OPTS.map((n) => {
-                    const on = draft.capacityMin === (n ?? null);
-                    return (
-                      <Pressable key={String(n)} style={[s.optChip, on && s.optChipOn]}
-                        onPress={() => setDraft((d) => ({ ...d, capacityMin: n ?? null }))}>
-                        <Text style={[s.optTxt, on && s.optTxtOn]}>
-                          {n === null ? 'Любая' : n === 11 ? '11+' : String(n)}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
+              {/* ── Время начала ── */}
+              <Text style={[s.sheetSec, { marginTop: 20 }]}>Время начала</Text>
+              <TimeScroll
+                selected={draft.dateTime.startHour}
+                onSelect={(h) => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, startHour: h } }))}
+              />
 
-                <Text style={s.sheetSec}>Цена за час (₽)</Text>
-                <View style={s.priceRow}>
-                  <View style={s.priceInputWrap}>
-                    <Text style={s.priceLabel}>от</Text>
-                    <TextInput style={s.priceInput} placeholder="0" placeholderTextColor={COLORS.text3} keyboardType="numeric"
-                      value={draft.priceMin !== null ? String(draft.priceMin) : ''}
-                      onChangeText={(v) => setDraft((d) => ({ ...d, priceMin: v ? Number(v) : null }))} />
-                  </View>
-                  <View style={s.priceDash} />
-                  <View style={s.priceInputWrap}>
-                    <Text style={s.priceLabel}>до</Text>
-                    <TextInput style={s.priceInput} placeholder="∞" placeholderTextColor={COLORS.text3} keyboardType="numeric"
-                      value={draft.priceMax !== null ? String(draft.priceMax) : ''}
-                      onChangeText={(v) => setDraft((d) => ({ ...d, priceMax: v ? Number(v) : null }))} />
-                  </View>
-                </View>
-                <View style={[s.optRow, { marginBottom: 4 }]}>
-                  {PRICE_PRESETS.map((p) => {
-                    const on = matchesPreset(p.min, p.max);
-                    return (
-                      <Pressable key={p.label} style={[s.optChip, on && s.optChipOn]}
-                        onPress={() => on ? setPricePreset(null, null) : setPricePreset(p.min, p.max)}>
-                        <Text style={[s.optTxt, on && s.optTxtOn]}>{p.label}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <Text style={s.sheetSec}>Удобства</Text>
-                {AMENITIES.map(({ key, label }) => (
-                  <View key={key} style={s.switchRow}>
-                    <Text style={s.switchLabel}>{label}</Text>
-                    <Switch value={draft[key]}
-                      onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
-                      trackColor={{ false: COLORS.border, true: COLORS.brandNavy + '70' }}
-                      thumbColor={draft[key] ? COLORS.brandNavy : '#f0f0f0'} />
-                  </View>
-                ))}
-
-                <View style={s.sheetFooter}>
-                  <Pressable style={s.footerReset} onPress={() => { setDraft(DEFAULT); filterRef.current?.dismiss(); setFilters(DEFAULT); setSearch(''); }}>
-                    <Text style={s.footerResetTxt}>Сбросить</Text>
-                  </Pressable>
-                  <Pressable style={({ pressed }) => [s.footerApply, pressed && { opacity: 0.88 }]} onPress={applyDraft}>
-                    <Text style={s.footerApplyTxt}>Показать суда{filtered.length > 0 ? ` (${filtered.length})` : ''}</Text>
-                  </Pressable>
-                </View>
+              {/* ── Продолжительность ── */}
+              <Text style={[s.sheetSec, { marginTop: 20 }]}>Продолжительность</Text>
+              <View style={s.optRow}>
+                {DURATION_OPTS.map((h) => {
+                  const on = draft.dateTime.durationHours === h;
+                  return (
+                    <Pressable key={h} style={[s.optChip, on && s.optChipOn]}
+                      onPress={() => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, durationHours: h } }))}>
+                      <Text style={[s.optTxt, on && s.optTxtOn]}>{durLabel(h)}</Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
-              {/* ── Panel 1: Дата и время ─────────────────────────────────── */}
-              <View style={[s.panel, { paddingBottom: insets.bottom + 16 }]}>
-                <View style={s.dtPageHeader}>
-                  <Pressable onPress={goToMain} style={s.dtBackBtn} hitSlop={10}>
-                    <ChevronLeft size={20} color={COLORS.brandNavy} strokeWidth={2} />
-                  </Pressable>
-                  <Text style={s.sheetTitle}>Дата и время</Text>
-                  <View style={{ width: 36 }} />
-                </View>
-
-                <CalendarPicker
-                  selected={draft.dateTime.date}
-                  onSelect={(d) => setDraft((prev) => ({ ...prev, dateTime: { ...prev.dateTime, date: d } }))}
-                />
-
-                <Text style={[s.sheetSec, { marginTop: 20 }]}>Время начала</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={{ gap: 8, paddingBottom: 4 }} decelerationRate="fast">
-                  {TIME_OPTS.map((h) => {
-                    const on = draft.dateTime.startHour === h;
-                    return (
-                      <Pressable key={h} style={[s.optChip, on && s.optChipOn]}
-                        onPress={() => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, startHour: h } }))}>
-                        <Text style={[s.optTxt, on && s.optTxtOn]}>{fmtHour(h)}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-
-                <Text style={[s.sheetSec, { marginTop: 20 }]}>Продолжительность</Text>
-                <View style={s.optRow}>
-                  {DURATION_OPTS.map((h) => {
-                    const on = draft.dateTime.durationHours === h;
-                    return (
-                      <Pressable key={h} style={[s.optChip, on && s.optChipOn]}
-                        onPress={() => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, durationHours: h } }))}>
-                        <Text style={[s.optTxt, on && s.optTxtOn]}>{durLabel(h)}</Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <View style={s.hint}>
-                  <Text style={s.hintTxt}>💡 Выберите дату и время для проверки доступности</Text>
-                </View>
-
-                <Pressable style={({ pressed }) => [s.footerApply, { marginTop: 20 }, pressed && { opacity: 0.88 }]} onPress={goToMain}>
-                  <Text style={s.footerApplyTxt}>Готово</Text>
-                </Pressable>
+              {/* ── Вместимость ── */}
+              <Text style={s.sheetSec}>Мин. вместимость (гостей)</Text>
+              <View style={s.optRow}>
+                {CAPACITY_OPTS.map((n) => {
+                  const on = draft.capacityMin === (n ?? null);
+                  return (
+                    <Pressable key={String(n)} style={[s.optChip, on && s.optChipOn]}
+                      onPress={() => setDraft((d) => ({ ...d, capacityMin: n ?? null }))}>
+                      <Text style={[s.optTxt, on && s.optTxtOn]}>
+                        {n === null ? 'Любая' : n === 11 ? '11+' : String(n)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
               </View>
 
-            </Animated.View>
+              {/* ── Цена ── */}
+              <Text style={s.sheetSec}>Цена за час (₽)</Text>
+              <View style={s.priceRow}>
+                <View style={s.priceInputWrap}>
+                  <Text style={s.priceLabel}>от</Text>
+                  <TextInput style={s.priceInput} placeholder="0" placeholderTextColor={COLORS.text3} keyboardType="numeric"
+                    value={draft.priceMin !== null ? String(draft.priceMin) : ''}
+                    onChangeText={(v) => setDraft((d) => ({ ...d, priceMin: v ? Number(v) : null }))} />
+                </View>
+                <View style={s.priceDash} />
+                <View style={s.priceInputWrap}>
+                  <Text style={s.priceLabel}>до</Text>
+                  <TextInput style={s.priceInput} placeholder="∞" placeholderTextColor={COLORS.text3} keyboardType="numeric"
+                    value={draft.priceMax !== null ? String(draft.priceMax) : ''}
+                    onChangeText={(v) => setDraft((d) => ({ ...d, priceMax: v ? Number(v) : null }))} />
+                </View>
+              </View>
+              <View style={[s.optRow, { marginBottom: 4 }]}>
+                {PRICE_PRESETS.map((p) => {
+                  const on = matchesPreset(p.min, p.max);
+                  return (
+                    <Pressable key={p.label} style={[s.optChip, on && s.optChipOn]}
+                      onPress={() => on ? setPricePreset(null, null) : setPricePreset(p.min, p.max)}>
+                      <Text style={[s.optTxt, on && s.optTxtOn]}>{p.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* ── Удобства ── */}
+              <Text style={s.sheetSec}>Удобства</Text>
+              {AMENITIES.map(({ key, label }) => (
+                <View key={key} style={s.switchRow}>
+                  <Text style={s.switchLabel}>{label}</Text>
+                  <Switch value={draft[key]}
+                    onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
+                    trackColor={{ false: COLORS.border, true: COLORS.brandNavy + '70' }}
+                    thumbColor={draft[key] ? COLORS.brandNavy : '#f0f0f0'} />
+                </View>
+              ))}
+            </ScrollView>
+
+            {/* Footer */}
+            <View style={s.sheetFooter}>
+              <Pressable style={s.footerReset} onPress={() => { setDraft(DEFAULT); closeSheet(); setFilters(DEFAULT); setSearch(''); }}>
+                <Text style={s.footerResetTxt}>Сбросить</Text>
+              </Pressable>
+              <Pressable style={({ pressed }) => [s.footerApply, pressed && { opacity: 0.88 }]} onPress={applyDraft}>
+                <Text style={s.footerApplyTxt}>Показать суда{draftFiltered.length > 0 ? ` (${draftFiltered.length})` : ''}</Text>
+              </Pressable>
+            </View>
           </View>
-        </BottomSheetScrollView>
-      </BottomSheetModal>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -787,29 +850,24 @@ const s = StyleSheet.create({
   emptyBtn:    { paddingHorizontal: 20, paddingVertical: 10, borderRadius: 12, backgroundColor: COLORS.brandNavy },
   emptyBtnTxt: { fontSize: 14, fontWeight: '700', color: COLORS.white },
 
-  // ── Sheet ────────────────────────────────────────────────────────────────
-  sheetBg:    { backgroundColor: COLORS.white, borderRadius: 20 },
-  handleWrap: { paddingTop: 12, paddingBottom: 2, alignItems: 'center' },
-  handle:     { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },
-  panel:      { width: SCREEN_W, paddingHorizontal: 20, paddingTop: 6 },
-  sheetHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 4 },
+  // ── Modal sheet ──────────────────────────────────────────────────────────
+  modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
+  modalSheet: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20, borderTopRightRadius: 20,
+    maxHeight: SCREEN_H * 0.92,
+    paddingHorizontal: 20,
+  },
+  handleWrap:  { paddingTop: 12, paddingBottom: 4, alignItems: 'center' },
+  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },
+  sheetHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
   sheetTitle:    { fontSize: 18, fontWeight: '800', color: COLORS.text1 },
   sheetResetTxt: { fontSize: 14, fontWeight: '600', color: COLORS.brandCyan },
+  sheetScroll:   { paddingBottom: 8 },
   sheetSec: {
     fontSize: 11, fontWeight: '700', color: COLORS.text3,
     textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10, marginTop: 18,
   },
-  dtRow: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingVertical: 14, paddingHorizontal: 14, borderRadius: 14,
-    backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border,
-  },
-  dtLeft:     { flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 },
-  dtIconWrap: { width: 38, height: 38, borderRadius: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.brandNavy + '12' },
-  dtMain:     { fontSize: 14, fontWeight: '600', color: COLORS.text1 },
-  dtSub:      { fontSize: 12, color: COLORS.text3, marginTop: 1 },
-  dtPageHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 },
-  dtBackBtn:    { width: 36, height: 36, borderRadius: 18, backgroundColor: COLORS.muted, alignItems: 'center', justifyContent: 'center' },
   optRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   optChip:   { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border },
   optChipOn: { backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
@@ -822,11 +880,9 @@ const s = StyleSheet.create({
   priceDash:  { width: 12, height: 1.5, backgroundColor: COLORS.text3, borderRadius: 1 },
   switchRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
   switchLabel:{ fontSize: 15, color: COLORS.text1 },
-  sheetFooter:  { flexDirection: 'row', gap: 12, marginTop: 24 },
+  sheetFooter:  { flexDirection: 'row', gap: 12, paddingTop: 16, paddingBottom: 4 },
   footerReset:  { flex: 1, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border },
   footerResetTxt: { fontSize: 15, fontWeight: '600', color: COLORS.text2 },
   footerApply:  { flex: 2, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.brandNavy },
   footerApplyTxt: { fontSize: 15, fontWeight: '700', color: COLORS.white },
-  hint:    { marginTop: 20, padding: 14, borderRadius: 12, backgroundColor: '#FFF8E1', borderWidth: 1, borderColor: '#FFE082' },
-  hintTxt: { fontSize: 13, color: '#795548', lineHeight: 18 },
 });
