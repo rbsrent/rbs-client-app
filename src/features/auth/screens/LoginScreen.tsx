@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import { ArrowLeft } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -170,7 +170,7 @@ export function LoginScreen() {
         {/* Header */}
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
-            <ArrowLeft size={22} color={COLORS.brandNavy} strokeWidth={2} />
+            <X size={20} color={COLORS.text1} strokeWidth={2} />
           </Pressable>
         </View>
 

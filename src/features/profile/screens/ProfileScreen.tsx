@@ -1,3 +1,5 @@
+import { BottomSheetModal, BottomSheetView } from '@gorhom/bottom-sheet';
+import Constants from 'expo-constants';
 import { useRouter } from 'expo-router';
 import {
   Bell,
@@ -16,10 +18,8 @@ import {
   Trash2,
   User,
 } from 'lucide-react-native';
-import Constants from 'expo-constants';
-import { memo } from 'react';
+import { memo, useRef } from 'react';
 import {
-  Alert,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -30,6 +30,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useAuth } from '@/features/auth/hooks/useAuth';
 import { COLORS } from '@/shared/colors';
+import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import { useAuthStore } from '@/store/useAuthStore';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -74,34 +75,38 @@ export const ProfileScreen = memo(function ProfileScreen() {
   const router = useRouter();
   const { session, smsUser } = useAuthStore();
   const { signOut } = useAuth();
-
-  const handleSignOut = () => {
-    Alert.alert('Выход', 'Вы уверены, что хотите выйти?', [
-      { text: 'Отмена', style: 'cancel' },
-      { text: 'Выйти', style: 'destructive', onPress: signOut },
-    ]);
-  };
+  const logoutSheetRef = useRef<BottomSheetModal>(null);
 
   // ── Not logged in ──────────────────────────────────────────────────────────
+  const guestMenu: MenuItem[] = [
+    { key: 'help',   Icon: HelpCircle, label: 'Помощь',              onPress: () => {} },
+    { key: 'about',  Icon: Info,       label: 'О приложении',        onPress: () => {} },
+  ];
+
   if (!session) {
     return (
       <View style={[s.root, { paddingTop: insets.top }]}>
-        <View style={s.topBar}>
-          <Text style={s.pageTitle}>Профиль</Text>
-        </View>
-        <View style={s.emptyBox}>
-          <View style={s.emptyAvatar}>
-            <User size={44} color="#aaa" strokeWidth={1.2} />
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}>
+          <View style={s.topBar}>
+            <Text style={s.pageTitle}>Профиль</Text>
           </View>
-          <Text style={s.emptyName}>Войдите в аккаунт</Text>
-          <Text style={s.emptySub}>Управляйте бронями, сертификатами и настройками</Text>
-          <Pressable
-            style={({ pressed }) => [s.loginBtn, pressed && { opacity: 0.85 }]}
-            onPress={() => router.push('/auth' as any)}
-          >
-            <Text style={s.loginBtnText}>Войти</Text>
-          </Pressable>
-        </View>
+
+          <View style={s.guestBox}>
+            <Text style={s.guestSub}>Войдите в аккаунт и начните планировать следующую поездку.</Text>
+            <Pressable
+              style={({ pressed }) => [s.loginBtn, pressed && { opacity: 0.85 }]}
+              onPress={() => router.push('/auth' as any)}
+            >
+              <Text style={s.loginBtnText}>Войдите или зарегистрируйтесь</Text>
+            </Pressable>
+          </View>
+
+          <View style={s.divider} />
+
+          <View style={s.menuSection}>
+            {guestMenu.map((item) => <MenuRow key={item.key} item={item} />)}
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -126,7 +131,7 @@ export const ProfileScreen = memo(function ProfileScreen() {
     { key: 'docs',     Icon: FileText,    label: 'Документы',        onPress: () => {} },
     { key: 'help',     Icon: HelpCircle,  label: 'Помощь',           onPress: () => {} },
     { key: 'about',    Icon: Info,        label: 'О приложении',     onPress: () => {} },
-    { key: 'signout',  Icon: LogOut,      label: 'Выйти',            onPress: handleSignOut,  danger: true },
+    { key: 'signout',  Icon: LogOut,      label: 'Выйти',            onPress: () => logoutSheetRef.current?.present(),  danger: true },
     { key: 'delete',   Icon: Trash2,      label: 'Удалить аккаунт',  onPress: () => {},       danger: true },
   ];
 
@@ -217,6 +222,39 @@ export const ProfileScreen = memo(function ProfileScreen() {
         </Text>
 
       </ScrollView>
+
+      {/* ── Logout action sheet ── */}
+      <BottomSheetModal
+        ref={logoutSheetRef}
+        enableDynamicSizing
+        enablePanDownToClose
+        backdropComponent={SheetBackdrop}
+        backgroundStyle={s.sheetBg}
+        handleComponent={() => (
+          <View style={s.sheetHandle}>
+            <View style={s.sheetBar} />
+          </View>
+        )}
+      >
+        <BottomSheetView style={[s.sheetContent, { paddingBottom: insets.bottom + 16 }]}>
+          <Text style={s.sheetTitle}>Выйти из аккаунта?</Text>
+          <Text style={s.sheetSub}>Вы будете перенаправлены на главный экран.</Text>
+
+          <Pressable
+            style={({ pressed }) => [s.sheetBtn, s.sheetBtnDanger, pressed && { opacity: 0.8 }]}
+            onPress={() => { logoutSheetRef.current?.dismiss(); signOut(); }}
+          >
+            <Text style={s.sheetBtnDangerTxt}>Выйти</Text>
+          </Pressable>
+
+          <Pressable
+            style={({ pressed }) => [s.sheetBtn, s.sheetBtnCancel, pressed && { opacity: 0.7 }]}
+            onPress={() => logoutSheetRef.current?.dismiss()}
+          >
+            <Text style={s.sheetBtnCancelTxt}>Отмена</Text>
+          </Pressable>
+        </BottomSheetView>
+      </BottomSheetModal>
     </View>
   );
 });
@@ -351,21 +389,18 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  // Empty state
-  emptyBox: {
-    flex: 1, alignItems: 'center', justifyContent: 'center',
-    gap: 12, paddingHorizontal: 32,
+  // Guest state (not logged in)
+  guestBox: {
+    paddingHorizontal: 24,
+    paddingTop: 8,
+    paddingBottom: 24,
+    gap: 16,
   },
-  emptyAvatar: {
-    width: 100, height: 100, borderRadius: 50,
-    backgroundColor: '#F2F2F2',
-    alignItems: 'center', justifyContent: 'center',
-  },
-  emptyName:  { fontSize: 22, fontWeight: '600', color: '#000' },
-  emptySub:   { fontSize: 14, color: '#666', textAlign: 'center', lineHeight: 21 },
+  guestSub: { fontSize: 15, color: '#666', lineHeight: 22 },
   loginBtn: {
-    marginTop: 8, height: 52, paddingHorizontal: 40,
-    borderRadius: 16, backgroundColor: '#232323',
+    height: 54,
+    borderRadius: 14,
+    backgroundColor: '#000',
     alignItems: 'center', justifyContent: 'center',
   },
   loginBtnText: { fontSize: 16, fontWeight: '600', color: '#FFF' },
@@ -377,4 +412,17 @@ const s = StyleSheet.create({
     marginTop: 24,
     marginBottom: 8,
   },
+
+  // logout sheet
+  sheetBg:      { backgroundColor: '#fff', borderTopLeftRadius: 24, borderTopRightRadius: 24 },
+  sheetHandle:  { alignItems: 'center', paddingTop: 12, paddingBottom: 4 },
+  sheetBar:     { width: 36, height: 4, borderRadius: 2, backgroundColor: '#DDDDDD' },
+  sheetContent: { paddingHorizontal: 24, paddingTop: 8, gap: 12 },
+  sheetTitle:   { fontSize: 18, fontWeight: '700', color: '#000', textAlign: 'center', marginBottom: 2 },
+  sheetSub:     { fontSize: 14, color: '#888', textAlign: 'center', lineHeight: 20, marginBottom: 4 },
+  sheetBtn:     { borderRadius: 14, paddingVertical: 16, alignItems: 'center' },
+  sheetBtnDanger:    { backgroundColor: '#000' },
+  sheetBtnDangerTxt: { fontSize: 16, fontWeight: '600', color: '#fff' },
+  sheetBtnCancel:    { backgroundColor: '#F2F2F2' },
+  sheetBtnCancelTxt: { fontSize: 16, fontWeight: '500', color: '#000' },
 });

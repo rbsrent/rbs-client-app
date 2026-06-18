@@ -2,6 +2,7 @@ import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
 import { Clock, Heart, X } from "lucide-react-native";
 import { useCallback, useState } from "react";
+import { useAuthStore } from "@/store/useAuthStore";
 import {
   Dimensions,
   Pressable,
@@ -160,6 +161,7 @@ function GroupCard({
 export default function WishlistScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { session } = useAuthStore();
 
   const [groups, setGroups] = useState<WishlistGroupMeta[]>([]);
   const [editing, setEditing] = useState(false);
@@ -169,6 +171,20 @@ export default function WishlistScreen() {
   }, []);
 
   useFocusEffect(load);
+
+  if (!session) {
+    return (
+      <View style={[s.root, s.gate, { paddingTop: insets.top }]}>
+        <Text style={s.pageTitle}>Вишлисты</Text>
+        <View style={s.gateBody}>
+          <Text style={s.gateDesc}>Войдите в аккаунт и начните сохранять понравившиеся объекты.</Text>
+          <Pressable style={s.gateBtn} onPress={() => router.push('/auth' as any)}>
+            <Text style={s.gateBtnTxt}>Войдите или зарегистрируйтесь</Text>
+          </Pressable>
+        </View>
+      </View>
+    );
+  }
 
   const recentGroup = groups.find((g) => g.id === RECENT_GROUP_ID) ?? null;
   const defaultGroup = groups.find((g) => g.id === DEFAULT_GROUP_ID) ?? null;
@@ -238,6 +254,12 @@ export default function WishlistScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
 
+  gate:     { paddingHorizontal: 0 },
+  gateBody: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24, gap: 16 },
+  gateDesc: { fontSize: 15, color: '#666', lineHeight: 22 },
+  gateBtn:  { height: 54, borderRadius: 14, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  gateBtnTxt: { fontSize: 16, fontWeight: '600', color: '#fff' },
+
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -256,11 +278,11 @@ const s = StyleSheet.create({
 
   pageTitle: {
     fontSize: 32,
-    fontWeight: "700",
+    fontWeight: "500",
     color: "#000",
-    paddingHorizontal: 16,
-    marginTop: 8,
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    marginTop: 16,
+    marginBottom: 8,
   },
 
   grid: {

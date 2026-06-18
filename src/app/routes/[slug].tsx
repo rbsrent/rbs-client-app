@@ -1,15 +1,8 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import {
-  Anchor,
-  ArrowRight,
-  ChevronLeft,
-  Clock,
-  MapPin,
-  Ship,
-} from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { ChevronLeft, Clock, MapPin } from "lucide-react-native";
+import { useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Dimensions,
@@ -19,8 +12,10 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { getCachedRoute, setCachedRoute, getRoutePreview } from "@/features/routes/store";
 import {
   DIFFICULTY,
   resolveRouteImage,
@@ -30,17 +25,100 @@ import { COLORS } from "@/shared/colors";
 import { publicSupabase } from "@/shared/supabase/publicClient";
 
 const { width: W } = Dimensions.get("window");
-const IMG_H = 300;
+const HERO_H = 380;
+const NAVY = COLORS.brandNavy;
+
+function durationLabel(h: number) {
+  if (h === 1) return "1 час";
+  if (h < 5) return `${h} часа`;
+  return `${h} часов`;
+}
+
+function SnakePath({ points }: { points: string[] }) {
+  if (points.length === 0) return null;
+
+  return (
+    <View style={sp.wrap}>
+      <View style={sp.header}>
+        <MapPin size={16} color={NAVY} strokeWidth={2} />
+        <Text style={sp.headerTxt}>Маршрут · {points.length} точек</Text>
+      </View>
+
+      <View style={sp.body}>
+        {points.map((name, i) => {
+          const isRight = i % 2 === 0;
+          const isFirst = i === 0;
+          const isLast = i === points.length - 1;
+
+          return (
+            <View key={i}>
+              {/* waypoint row */}
+              <View style={[sp.row, isRight ? sp.rowRight : sp.rowLeft]}>
+                {/* label card */}
+                <View
+                  style={[sp.labelCard, isRight ? sp.labelRight : sp.labelLeft]}
+                >
+                  {(isFirst || isLast) && (
+                    <Text style={sp.badge}>{isFirst ? "Старт" : "Финиш"}</Text>
+                  )}
+                  <Text style={sp.label}>{name}</Text>
+                </View>
+
+                {/* dot */}
+                <View style={sp.dotWrap}>
+                  <View style={sp.dot}>
+                    <Text style={sp.dotNum}>{i + 1}</Text>
+                  </View>
+                </View>
+
+                {/* spacer opposite side */}
+                <View style={sp.spacer} />
+              </View>
+
+              {/* connector between this and next point */}
+              {!isLast && (
+                <View
+                  style={[sp.connector, isRight ? sp.connRight : sp.connLeft]}
+                >
+                  {/* top half: horizontal run + down */}
+                  <View
+                    style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]}
+                  />
+                  {/* bottom half: back to center */}
+                  <View
+                    style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]}
+                  />
+                </View>
+              )}
+            </View>
+          );
+        })}
+      </View>
+    </View>
+  );
+}
+
+function RouteDescription({ text }: { text: string }) {
+  return (
+    <View style={rd.wrap}>
+      <Text style={rd.title}>О маршруте</Text>
+      <View style={rd.quoteBar} />
+      <Text style={rd.body}>{text}</Text>
+    </View>
+  );
+}
 
 export default function RouteDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const [route, setRoute] = useState<WaterRoute | null>(null);
-  const [loading, setLoading] = useState(true);
+  const preview = useRef(getRoutePreview(slug as string)).current;
+  const cached = useRef(getCachedRoute(slug as string)).current;
+  const [route, setRoute] = useState<WaterRoute | null>(cached);
+  const [loading, setLoading] = useState(!cached);
 
   useEffect(() => {
-    if (!slug) return;
+    if (!slug || cached) return;
     let cancelled = false;
     (async () => {
       const { data } = await publicSupabase
@@ -50,7 +128,9 @@ export default function RouteDetailScreen() {
         .eq("is_active", true)
         .single();
       if (!cancelled) {
-        setRoute((data as WaterRoute) ?? null);
+        const result = (data as WaterRoute) ?? null;
+        if (result) setCachedRoute(slug as string, result);
+        setRoute(result);
         setLoading(false);
       }
     })();
@@ -59,47 +139,24 @@ export default function RouteDetailScreen() {
     };
   }, [slug]);
 
-  if (loading) {
-    return (
-      <View style={[s.center, { paddingTop: insets.top }]}>
-        <ActivityIndicator color={COLORS.brandNavy} size="large" />
-      </View>
-    );
-  }
-
-  if (!route) {
-    return (
-      <View style={[s.center, { paddingTop: insets.top }]}>
-        <Text style={s.notFound}>Маршрут не найден</Text>
-        <Pressable onPress={() => router.back()} style={s.backLink}>
-          <Text style={s.backLinkTxt}>← Назад</Text>
-        </Pressable>
-      </View>
-    );
-  }
-
-  const imageUrl = resolveRouteImage(route.map_image_url);
-  const diff = DIFFICULTY[route.difficulty_level] ?? {
-    label: route.difficulty_level,
-    color: COLORS.text3,
-  };
-  const points = (route.route_points ?? []).map((p) => p.name).filter(Boolean);
-
-  const durationLabel = (() => {
-    const h = route.duration_hours;
-    if (!h) return null;
-    if (h === 1) return "1 час";
-    if (h < 5) return `${h} часа`;
-    return `${h} часов`;
-  })();
+  const imageUrl = route
+    ? resolveRouteImage(route.map_image_url)
+    : (preview?.imageUrl ?? null);
+  const diff = route
+    ? (DIFFICULTY[route.difficulty_level] ?? {
+        label: route.difficulty_level,
+        color: COLORS.text3,
+      })
+    : null;
+  const points = (route?.route_points ?? []).map((p) => p.name).filter(Boolean);
 
   return (
     <View style={s.root}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
-        {/* Hero image */}
+        {/* ── hero ── */}
         <View style={s.hero}>
           {imageUrl ? (
             <Image
@@ -110,22 +167,34 @@ export default function RouteDetailScreen() {
             />
           ) : (
             <LinearGradient
-              colors={[COLORS.brandNavy, COLORS.brandCyan]}
+              colors={[NAVY, COLORS.brandCyan]}
               style={StyleSheet.absoluteFill}
             />
           )}
+
           <LinearGradient
-            colors={["rgba(0,0,0,0.45)", "transparent"]}
-            style={[StyleSheet.absoluteFill, { height: 120 }]}
+            colors={["rgba(0,0,0,0.52)", "transparent"]}
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              height: 130,
+            }}
             pointerEvents="none"
           />
           <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.6)"]}
-            style={[StyleSheet.absoluteFill, { top: IMG_H * 0.4 }]}
+            colors={["transparent", "rgba(0,0,0,0.78)"]}
+            style={{
+              position: "absolute",
+              bottom: 0,
+              left: 0,
+              right: 0,
+              height: HERO_H * 0.58,
+            }}
             pointerEvents="none"
           />
 
-          {/* Back button */}
           <Pressable
             style={[s.backBtn, { top: insets.top + 8 }]}
             onPress={() => router.back()}
@@ -134,118 +203,206 @@ export default function RouteDetailScreen() {
             <ChevronLeft size={20} color="#fff" strokeWidth={2.5} />
           </Pressable>
 
-          {/* Badges */}
-          <View style={s.heroBadges}>
-            <View style={[s.badge, { backgroundColor: diff.color }]}>
-              <Text style={s.badgeTxt}>{diff.label}</Text>
-            </View>
-            {route.vessel_type === "boat" && (
-              <View style={[s.badge, s.badgeDark]}>
-                <Ship size={11} color="#fff" strokeWidth={2} />
-                <Text style={s.badgeTxt}>Катер</Text>
+          <View style={s.heroContent}>
+            {diff && (
+              <View style={[s.diffPill, { backgroundColor: diff.color }]}>
+                <Text style={s.diffTxt}>{diff.label}</Text>
               </View>
             )}
-            {route.vessel_type === "yacht" && (
-              <View style={[s.badge, s.badgeDark]}>
-                <Anchor size={11} color="#fff" strokeWidth={2} />
-                <Text style={s.badgeTxt}>Яхта</Text>
+            <Text style={s.heroName} numberOfLines={3}>
+              {route?.name ?? preview?.name ?? ""}
+            </Text>
+            {route && (
+              <View style={s.heroMeta}>
+                <View style={s.heroMetaItem}>
+                  <Clock
+                    size={13}
+                    color="rgba(255,255,255,0.8)"
+                    strokeWidth={2}
+                  />
+                  <Text style={s.heroMetaTxt}>
+                    {durationLabel(route.duration_hours)}
+                  </Text>
+                </View>
+                {points.length > 0 && (
+                  <View style={s.heroMetaItem}>
+                    <MapPin
+                      size={13}
+                      color="rgba(255,255,255,0.8)"
+                      strokeWidth={2}
+                    />
+                    <Text style={s.heroMetaTxt}>
+                      {points.length} точек маршрута
+                    </Text>
+                  </View>
+                )}
               </View>
             )}
           </View>
-
-          {/* Duration bottom-right */}
-          {durationLabel && (
-            <View style={s.heroDuration}>
-              <Clock size={13} color="rgba(255,255,255,0.85)" strokeWidth={2} />
-              <Text style={s.heroDurationTxt}>{durationLabel}</Text>
-            </View>
-          )}
         </View>
 
-        {/* Content */}
-        <View style={s.content}>
-          <Text style={s.name}>{route.name}</Text>
-
-          {/* Route points */}
-          {points.length > 0 && (
-            <View style={s.pointsRow}>
-              <MapPin size={14} color={COLORS.brandCyan} strokeWidth={2} />
-              <View style={s.pointsInner}>
-                {points.map((p, i) => (
-                  <View key={i} style={s.pointItem}>
-                    <Text style={s.pointTxt}>{p}</Text>
-                    {i < points.length - 1 && (
-                      <ArrowRight
-                        size={12}
-                        color={COLORS.text3}
-                        strokeWidth={2}
-                      />
-                    )}
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Description */}
-          {route.description ? (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>О маршруте</Text>
-              <Text style={s.description}>{route.description}</Text>
-            </View>
-          ) : null}
-
-          {/* Highlights */}
-          {route.highlights && route.highlights.length > 0 && (
-            <View style={s.section}>
-              <Text style={s.sectionTitle}>Что увидите</Text>
-              <View style={s.chips}>
-                {route.highlights.map((h, i) => (
-                  <View key={i} style={s.chip}>
-                    <Text style={s.chipTxt}>{h}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          )}
-
-          {/* Stats row */}
-          <View style={s.statsCard}>
-            {durationLabel && (
-              <View style={s.statItem}>
-                <Clock size={20} color={COLORS.brandCyan} strokeWidth={1.8} />
-                <Text style={s.statVal}>{durationLabel}</Text>
-                <Text style={s.statLbl}>Длительность</Text>
-              </View>
-            )}
-            {points.length > 0 && (
-              <View style={[s.statItem, s.statDivider]}>
-                <MapPin size={20} color={COLORS.brandCyan} strokeWidth={1.8} />
-                <Text style={s.statVal}>{points.length}</Text>
-                <Text style={s.statLbl}>Точек маршрута</Text>
-              </View>
-            )}
-            <View style={[s.statItem, points.length > 0 && s.statDivider]}>
-              <View style={[s.diffDot, { backgroundColor: diff.color }]} />
-              <Text style={s.statVal}>{diff.label}</Text>
-              <Text style={s.statLbl}>Сложность</Text>
-            </View>
+        {/* ── content ── */}
+        {loading ? (
+          <View style={s.loadingBlock}>
+            <ActivityIndicator color={NAVY} size="small" />
           </View>
-        </View>
+        ) : !route ? (
+          <View style={s.loadingBlock}>
+            <Text style={{ color: COLORS.text3 }}>Маршрут не найден</Text>
+          </View>
+        ) : (
+          <Animated.View entering={FadeIn.duration(260)} style={s.content}>
+            {/* ── snake path ── */}
+            {points.length > 0 && <SnakePath points={points} />}
+
+            {/* ── description ── */}
+            {route.detailed_description ? (
+              <RouteDescription text={route.detailed_description} />
+            ) : null}
+
+            {/* ── highlights ── */}
+            {route.highlights && route.highlights.length > 0 && (
+              <View style={s.section}>
+                <View style={s.sectionRow}>
+                  <Text style={s.sectionTitle}>Что увидите</Text>
+                </View>
+                <View style={s.chips}>
+                  {route.highlights.map((h, i) => (
+                    <View key={i} style={s.chip}>
+                      <Text style={s.chipTxt}>{h}</Text>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
+          </Animated.View>
+        )}
       </ScrollView>
     </View>
   );
 }
 
+const DOT_SIZE = 36;
+const SIDE_W = (W - 48 - DOT_SIZE) / 2; // available per side
+const CONN_H = 28; // half-arc height
+const CONN_W = SIDE_W * 0.55;
+
+const sp = StyleSheet.create({
+  wrap: { marginHorizontal: 0 },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 20,
+    paddingHorizontal: 20,
+  },
+  headerTxt: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
+
+  body: { paddingHorizontal: 24 },
+
+  row: { flexDirection: "row", alignItems: "center" },
+  rowRight: { flexDirection: "row" },
+  rowLeft: { flexDirection: "row-reverse" },
+
+  labelCard: {
+    width: SIDE_W,
+    backgroundColor: "#F8F9FB",
+    borderRadius: 12,
+    padding: 12,
+    gap: 3,
+  },
+  labelRight: { marginRight: 12 },
+  labelLeft: { marginLeft: 12 },
+
+  badge: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: NAVY,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  label: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: COLORS.text1,
+    lineHeight: 18,
+  },
+
+  dotWrap: { width: DOT_SIZE, alignItems: "center" },
+  dot: {
+    width: DOT_SIZE,
+    height: DOT_SIZE,
+    borderRadius: DOT_SIZE / 2,
+    backgroundColor: NAVY,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  dotNum: { fontSize: 13, fontWeight: "700", color: "#fff" },
+
+  spacer: { width: SIDE_W },
+
+  // connector: sits between two waypoint rows, centered on dot column
+  connector: {
+    width: CONN_W,
+    alignSelf: "flex-start", // overridden per direction below
+  },
+  connRight: {
+    alignSelf: "flex-end",
+    marginRight: SIDE_W + DOT_SIZE / 2 - CONN_W / 2,
+  },
+  connLeft: {
+    alignSelf: "flex-start",
+    marginLeft: SIDE_W + DOT_SIZE / 2 - CONN_W / 2,
+  },
+
+  // each arc is half the S-curve
+  arc: { width: CONN_W, height: CONN_H },
+
+  // right-side S-curve: top arc curves RIGHT, bottom curves back LEFT
+  arcTopRight: {
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderBottomRightRadius: CONN_W * 0.7,
+    borderColor: NAVY,
+  },
+  arcBotRight: {
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderBottomLeftRadius: CONN_W * 0.7,
+    borderColor: NAVY,
+  },
+
+  // left-side S-curve: mirror
+  arcTopLeft: {
+    borderLeftWidth: 2,
+    borderBottomWidth: 2,
+    borderBottomLeftRadius: CONN_W * 0.7,
+    borderColor: NAVY,
+  },
+  arcBotLeft: {
+    borderRightWidth: 2,
+    borderBottomWidth: 2,
+    borderBottomRightRadius: CONN_W * 0.7,
+    borderColor: NAVY,
+  },
+});
+
+const rd = StyleSheet.create({
+  wrap: { paddingHorizontal: 20, gap: 12 },
+  title: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
+  quoteBar: {
+    width: 36,
+    height: 3,
+    borderRadius: 2,
+    backgroundColor: NAVY,
+  },
+  body: { fontSize: 15, color: COLORS.text2, lineHeight: 24 },
+});
+
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
-  center: { flex: 1, alignItems: "center", justifyContent: "center", gap: 12 },
-  notFound: { fontSize: 16, color: COLORS.text2 },
-  backLink: { paddingVertical: 8 },
-  backLinkTxt: { fontSize: 15, color: COLORS.brandCyan, fontWeight: "600" },
 
-  hero: { width: W, height: IMG_H, backgroundColor: COLORS.muted },
-
+  hero: { width: W, height: HERO_H, backgroundColor: COLORS.muted },
   backBtn: {
     position: "absolute",
     left: 16,
@@ -256,88 +413,44 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-
-  heroBadges: {
+  heroContent: {
     position: "absolute",
-    bottom: 14,
-    left: 14,
-    flexDirection: "row",
-    gap: 6,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    padding: 20,
+    gap: 8,
   },
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
+  diffPill: {
+    alignSelf: "flex-start",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
+    marginBottom: 2,
   },
-  badgeDark: { backgroundColor: "rgba(0,0,0,0.45)" },
-  badgeTxt: { fontSize: 12, fontWeight: "700", color: "#fff" },
-
-  heroDuration: {
-    position: "absolute",
-    bottom: 14,
-    right: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(0,0,0,0.38)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  heroDurationTxt: {
+  diffTxt: { fontSize: 11, fontWeight: "700", color: "#fff" },
+  heroName: { fontSize: 26, fontWeight: "800", color: "#fff", lineHeight: 32 },
+  heroMeta: { flexDirection: "row", gap: 14, marginTop: 2 },
+  heroMetaItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  heroMetaTxt: {
     fontSize: 12,
-    color: "rgba(255,255,255,0.9)",
-    fontWeight: "600",
+    color: "rgba(255,255,255,0.85)",
+    fontWeight: "500",
   },
 
-  content: { padding: 20, gap: 20 },
+  loadingBlock: { paddingTop: 40, alignItems: "center" },
+  content: { paddingVertical: 28, gap: 28 },
 
-  name: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: COLORS.text1,
-    lineHeight: 33,
-  },
-
-  pointsRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
-  pointsInner: {
-    flex: 1,
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 4,
-    alignItems: "center",
-  },
-  pointItem: { flexDirection: "row", alignItems: "center", gap: 4 },
-  pointTxt: { fontSize: 13, color: COLORS.text2, fontWeight: "500" },
-
-  section: { gap: 10 },
+  section: { paddingHorizontal: 20, gap: 12 },
+  sectionRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   sectionTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
-  description: { fontSize: 14, color: COLORS.text2, lineHeight: 22 },
 
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     backgroundColor: COLORS.muted,
-    borderRadius: 8,
+    borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
   chipTxt: { fontSize: 13, color: COLORS.text2, fontWeight: "500" },
-
-  statsCard: {
-    flexDirection: "row",
-    backgroundColor: "#F8F9FB",
-    borderRadius: 16,
-    padding: 16,
-  },
-  statItem: { flex: 1, alignItems: "center", gap: 6 },
-  statDivider: {
-    borderLeftWidth: 1,
-    borderLeftColor: "#E8E8E8",
-  },
-  statVal: { fontSize: 14, fontWeight: "700", color: COLORS.text1 },
-  statLbl: { fontSize: 11, color: COLORS.text3, textAlign: "center" },
-  diffDot: { width: 20, height: 20, borderRadius: 10 },
 });

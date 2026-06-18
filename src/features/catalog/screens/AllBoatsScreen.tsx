@@ -1,7 +1,9 @@
 import {
   Calendar,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
+  ChevronUp,
   LayoutList,
   Map,
   Search,
@@ -21,7 +23,6 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
-  Switch,
   Text,
   TextInput,
   View,
@@ -30,10 +31,14 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 import { ScreenHeader } from '@/shared/components/ScreenHeader';
-import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { Boat } from '@/store/useCatalogStore';
+import { useHomeData } from '@/features/home/hooks/useHomeData';
 
 import { PromoCard } from '../../home/components/PromoCard';
+import { useAvailabilityCache } from '../hooks/useAvailabilityCache';
+import { usePiersCache } from '../hooks/usePiersCache';
+import { findPiersInRadius, sortBoats, AvailInfo } from '../utils/filterUtils';
+import { useDiscountsCache } from '../hooks/useDiscountsCache';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -52,6 +57,8 @@ interface Filters {
   hasToilet: boolean;
   hasHeating: boolean;
   dateTime: DateTimeFilter;
+  pierIds: string[];
+  pierRadiusKm: number;
 }
 
 const DEFAULT: Filters = {
@@ -59,6 +66,8 @@ const DEFAULT: Filters = {
   capacityMin: null, priceMin: null, priceMax: null,
   hasTarp: false, hasToilet: false, hasHeating: false,
   dateTime: { date: null, startHour: 10, durationHours: 2 },
+  pierIds: [],
+  pierRadiusKm: 5,
 };
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -105,19 +114,14 @@ function fmtFull(d: Date)    { return `${d.getDate()} ${MONTHS_GEN_RU[d.getMonth
 function fmtHour(h: number)  { return `${String(h).padStart(2,'0')}:00`; }
 function ruFmt(n: number)    { return new Intl.NumberFormat('ru-RU').format(n); }
 
-type AvailStatus = 'fully_available' | 'partially_available' | 'not_available';
-
-function toIsoMsk(date: Date, extraHours = 0): string {
-  const d = new Date(date.getTime() + extraHours * 3600_000);
-  const p = (n: number) => String(n).padStart(2, '0');
-  return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:00:00+03:00`;
-}
 
 function countActive(f: Filters): number {
   return [
     f.typeId !== 'all', f.capacityMin !== null,
     f.priceMin !== null, f.priceMax !== null,
-    f.hasTarp, f.hasToilet, f.hasHeating, f.dateTime.date !== null,
+    f.hasTarp, f.hasToilet, f.hasHeating,
+    f.dateTime.date !== null,
+    f.pierIds.length > 0,
   ].filter(Boolean).length;
 }
 
@@ -276,6 +280,31 @@ const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.Com
   FlatListProps<Boat> & { ref?: React.Ref<FlatList<Boat>> }
 >;
 
+function FilterSection({
+  title, expanded, onToggle, children,
+}: {
+  title: string; expanded: boolean; onToggle: () => void; children: React.ReactNode;
+}) {
+  return (
+    <View style={fs.wrap}>
+      <Pressable style={fs.header} onPress={onToggle}>
+        <Text style={fs.title}>{title}</Text>
+        {expanded
+          ? <ChevronUp size={18} color={COLORS.text2} strokeWidth={2} />
+          : <ChevronDown size={18} color={COLORS.text2} strokeWidth={2} />}
+      </Pressable>
+      {expanded && <View style={fs.body}>{children}</View>}
+    </View>
+  );
+}
+
+const fs = StyleSheet.create({
+  wrap:   { paddingHorizontal: 24, paddingVertical: 20 },
+  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  title:  { fontSize: 17, fontWeight: '700', color: '#000' },
+  body:   { marginTop: 20 },
+});
+
 // ─── Screen ───────────────────────────────────────────────────────────────────
 
 export function AllBoatsScreen() {
@@ -291,18 +320,30 @@ export function AllBoatsScreen() {
     return { ...DEFAULT, typeId: chip.id };
   }, []);
 
-  const [allBoats, setAll]      = useState<Boat[]>([]);
-  const [total, setTotal]       = useState(0);
-  const [loading, setLoading]   = useState(true);
-  const [refreshing, setRef]    = useState(false);
-  const [viewMode, setView]     = useState<'list' | 'map'>('list');
+  const { boats: allBoats, isLoadingBoats: loading, refetch } = useHomeData();
+  const allPiers = usePiersCache();
+
+  const total = allBoats.length;
+  const [refreshing, setRef] = useState(false);
+  const [viewMode, setView]  = useState<'list' | 'map'>('list');
   const [filters, setFilters]   = useState<Filters>(initialFilters);
   const [draft, setDraft]       = useState<Filters>(initialFilters);
   const [searchText, setSearch] = useState('');
-  const [availMap, setAvailMap]         = useState<Record<string, AvailStatus>>({});
-  const [availLoading, setAvailLoading] = useState(false);
   const [filterVisible, setFilterVisible] = useState(false);
-  const fetched = useRef(false);
+  const [sec, setSec] = useState({ amenities: true, datetime: true, pier: false });
+
+  const capIdx = draft.capacityMin === null
+    ? 0
+    : Math.max(0, CAPACITY_OPTS.indexOf(draft.capacityMin as typeof CAPACITY_OPTS[number]));
+
+  const { availMap, loading: availLoading } = useAvailabilityCache(filters.dateTime);
+  const discountsMap = useDiscountsCache();
+
+  const handleRefresh = useCallback(async () => {
+    setRef(true);
+    await refetch();
+    setRef(false);
+  }, [refetch]);
 
   // Toggle overlay pointer-events via setNativeProps — zero React re-renders
   useEffect(() => {
@@ -315,104 +356,57 @@ export function AllBoatsScreen() {
   }, []);
 
   // ── Animated values (all useNativeDriver: true) ────────────────────────────
-  // Pure opacity fade — no translateY, no border, completely clean
   const overlayOpacity = scrollY.interpolate({
     inputRange: [COLLAPSE_AT * 0.45, COLLAPSE_AT],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
 
-  // ── Fetch ──────────────────────────────────────────────────────────────────
-  const fetchBoats = useCallback(async (silent = false) => {
-    silent ? setRef(true) : setLoading(true);
-    try {
-      const { data, count } = await publicSupabase
-        .from('boats')
-        .select(`
-          id, name, type, capacity, length_meters,
-          price_per_hour, public_price_per_hour_night,
-          pier_id, seo_slug,
-          has_tarp, has_heating, has_toilet, has_covered_saloon, has_bluetooth,
-          boat_images(image_path, position),
-          piers(name)
-        `, { count: 'exact' })
-        .eq('moderation_status', 'approved')
-        .eq('is_hidden', false)
-        .order('display_order', { ascending: true });
-
-      const mapped: Boat[] = ((data ?? []) as any[]).map((b) => {
-        const sorted = [...(b.boat_images ?? [])].sort((a: any, z: any) => a.position - z.position);
-        const img    = sorted[0]?.image_path ?? null;
-        return {
-          id: b.id, name: b.name, type: b.type,
-          capacity: b.capacity, length_meters: b.length_meters,
-          price_per_hour: b.price_per_hour,
-          public_price_per_hour_night: b.public_price_per_hour_night,
-          public_price_per_hour_weekend: null,
-          pier_id: b.pier_id, pier_name: b.piers?.name ?? null,
-          seo_slug: b.seo_slug, promo_video_url: null,
-          cover_image_url: img
-            ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${img}` : null,
-          rating: null, review_count: 0,
-          has_tarp: b.has_tarp ?? false, has_heating: b.has_heating ?? false,
-          has_toilet: b.has_toilet ?? false, has_covered_saloon: b.has_covered_saloon ?? false,
-          has_bluetooth: b.has_bluetooth ?? false,
-        };
-      });
-      setAll(mapped);
-      setTotal(count ?? mapped.length);
-    } finally { setLoading(false); setRef(false); }
-  }, []);
-
-  useEffect(() => { if (!fetched.current) { fetched.current = true; fetchBoats(); } }, []);
-
-  // ── Availability check via RPC when date filter active ────────────────────
-  useEffect(() => {
-    const dt = filters.dateTime;
-    if (!dt.date) { setAvailMap({}); return; }
-
-    const startDate = new Date(dt.date.getFullYear(), dt.date.getMonth(), dt.date.getDate(), dt.startHour);
-    const pStart = toIsoMsk(startDate);
-    const pEnd   = toIsoMsk(startDate, dt.durationHours);
-
-    let cancelled = false;
-    setAvailLoading(true);
-    (async () => {
-      try {
-        const { data } = await publicSupabase
-          .rpc('get_boats_with_availability', { p_start_datetime: pStart, p_end_datetime: pEnd });
-        if (cancelled || !data) return;
-        const map: Record<string, AvailStatus> = {};
-        (data as any[]).forEach((row) => { map[row.boat_id] = row.availability_status; });
-        setAvailMap(map);
-      } finally {
-        if (!cancelled) setAvailLoading(false);
-      }
-    })();
-
-    return () => { cancelled = true; };
-  }, [filters.dateTime]);
-
-  // ── Client filter ──────────────────────────────────────────────────────────
-  const renderBoat = useCallback(({ item }: { item: Boat }) => <PromoCard boat={item} />, []);
+  // ── Client filter + sort ───────────────────────────────────────────────────
+  const renderBoat = useCallback(
+    ({ item }: { item: Boat }) => (
+      <PromoCard
+        boat={item}
+        availInfo={availMap[item.id]}
+        discount={discountsMap.get(item.id)}
+      />
+    ),
+    [availMap, discountsMap],
+  );
 
   const applyBoatFilter = useCallback((f: Filters, q: string) => {
-    const chip         = TYPE_CHIPS.find((c) => c.id === f.typeId);
+    const chip = TYPE_CHIPS.find((c) => c.id === f.typeId);
     const hasAvailData = f.dateTime.date !== null && Object.keys(availMap).length > 0;
-    return allBoats.filter((b) => {
+
+    // pier radius filter
+    let pierSet: Set<string> | null = null;
+    if (f.pierIds.length > 0) {
+      pierSet = findPiersInRadius(allPiers, f.pierIds, f.pierRadiusKm);
+    }
+
+    const pass = allBoats.filter((b) => {
       const t = (b.type ?? '').toLowerCase();
       if (chip?.boatType && t !== chip.boatType) return false;
-      if (q && !b.name.toLowerCase().includes(q))           return false;
+      if (q && !b.name.toLowerCase().includes(q)) return false;
       if (f.capacityMin !== null && (b.capacity ?? 0) < f.capacityMin) return false;
-      if (f.priceMin    !== null && b.price_per_hour < f.priceMin)      return false;
-      if (f.priceMax    !== null && b.price_per_hour > f.priceMax)      return false;
+      if (f.priceMin !== null && b.price_per_hour < f.priceMin) return false;
+      if (f.priceMax !== null && b.price_per_hour > f.priceMax) return false;
       if (f.hasTarp    && !b.has_tarp)    return false;
       if (f.hasToilet  && !b.has_toilet)  return false;
       if (f.hasHeating && !b.has_heating) return false;
-      if (hasAvailData && availMap[b.id] === 'not_available') return false;
+      if (hasAvailData && availMap[b.id]?.status === 'not_available') return false;
+      if (pierSet && (!b.pier_id || !pierSet.has(b.pier_id))) return false;
       return true;
     });
-  }, [allBoats, availMap]);
+
+    return sortBoats(pass, {
+      pierIds: f.pierIds,
+      availMap,
+      allPiers,
+      radiusKm: f.pierRadiusKm,
+      dateActive: f.dateTime.date !== null,
+    });
+  }, [allBoats, availMap, allPiers]);
 
   const filtered      = useMemo(() => applyBoatFilter(filters, searchText.trim().toLowerCase()), [applyBoatFilter, filters, searchText]);
   const draftFiltered = useMemo(() => applyBoatFilter(draft,   searchText.trim().toLowerCase()), [applyBoatFilter, draft,    searchText]);
@@ -471,7 +465,7 @@ export function AllBoatsScreen() {
             { useNativeDriver: true },
           )}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={() => fetchBoats(true)} tintColor={COLORS.brandNavy} />
+            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandNavy} />
           }
           ListHeaderComponent={
             <View>
@@ -518,6 +512,13 @@ export function AllBoatsScreen() {
                       {filters.dateTime.date !== null ? fmtShort(filters.dateTime.date) : 'Дата'}
                     </Text>
                   </Pressable>
+                  <Pressable style={[s.chip, filters.pierIds.length > 0 && s.chipOn]} onPress={openSheet}>
+                    <Text style={[s.chipTxt, filters.pierIds.length > 0 && s.chipTxtOn]}>
+                      {filters.pierIds.length > 0
+                        ? `${filters.pierIds.length} пирс${filters.pierIds.length > 1 ? 'а' : ''}`
+                        : 'Пирс'}
+                    </Text>
+                  </Pressable>
                 </ScrollView>
               </View>
 
@@ -562,6 +563,17 @@ export function AllBoatsScreen() {
                   {filters.hasTarp    && <Pressable style={s.tag} onPress={() => removeTag('hasTarp', false)}><Text style={s.tagTxt}>Тент</Text><X size={11} color={COLORS.brandNavy} strokeWidth={2.5} /></Pressable>}
                   {filters.hasToilet  && <Pressable style={s.tag} onPress={() => removeTag('hasToilet', false)}><Text style={s.tagTxt}>Туалет</Text><X size={11} color={COLORS.brandNavy} strokeWidth={2.5} /></Pressable>}
                   {filters.hasHeating && <Pressable style={s.tag} onPress={() => removeTag('hasHeating', false)}><Text style={s.tagTxt}>Отопление</Text><X size={11} color={COLORS.brandNavy} strokeWidth={2.5} /></Pressable>}
+                  {filters.pierIds.length > 0 && (
+                    <Pressable style={s.tag} onPress={() => removeTag('pierIds', [])}>
+                      <Text style={s.tagTxt}>
+                        {filters.pierIds.length === 1
+                          ? (allPiers.find((p) => p.id === filters.pierIds[0])?.name ?? 'Пирс')
+                          : `${filters.pierIds.length} пирса`}
+                        {` ±${filters.pierRadiusKm} км`}
+                      </Text>
+                      <X size={11} color={COLORS.brandNavy} strokeWidth={2.5} />
+                    </Pressable>
+                  )}
                   <Pressable style={s.resetBtn} onPress={() => { setFilters(DEFAULT); setSearch(''); }}>
                     <Text style={s.resetTxt}>Сбросить</Text>
                   </Pressable>
@@ -641,130 +653,206 @@ export function AllBoatsScreen() {
       </View>
 
       {/* ── Filter Modal ─────────────────────────────────────────────────── */}
-      <Modal
-        visible={filterVisible}
-        animationType="slide"
-        transparent
-        onRequestClose={closeSheet}
-      >
-        <View style={s.modalOverlay}>
+      <Modal visible={filterVisible} animationType="slide" transparent onRequestClose={closeSheet}>
+        <View style={s.modalOverlay} pointerEvents="box-none">
           <Pressable style={StyleSheet.absoluteFill} onPress={closeSheet} />
-          <View style={[s.modalSheet, { paddingBottom: insets.bottom + 8 }]}>
+          <View style={[s.modalSheet, s.modalSheetFull]}>
+
             {/* Handle */}
             <View style={s.handleWrap}><View style={s.handle} /></View>
 
             {/* Header */}
-            <View style={s.sheetHeader}>
-              <Text style={s.sheetTitle}>Фильтры</Text>
-              <Pressable onPress={() => setDraft(DEFAULT)} hitSlop={8}>
-                <Text style={s.sheetResetTxt}>Сбросить всё</Text>
+            <View style={s.fHeader}>
+              <Text style={s.fHeaderTitle}>Фильтры</Text>
+              <Pressable style={s.fCloseBtn} onPress={closeSheet} hitSlop={8}>
+                <X size={16} color={COLORS.text1} strokeWidth={2.5} />
               </Pressable>
             </View>
 
-            {/* Content */}
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              keyboardShouldPersistTaps="handled"
-              contentContainerStyle={s.sheetScroll}
-            >
-              {/* ── Дата ── */}
-              <Text style={s.sheetSec}>Дата</Text>
-              <CalendarPicker
-                selected={draft.dateTime.date}
-                onSelect={(d) => setDraft((prev) => ({ ...prev, dateTime: { ...prev.dateTime, date: d } }))}
-              />
+            <ScrollView showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
 
-              {/* ── Время начала ── */}
-              <Text style={[s.sheetSec, { marginTop: 20 }]}>Время начала</Text>
-              <TimeScroll
-                selected={draft.dateTime.startHour}
-                onSelect={(h) => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, startHour: h } }))}
-              />
-
-              {/* ── Продолжительность ── */}
-              <Text style={[s.sheetSec, { marginTop: 20 }]}>Продолжительность</Text>
-              <View style={s.optRow}>
-                {DURATION_OPTS.map((h) => {
-                  const on = draft.dateTime.durationHours === h;
-                  return (
-                    <Pressable key={h} style={[s.optChip, on && s.optChipOn]}
-                      onPress={() => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, durationHours: h } }))}>
-                      <Text style={[s.optTxt, on && s.optTxtOn]}>{durLabel(h)}</Text>
-                    </Pressable>
-                  );
-                })}
+              {/* ── Тип судна ── */}
+              <View style={s.fSection}>
+                <Text style={s.fSecTitle}>Тип судна</Text>
+                <View style={[s.fChipGrid, { marginTop: 16 }]}>
+                  {TYPE_CHIPS.map((c) => {
+                    const on = draft.typeId === c.id;
+                    return (
+                      <Pressable key={c.id} style={[s.fChip, on && s.fChipOn]}
+                        onPress={() => setDraft((d) => ({ ...d, typeId: c.id }))}>
+                        <Text style={[s.fChipTxt, on && s.fChipTxtOn]}>{c.label}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
               </View>
+              <View style={s.fDivider} />
 
               {/* ── Вместимость ── */}
-              <Text style={s.sheetSec}>Мин. вместимость (гостей)</Text>
-              <View style={s.optRow}>
-                {CAPACITY_OPTS.map((n) => {
-                  const on = draft.capacityMin === (n ?? null);
-                  return (
-                    <Pressable key={String(n)} style={[s.optChip, on && s.optChipOn]}
-                      onPress={() => setDraft((d) => ({ ...d, capacityMin: n ?? null }))}>
-                      <Text style={[s.optTxt, on && s.optTxtOn]}>
-                        {n === null ? 'Любая' : n === 11 ? '11+' : String(n)}
-                      </Text>
+              <View style={s.fSection}>
+                <Text style={s.fSecTitle}>Вместимость</Text>
+                <View style={s.fStepRow}>
+                  <Text style={s.fStepLabel}>Мин. гостей</Text>
+                  <View style={s.fStepper}>
+                    <Pressable
+                      style={[s.fStepBtn, capIdx === 0 && s.fStepBtnDis]}
+                      onPress={() => capIdx > 0 && setDraft((d) => ({ ...d, capacityMin: CAPACITY_OPTS[capIdx - 1] ?? null }))}
+                    >
+                      <Text style={[s.fStepBtnTxt, capIdx === 0 && s.fStepBtnTxtDis]}>−</Text>
                     </Pressable>
-                  );
-                })}
+                    <Text style={s.fStepVal}>
+                      {capIdx === 0 ? 'Неважно' : CAPACITY_OPTS[capIdx] === 11 ? '11+' : `${CAPACITY_OPTS[capIdx]}+`}
+                    </Text>
+                    <Pressable
+                      style={[s.fStepBtn, capIdx === CAPACITY_OPTS.length - 1 && s.fStepBtnDis]}
+                      onPress={() => capIdx < CAPACITY_OPTS.length - 1 && setDraft((d) => ({ ...d, capacityMin: CAPACITY_OPTS[capIdx + 1] ?? null }))}
+                    >
+                      <Text style={[s.fStepBtnTxt, capIdx === CAPACITY_OPTS.length - 1 && s.fStepBtnTxtDis]}>+</Text>
+                    </Pressable>
+                  </View>
+                </View>
               </View>
+              <View style={s.fDivider} />
 
               {/* ── Цена ── */}
-              <Text style={s.sheetSec}>Цена за час (₽)</Text>
-              <View style={s.priceRow}>
-                <View style={s.priceInputWrap}>
-                  <Text style={s.priceLabel}>от</Text>
-                  <TextInput style={s.priceInput} placeholder="0" placeholderTextColor={COLORS.text3} keyboardType="numeric"
-                    value={draft.priceMin !== null ? String(draft.priceMin) : ''}
-                    onChangeText={(v) => setDraft((d) => ({ ...d, priceMin: v ? Number(v) : null }))} />
+              <View style={s.fSection}>
+                <Text style={s.fSecTitle}>Цена за час</Text>
+                <Text style={s.fSecSub}>В рублях за час аренды</Text>
+                <View style={s.fPriceRow}>
+                  <View style={s.fPriceBox}>
+                    <Text style={s.fPriceBoxLbl}>от</Text>
+                    <TextInput style={s.fPriceInput} placeholder="0" placeholderTextColor={COLORS.text3}
+                      keyboardType="numeric"
+                      value={draft.priceMin !== null ? String(draft.priceMin) : ''}
+                      onChangeText={(v) => setDraft((d) => ({ ...d, priceMin: v ? Number(v) : null }))} />
+                  </View>
+                  <View style={s.fPriceDash} />
+                  <View style={s.fPriceBox}>
+                    <Text style={s.fPriceBoxLbl}>до</Text>
+                    <TextInput style={s.fPriceInput} placeholder="∞" placeholderTextColor={COLORS.text3}
+                      keyboardType="numeric"
+                      value={draft.priceMax !== null ? String(draft.priceMax) : ''}
+                      onChangeText={(v) => setDraft((d) => ({ ...d, priceMax: v ? Number(v) : null }))} />
+                  </View>
                 </View>
-                <View style={s.priceDash} />
-                <View style={s.priceInputWrap}>
-                  <Text style={s.priceLabel}>до</Text>
-                  <TextInput style={s.priceInput} placeholder="∞" placeholderTextColor={COLORS.text3} keyboardType="numeric"
-                    value={draft.priceMax !== null ? String(draft.priceMax) : ''}
-                    onChangeText={(v) => setDraft((d) => ({ ...d, priceMax: v ? Number(v) : null }))} />
+                <View style={[s.fChipGrid, { marginTop: 12 }]}>
+                  {PRICE_PRESETS.map((p) => {
+                    const on = matchesPreset(p.min, p.max);
+                    return (
+                      <Pressable key={p.label} style={[s.fChip, on && s.fChipOn]}
+                        onPress={() => on ? setPricePreset(null, null) : setPricePreset(p.min, p.max)}>
+                        <Text style={[s.fChipTxt, on && s.fChipTxtOn]}>{p.label}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
               </View>
-              <View style={[s.optRow, { marginBottom: 4 }]}>
-                {PRICE_PRESETS.map((p) => {
-                  const on = matchesPreset(p.min, p.max);
+              <View style={s.fDivider} />
+
+              {/* ── Удобства ── */}
+              <FilterSection title="Удобства" expanded={sec.amenities}
+                onToggle={() => setSec((s) => ({ ...s, amenities: !s.amenities }))}>
+                {AMENITIES.map(({ key, label }) => {
+                  const on = draft[key];
                   return (
-                    <Pressable key={p.label} style={[s.optChip, on && s.optChipOn]}
-                      onPress={() => on ? setPricePreset(null, null) : setPricePreset(p.min, p.max)}>
-                      <Text style={[s.optTxt, on && s.optTxtOn]}>{p.label}</Text>
+                    <Pressable key={key} style={s.fCheckRow}
+                      onPress={() => setDraft((d) => ({ ...d, [key]: !d[key] }))}>
+                      <Text style={s.fCheckLabel}>{label}</Text>
+                      <View style={[s.fCheckbox, on && s.fCheckboxOn]}>
+                        {on && <View style={s.fCheckmark} />}
+                      </View>
                     </Pressable>
                   );
                 })}
-              </View>
+              </FilterSection>
+              <View style={s.fDivider} />
 
-              {/* ── Удобства ── */}
-              <Text style={s.sheetSec}>Удобства</Text>
-              {AMENITIES.map(({ key, label }) => (
-                <View key={key} style={s.switchRow}>
-                  <Text style={s.switchLabel}>{label}</Text>
-                  <Switch value={draft[key]}
-                    onValueChange={(v) => setDraft((d) => ({ ...d, [key]: v }))}
-                    trackColor={{ false: COLORS.border, true: COLORS.brandNavy + '70' }}
-                    thumbColor={draft[key] ? COLORS.brandNavy : '#f0f0f0'} />
+              {/* ── Дата и время ── */}
+              <FilterSection title="Дата и время" expanded={sec.datetime}
+                onToggle={() => setSec((s) => ({ ...s, datetime: !s.datetime }))}>
+                <CalendarPicker
+                  selected={draft.dateTime.date}
+                  onSelect={(d) => setDraft((prev) => ({ ...prev, dateTime: { ...prev.dateTime, date: d } }))}
+                />
+                <Text style={[s.fSubSec, { marginTop: 20 }]}>Время начала</Text>
+                <TimeScroll
+                  selected={draft.dateTime.startHour}
+                  onSelect={(h) => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, startHour: h } }))}
+                />
+                <Text style={[s.fSubSec, { marginTop: 20 }]}>Продолжительность</Text>
+                <View style={s.fChipGrid}>
+                  {DURATION_OPTS.map((h) => {
+                    const on = draft.dateTime.durationHours === h;
+                    return (
+                      <Pressable key={h} style={[s.fChip, on && s.fChipOn]}
+                        onPress={() => setDraft((d) => ({ ...d, dateTime: { ...d.dateTime, durationHours: h } }))}>
+                        <Text style={[s.fChipTxt, on && s.fChipTxtOn]}>{durLabel(h)}</Text>
+                      </Pressable>
+                    );
+                  })}
                 </View>
-              ))}
+              </FilterSection>
+              <View style={s.fDivider} />
+
+              {/* ── Пирс ── */}
+              {allPiers.length > 0 && (
+                <>
+                  <FilterSection title="Пирс отправления" expanded={sec.pier}
+                    onToggle={() => setSec((s) => ({ ...s, pier: !s.pier }))}>
+                    {allPiers.map((p) => {
+                      const on = draft.pierIds.includes(p.id);
+                      return (
+                        <Pressable key={p.id} style={s.fCheckRow}
+                          onPress={() => setDraft((d) => ({
+                            ...d,
+                            pierIds: on ? d.pierIds.filter((x) => x !== p.id) : [...d.pierIds, p.id],
+                          }))}>
+                          <Text style={s.fCheckLabel}>{p.name}</Text>
+                          <View style={[s.fCheckbox, on && s.fCheckboxOn]}>
+                            {on && <View style={s.fCheckmark} />}
+                          </View>
+                        </Pressable>
+                      );
+                    })}
+                    {draft.pierIds.length > 0 && (
+                      <>
+                        <Text style={[s.fSubSec, { marginTop: 20 }]}>Радиус поиска</Text>
+                        <View style={[s.fChipGrid, { marginTop: 8 }]}>
+                          {[1, 2, 5, 10, 20].map((km) => {
+                            const on = draft.pierRadiusKm === km;
+                            return (
+                              <Pressable key={km} style={[s.fChip, on && s.fChipOn]}
+                                onPress={() => setDraft((d) => ({ ...d, pierRadiusKm: km }))}>
+                                <Text style={[s.fChipTxt, on && s.fChipTxtOn]}>{km} км</Text>
+                              </Pressable>
+                            );
+                          })}
+                        </View>
+                      </>
+                    )}
+                  </FilterSection>
+                  <View style={s.fDivider} />
+                </>
+              )}
+
+              <View style={{ height: 8 }} />
             </ScrollView>
 
             {/* Footer */}
-            <View style={s.sheetFooter}>
-              <Pressable style={s.footerReset} onPress={() => { setDraft(DEFAULT); closeSheet(); setFilters(DEFAULT); setSearch(''); }}>
-                <Text style={s.footerResetTxt}>Сбросить</Text>
+            <View style={[s.fFooter, { paddingBottom: insets.bottom + 12 }]}>
+              <Pressable onPress={() => { setDraft(DEFAULT); }} hitSlop={12}>
+                <Text style={s.fFooterReset}>Очистить всё</Text>
               </Pressable>
-              <Pressable style={({ pressed }) => [s.footerApply, pressed && { opacity: 0.88 }]} onPress={applyDraft}>
-                <Text style={s.footerApplyTxt}>Показать суда{draftFiltered.length > 0 ? ` (${draftFiltered.length})` : ''}</Text>
+              <Pressable style={({ pressed }) => [s.fFooterApply, pressed && { opacity: 0.88 }]} onPress={applyDraft}>
+                <Text style={s.fFooterApplyTxt}>
+                  {draftFiltered.length > 0 ? `Показать ${draftFiltered.length} судов` : 'Показать суда'}
+                </Text>
               </Pressable>
             </View>
           </View>
         </View>
       </Modal>
+
     </View>
   );
 }
@@ -851,38 +939,121 @@ const s = StyleSheet.create({
   emptyBtnTxt: { fontSize: 14, fontWeight: '700', color: COLORS.white },
 
   // ── Modal sheet ──────────────────────────────────────────────────────────
+  // ── Modals ───────────────────────────────────────────────────────────────
   modalOverlay: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(0,0,0,0.45)' },
   modalSheet: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20, borderTopRightRadius: 20,
-    maxHeight: SCREEN_H * 0.92,
-    paddingHorizontal: 20,
+    borderTopLeftRadius: 24, borderTopRightRadius: 24,
+    maxHeight: SCREEN_H * 0.94,
   },
-  handleWrap:  { paddingTop: 12, paddingBottom: 4, alignItems: 'center' },
-  handle:      { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },
-  sheetHeader:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 12 },
-  sheetTitle:    { fontSize: 18, fontWeight: '800', color: COLORS.text1 },
-  sheetResetTxt: { fontSize: 14, fontWeight: '600', color: COLORS.brandCyan },
-  sheetScroll:   { paddingBottom: 8 },
-  sheetSec: {
-    fontSize: 11, fontWeight: '700', color: COLORS.text3,
-    textTransform: 'uppercase', letterSpacing: 0.7, marginBottom: 10, marginTop: 18,
+  modalSheetFull: { maxHeight: SCREEN_H * 0.96 },
+  handleWrap: { paddingTop: 12, paddingBottom: 2, alignItems: 'center' },
+  handle:     { width: 36, height: 4, borderRadius: 2, backgroundColor: COLORS.border },
+
+  // ── Filter sheet header ──────────────────────────────────────────────────
+  fHeader: {
+    height: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border,
+    position: 'relative',
   },
-  optRow:    { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  optChip:   { paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border },
-  optChipOn: { backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
-  optTxt:    { fontSize: 13, fontWeight: '500', color: COLORS.text2 },
-  optTxtOn:  { color: COLORS.white, fontWeight: '600' },
-  priceRow:  { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 10 },
-  priceInputWrap: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingVertical: 12, backgroundColor: COLORS.backgroundAlt, borderRadius: 12, borderWidth: 1, borderColor: COLORS.border },
-  priceLabel: { fontSize: 13, color: COLORS.text3, fontWeight: '500' },
-  priceInput: { flex: 1, fontSize: 14, color: COLORS.text1, padding: 0 },
-  priceDash:  { width: 12, height: 1.5, backgroundColor: COLORS.text3, borderRadius: 1 },
-  switchRow:  { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
-  switchLabel:{ fontSize: 15, color: COLORS.text1 },
-  sheetFooter:  { flexDirection: 'row', gap: 12, paddingTop: 16, paddingBottom: 4 },
-  footerReset:  { flex: 1, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border },
-  footerResetTxt: { fontSize: 15, fontWeight: '600', color: COLORS.text2 },
-  footerApply:  { flex: 2, height: 50, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.brandNavy },
-  footerApplyTxt: { fontSize: 15, fontWeight: '700', color: COLORS.white },
+  fHeaderTitle: { fontSize: 16, fontWeight: '700', color: '#000' },
+  fCloseBtn: {
+    position: 'absolute', right: 16,
+    width: 32, height: 32, borderRadius: 16,
+    backgroundColor: '#F0F0F0', alignItems: 'center', justifyContent: 'center',
+  },
+
+  // ── Sections ─────────────────────────────────────────────────────────────
+  fSection:  { paddingHorizontal: 24, paddingVertical: 24 },
+  fSecTitle: { fontSize: 17, fontWeight: '700', color: '#000' },
+  fSecSub:   { fontSize: 13, color: COLORS.text3, marginTop: 4 },
+  fSubSec:   { fontSize: 14, fontWeight: '600', color: COLORS.text1, marginBottom: 10 },
+  fDivider:  { height: StyleSheet.hairlineWidth, backgroundColor: COLORS.border },
+
+  // ── Chips ────────────────────────────────────────────────────────────────
+  fChipGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
+  fChip: {
+    paddingHorizontal: 16, paddingVertical: 10,
+    borderRadius: 30, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
+  },
+  fChipOn:    { borderWidth: 2, borderColor: '#000', backgroundColor: '#F7F7F7' },
+  fChipTxt:   { fontSize: 14, color: COLORS.text2, fontWeight: '500' },
+  fChipTxtOn: { color: '#000', fontWeight: '700' },
+
+  // ── Stepper ──────────────────────────────────────────────────────────────
+  fStepRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20 },
+  fStepLabel:  { fontSize: 15, color: COLORS.text1 },
+  fStepper:    { flexDirection: 'row', alignItems: 'center', gap: 14 },
+  fStepBtn: {
+    width: 32, height: 32, borderRadius: 16,
+    borderWidth: 1, borderColor: COLORS.border,
+    alignItems: 'center', justifyContent: 'center',
+  },
+  fStepBtnDis:    { borderColor: COLORS.border, opacity: 0.3 },
+  fStepBtnTxt:    { fontSize: 20, fontWeight: '300', color: '#000', lineHeight: 24 },
+  fStepBtnTxtDis: { color: COLORS.text3 },
+  fStepVal:       { fontSize: 15, fontWeight: '500', color: '#000', minWidth: 72, textAlign: 'center' },
+
+  // ── Price ────────────────────────────────────────────────────────────────
+  fPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 20 },
+  fPriceBox: {
+    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6,
+    paddingHorizontal: 14, paddingVertical: 14,
+    borderRadius: 12, borderWidth: 1, borderColor: COLORS.border,
+    backgroundColor: COLORS.backgroundAlt,
+  },
+  fPriceBoxLbl: { fontSize: 13, color: COLORS.text3, fontWeight: '500' },
+  fPriceInput:  { flex: 1, fontSize: 15, color: '#000', padding: 0 },
+  fPriceDash:   { width: 16, height: 1.5, backgroundColor: COLORS.text3 },
+
+  // ── Checkbox rows ────────────────────────────────────────────────────────
+  fCheckRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingVertical: 16,
+    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border,
+  },
+  fCheckLabel:    { fontSize: 15, color: '#000', flex: 1 },
+  fCheckbox: {
+    width: 24, height: 24, borderRadius: 6,
+    borderWidth: 1.5, borderColor: '#BBBBBB',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  fCheckboxOn:  { backgroundColor: '#000', borderColor: '#000' },
+  fCheckmark:   { width: 12, height: 12, borderRadius: 2, backgroundColor: '#fff' },
+
+  // ── Show more link ───────────────────────────────────────────────────────
+  fShowMore:    { paddingTop: 16 },
+  fShowMoreTxt: { fontSize: 14, fontWeight: '600', color: '#000', textDecorationLine: 'underline' },
+
+  // ── Footer ───────────────────────────────────────────────────────────────
+  fFooter: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 24, paddingTop: 14,
+    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border,
+  },
+  fFooterReset:      { fontSize: 15, fontWeight: '600', color: COLORS.text2, textDecorationLine: 'underline' },
+  fFooterApply: {
+    height: 52, paddingHorizontal: 28, borderRadius: 26,
+    backgroundColor: '#000', alignItems: 'center', justifyContent: 'center',
+  },
+  fFooterApplyTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },
+
+  // ── Pier sheet rows ──────────────────────────────────────────────────────
+  pierStackList: {
+    marginTop: 10, borderRadius: 14, overflow: 'hidden',
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  pierRow: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    paddingHorizontal: 16, paddingVertical: 15,
+    backgroundColor: COLORS.white,
+  },
+  pierRowBorder:     { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border },
+  pierRowOn:         { backgroundColor: '#F7F7F7' },
+  pierRowTxt:        { fontSize: 15, color: COLORS.text1, fontWeight: '500', flex: 1 },
+  pierRowTxtOn:      { color: '#000', fontWeight: '600' },
+  pierRowCheckbox:   { width: 24, height: 24, borderRadius: 6, borderWidth: 1.5, borderColor: '#BBBBBB', alignItems: 'center', justifyContent: 'center' },
+  pierRowCheckboxOn: { backgroundColor: '#000', borderColor: '#000' },
+  pierRowCheckmark:  { width: 12, height: 12, borderRadius: 2, backgroundColor: '#fff' },
 });

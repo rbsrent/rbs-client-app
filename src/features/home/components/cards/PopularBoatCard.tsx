@@ -2,6 +2,7 @@ import { Dimensions } from 'react-native';
 import { memo } from 'react';
 
 import { BoatCard } from '@/shared/components/BoatCard';
+import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
 import { HomeBoat } from '@/store/useHomeStore';
 
 const { width: W } = Dimensions.get('window');
@@ -9,11 +10,12 @@ export const CARD_W = W * 0.46;
 export const IMG_H  = Math.round(CARD_W * 1.05);
 
 interface Props {
-  boat:   HomeBoat;
-  badge?: string;
+  boat:      HomeBoat;
+  badge?:    string;
+  discount?: ActiveDiscount;
 }
 
-export const PopularBoatCard = memo(function PopularBoatCard({ boat, badge }: Props) {
+export const PopularBoatCard = memo(function PopularBoatCard({ boat, badge, discount }: Props) {
   return (
     <BoatCard
       boat={{
@@ -29,6 +31,7 @@ export const PopularBoatCard = memo(function PopularBoatCard({ boat, badge }: Pr
       }}
       layout="strip"
       badge={badge}
+      discount={discount}
     />
   );
 });

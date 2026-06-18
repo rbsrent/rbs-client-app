@@ -17,8 +17,6 @@ import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-na
 import { COLORS } from '@/shared/colors';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 
-// ─── Types ────────────────────────────────────────────────────────────────────
-
 interface Service {
   key: string;
   label: string;
@@ -33,7 +31,6 @@ interface ServiceGroup {
   items: Service[];
 }
 
-// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const ALL: Service[] = [
   {
@@ -49,7 +46,7 @@ const ALL: Service[] = [
     icon: <Sailboat size={22} color="#4B2CA0" strokeWidth={2} />,
     bg: '#E8E3FF',
     route: '/boats?type=yacht',
-    badge: 'Хит',
+    // badge: 'Хит',
   },
   {
     key: 'ship',
@@ -57,6 +54,7 @@ const ALL: Service[] = [
     icon: <Ship size={22} color="#8B1A60" strokeWidth={2} />,
     bg: '#FAE3F5',
     route: '/cruises',
+    badge: 'Скоро',
   },
   {
     key: 'routes',
@@ -110,8 +108,6 @@ const GROUPS: ServiceGroup[] = [
   },
 ];
 
-// ─── ServiceItem ──────────────────────────────────────────────────────────────
-
 const AnimPressable = Animated.createAnimatedComponent(Pressable);
 
 function ServiceItem({
@@ -143,8 +139,6 @@ function ServiceItem({
     </AnimPressable>
   );
 }
-
-// ─── ServiceGrid ──────────────────────────────────────────────────────────────
 
 export const ServiceGrid = memo(function ServiceGrid() {
   const router   = useRouter();
@@ -206,7 +200,6 @@ export const ServiceGrid = memo(function ServiceGrid() {
   );
 });
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   grid: {

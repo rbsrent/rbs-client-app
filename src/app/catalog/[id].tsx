@@ -19,8 +19,8 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { COLORS } from "@/shared/colors";
 import { getBoatPreview } from "@/shared/boatPreviewStore";
+import { COLORS } from "@/shared/colors";
 import { useWishlistPicker } from "@/shared/components/WishlistPickerContext";
 import { useWishlistStore } from "@/store/useWishlistStore";
 
@@ -247,7 +247,7 @@ export default function BoatDetailScreen() {
                 <View>
                   <Text style={s.hostName}>RBS Аренда</Text>
                   <View style={{ flexDirection: "row", gap: 10 }}>
-                    <Text style={s.hostSub}>Суперхозяин</Text>
+                    {/* <Text style={s.hostSub}>Суперхозяин</Text> */}
                     <Text style={s.hostSub}>{boat.piers?.name ?? "Санкт-Петербург"}</Text>
                   </View>
                 </View>
