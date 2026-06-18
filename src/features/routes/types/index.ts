@@ -5,6 +5,7 @@ export interface WaterRoute {
   id: string;
   name: string;
   description: string | null;
+  detailed_description: string | null;
   duration_hours: number;
   difficulty_level: string;
   route_points: { lat: number; lng: number; name: string }[];
