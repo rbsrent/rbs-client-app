@@ -46,7 +46,6 @@ const s = StyleSheet.create({
     width: CARD_W,
     height: IMG_H + 50,
     borderRadius: 12,
-    backgroundColor: '#F2F2F2',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 12,

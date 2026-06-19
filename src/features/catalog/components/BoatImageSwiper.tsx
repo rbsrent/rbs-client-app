@@ -1,9 +1,9 @@
 import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
+import { FlatList } from 'react-native-gesture-handler';
 import {
   Dimensions,
-  FlatList,
   Modal,
   Pressable,
   StatusBar,
@@ -12,11 +12,17 @@ import {
   View,
 } from 'react-native';
 import Animated, {
+  Easing,
+  SharedTransition,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from 'react-native-reanimated';
+
+const heroTransition = SharedTransition
+  .duration(380)
+  .easing(Easing.bezier(0.35, 0, 0.25, 1) as any);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 const { width: W } = Dimensions.get('window');
@@ -55,12 +61,13 @@ const renderFullSlide = ({ item }: { item: string }) => <FullSlideItem uri={item
 const keyExt          = (_: any, i: number) => String(i);
 
 export interface BoatImageSwiperProps {
-  images:         string[];
-  previewUri?:    string | null;
-  onIndexChange?: (idx: number) => void;
+  images:           string[];
+  previewUri?:      string | null;
+  onIndexChange?:   (idx: number) => void;
+  heroSharedTag?:   string;
 }
 
-export default function BoatImageSwiper({ images, previewUri, onIndexChange }: BoatImageSwiperProps) {
+export default function BoatImageSwiper({ images, previewUri, onIndexChange, heroSharedTag }: BoatImageSwiperProps) {
   const insets = useSafeAreaInsets();
   const [activeIdx, setActiveIdx] = useState(0);
   const [fsVisible, setFsVisible] = useState(false);
@@ -90,7 +97,13 @@ export default function BoatImageSwiper({ images, previewUri, onIndexChange }: B
 
   return (
     <>
-      <View style={s.imageSection}>
+      <Animated.View
+        style={s.imageSection}
+        {...(heroSharedTag ? {
+          sharedTransitionTag: heroSharedTag,
+          sharedTransitionStyle: heroTransition,
+        } : {})}
+      >
         {images.length > 0 ? (
           <Pressable onPress={openFs}>
             <FlatList
@@ -126,7 +139,7 @@ export default function BoatImageSwiper({ images, previewUri, onIndexChange }: B
             <Text style={s.counterTxt}>{activeIdx + 1} / {images.length}</Text>
           </View>
         )}
-      </View>
+      </Animated.View>
 
       <Modal
         visible={fsVisible}

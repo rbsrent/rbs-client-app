@@ -1,7 +1,6 @@
 import { ArrowLeft } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -17,6 +16,7 @@ import { COLORS } from '@/shared/colors';
 import { digitsToE164, isValidDigits, normalizePhone } from '@/shared/utils/phone';
 
 import { useAuth } from '../hooks/useAuth';
+import { Spinner } from '@/shared/components/Spinner';
 
 interface Props {
   onBack: () => void;
@@ -90,7 +90,7 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
           disabled={!isValidDigits(digits) || isLoading}
         >
           {isLoading ? (
-            <ActivityIndicator color={COLORS.white} />
+            <Spinner color="#fff" trackColor="rgba(255,255,255,0.25)" />
           ) : (
             <Text style={styles.sendBtnText}>Получить код</Text>
           )}
@@ -118,7 +118,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -142,7 +141,6 @@ const styles = StyleSheet.create({
   },
   channelRow: {
     flexDirection: 'row',
-    backgroundColor: COLORS.muted,
     borderRadius: 12,
     padding: 3,
     gap: 3,
@@ -174,7 +172,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    backgroundColor: COLORS.backgroundAlt,
     borderRadius: 14,
     paddingHorizontal: 16,
     paddingVertical: 15,

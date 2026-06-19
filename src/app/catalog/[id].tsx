@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { Anchor, ArrowLeft, Heart, Share2 } from "lucide-react-native";
 import { useCallback, useEffect, useRef } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   Share,
   StyleSheet,
@@ -34,6 +33,7 @@ import BoatDetailDescription from "@/features/catalog/components/detail/BoatDeta
 import BoatDetailFeatures from "@/features/catalog/components/detail/BoatDetailFeatures";
 import BoatDetailReviews from "@/features/catalog/components/detail/BoatDetailReviews";
 import { useBoatDetail } from "@/features/catalog/hooks/useBoatDetail";
+import { Spinner } from '@/shared/components/Spinner';
 
 const CARD_OVERLAP = 28;
 
@@ -192,6 +192,7 @@ export default function BoatDetailScreen() {
         <BoatImageSwiper
           images={images}
           previewUri={preview?.cover}
+          heroSharedTag={`boat-img-${id}`}
         />
 
         <View style={s.card}>
@@ -204,13 +205,8 @@ export default function BoatDetailScreen() {
 
           {/* loading state — spinner only */}
           {isLoading ? (
-            <ActivityIndicator
-              color={COLORS.brandNavy}
-              size="small"
-              style={{ marginBottom: 36 }}
-            />
-          ) : boat ? (
-            /* ── full content fades in after load ── */
+            <Spinner size={20} style={{ marginBottom: 36 }} />
+          ) : (
             <Animated.View entering={FadeIn.duration(260)}>
               <View style={s.statsRow}>
                 <View style={s.statsCell}>
@@ -283,7 +279,7 @@ export default function BoatDetailScreen() {
                 boatId={boat.id}
               />
             </Animated.View>
-          ) : null}
+          )}
         </View>
       </Animated.ScrollView>
 

@@ -12,7 +12,7 @@ interface Props {
   border?: boolean;
 }
 
-export function ScreenHeader({ title, onBack, right, border = true }: Props) {
+export function ScreenHeader({ title, onBack, right, border = false }: Props) {
   const router = useRouter();
   const insets = useSafeAreaInsets();
 
@@ -63,8 +63,6 @@ const styles = StyleSheet.create({
   backBtn: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },

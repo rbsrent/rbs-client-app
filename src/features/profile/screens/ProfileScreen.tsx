@@ -285,7 +285,6 @@ const s = StyleSheet.create({
   topActions: { flexDirection: 'row', gap: 8 },
   actionBtn: {
     width: 40, height: 40, borderRadius: 20,
-    backgroundColor: '#F2F2F2',
     alignItems: 'center', justifyContent: 'center',
   },
 

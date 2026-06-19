@@ -1,3 +1,3 @@
-import { AllBoatsScreen } from '@/features/catalog/screens/AllBoatsScreen';
+import { CatalogMenuScreen } from '@/features/catalog/screens/CatalogMenuScreen';
 
-export default AllBoatsScreen;
+export default CatalogMenuScreen;

@@ -4,7 +4,6 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ChevronLeft, Clock, MapPin } from "lucide-react-native";
 import { useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   Pressable,
   ScrollView,
@@ -12,7 +11,12 @@ import {
   Text,
   View,
 } from "react-native";
-import Animated, { FadeIn } from "react-native-reanimated";
+import Animated, {
+  FadeIn,
+  FadeInLeft,
+  FadeInRight,
+  ZoomIn,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getCachedRoute, setCachedRoute, getRoutePreview } from "@/features/routes/store";
@@ -23,6 +27,7 @@ import {
 } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
 import { publicSupabase } from "@/shared/supabase/publicClient";
+import { Spinner } from '@/shared/components/Spinner';
 
 const { width: W } = Dimensions.get("window");
 const HERO_H = 380;
@@ -49,46 +54,52 @@ function SnakePath({ points }: { points: string[] }) {
           const isRight = i % 2 === 0;
           const isFirst = i === 0;
           const isLast = i === points.length - 1;
+          const STEP = 340;
+          const cardDelay = i * STEP;
+
+          // card slides from its side; dot pops after card settles
+          const cardEnter = isRight
+            ? FadeInLeft.delay(cardDelay).duration(320).springify().damping(18).stiffness(120)
+            : FadeInRight.delay(cardDelay).duration(320).springify().damping(18).stiffness(120);
 
           return (
             <View key={i}>
               {/* waypoint row */}
               <View style={[sp.row, isRight ? sp.rowRight : sp.rowLeft]}>
                 {/* label card */}
-                <View
+                <Animated.View
+                  entering={cardEnter}
                   style={[sp.labelCard, isRight ? sp.labelRight : sp.labelLeft]}
                 >
                   {(isFirst || isLast) && (
                     <Text style={sp.badge}>{isFirst ? "Старт" : "Финиш"}</Text>
                   )}
                   <Text style={sp.label}>{name}</Text>
-                </View>
+                </Animated.View>
 
-                {/* dot */}
+                {/* dot — pops in after card */}
                 <View style={sp.dotWrap}>
-                  <View style={sp.dot}>
+                  <Animated.View
+                    entering={ZoomIn.delay(cardDelay + 180).duration(280).springify().damping(12).stiffness(180)}
+                    style={sp.dot}
+                  >
                     <Text style={sp.dotNum}>{i + 1}</Text>
-                  </View>
+                  </Animated.View>
                 </View>
 
                 {/* spacer opposite side */}
                 <View style={sp.spacer} />
               </View>
 
-              {/* connector between this and next point */}
+              {/* connector fades in after dot */}
               {!isLast && (
-                <View
+                <Animated.View
+                  entering={FadeIn.delay(cardDelay + 280).duration(80)}
                   style={[sp.connector, isRight ? sp.connRight : sp.connLeft]}
                 >
-                  {/* top half: horizontal run + down */}
-                  <View
-                    style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]}
-                  />
-                  {/* bottom half: back to center */}
-                  <View
-                    style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]}
-                  />
-                </View>
+                  <View style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]} />
+                  <View style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]} />
+                </Animated.View>
               )}
             </View>
           );
@@ -244,7 +255,7 @@ export default function RouteDetailScreen() {
         {/* ── content ── */}
         {loading ? (
           <View style={s.loadingBlock}>
-            <ActivityIndicator color={NAVY} size="small" />
+            <Spinner size={20} />
           </View>
         ) : !route ? (
           <View style={s.loadingBlock}>
@@ -447,7 +458,6 @@ const s = StyleSheet.create({
 
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
-    backgroundColor: COLORS.muted,
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,

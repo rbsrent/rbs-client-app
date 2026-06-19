@@ -235,7 +235,6 @@ const s = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "#F2F2F2",
     alignItems: "center",
     justifyContent: "center",
   },
@@ -243,7 +242,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#F2F2F2",
   },
   editBtnTxt: { fontSize: 14, fontWeight: "500", color: "#000" },
 
@@ -326,7 +324,6 @@ const s = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: "#F5F5F5",
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 4,

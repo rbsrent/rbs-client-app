@@ -12,7 +12,6 @@ import {
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -25,6 +24,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/shared/colors";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { publicSupabase } from "@/shared/supabase/publicClient";
+import { Spinner } from '@/shared/components/Spinner';
 
 type PaymentState = "loading" | "pending" | "success" | "failed" | "error";
 
@@ -208,7 +208,7 @@ export default function BookingDetailScreen() {
       <View style={[s.root, { paddingTop: insets.top }]}>
         <ScreenHeader title="Бронирование" onBack={() => router.back()} />
         <View style={s.centerBox}>
-          <ActivityIndicator color={COLORS.brandNavy} size="large" />
+          <Spinner />
           <Text style={s.centerLabel}>Проверяем статус платежа…</Text>
         </View>
       </View>
@@ -262,7 +262,7 @@ export default function BookingDetailScreen() {
             disabled={rechecking}
           >
             {rechecking ? (
-              <ActivityIndicator color={COLORS.brandNavy} size="small" />
+              <Spinner size={20} />
             ) : (
               <>
                 <RefreshCw size={15} color={COLORS.brandNavy} strokeWidth={2} />

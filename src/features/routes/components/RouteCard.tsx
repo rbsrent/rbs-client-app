@@ -1,17 +1,28 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Clock, MapPin } from 'lucide-react-native';
-import { memo } from 'react';
+import { Clock, Heart, MapPin } from 'lucide-react-native';
+import { memo, useEffect, useRef } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
+import { useAuthStore } from '@/store/useAuthStore';
+import { useRouteSavedStore } from '@/store/useRouteSavedStore';
 
 import { setRoutePreview } from '../store';
-import { DIFFICULTY, resolveRouteImage, WaterRoute } from '../types';
+import { resolveRouteImage, WaterRoute } from '../types';
+import { SaveRouteSheet, SaveRouteSheetHandle } from './SaveRouteSheet';
 
 const { width: W } = Dimensions.get('window');
-const IMG_H = 220;
+const IMG_H = Math.round(W * 0.6);
+
+const AnimPressable = Animated.createAnimatedComponent(Pressable);
 
 function durationLabel(h: number) {
   if (h === 1) return '1 час';
@@ -19,10 +30,50 @@ function durationLabel(h: number) {
   return `${h} часов`;
 }
 
+function HeartBtn({ routeId }: { routeId: string }) {
+  const router   = useRouter();
+  const session  = useAuthStore((s) => s.session);
+  const hydrate  = useRouteSavedStore((s) => s.hydrate);
+  const isSaved  = useRouteSavedStore((s) => s.isSaved(routeId));
+  const toggle   = useRouteSavedStore((s) => s.toggle);
+  const sheetRef = useRef<SaveRouteSheetHandle>(null);
+  const scale    = useSharedValue(1);
+
+  useEffect(() => { hydrate(); }, []);
+
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+
+  const handlePress = async () => {
+    if (!session) {
+      router.push('/auth' as any);
+      return;
+    }
+    scale.value = withSequence(
+      withTiming(0.82, { duration: 90 }),
+      withTiming(1,    { duration: 90 }),
+    );
+    const nowSaved = await toggle(routeId);
+    sheetRef.current?.show(nowSaved);
+  };
+
+  return (
+    <>
+      <AnimPressable style={[s.heartBtn, anim]} onPress={handlePress} hitSlop={12}>
+        <Heart
+          size={18}
+          color={isSaved ? COLORS.error : 'rgba(255,255,255,0.95)'}
+          fill={isSaved ? COLORS.error : 'transparent'}
+          strokeWidth={2}
+        />
+      </AnimPressable>
+      <SaveRouteSheet ref={sheetRef} />
+    </>
+  );
+}
+
 export const RouteCard = memo(function RouteCard({ route }: { route: WaterRoute }) {
   const router   = useRouter();
   const imageUrl = resolveRouteImage(route.map_image_url);
-  const diff     = DIFFICULTY[route.difficulty_level] ?? { label: route.difficulty_level, color: COLORS.text3 };
   const points   = (route.route_points ?? []).map((p) => p.name).filter(Boolean);
   const slug     = route.seo_slug ?? route.id;
 
@@ -33,10 +84,9 @@ export const RouteCard = memo(function RouteCard({ route }: { route: WaterRoute 
 
   return (
     <Pressable
-      style={({ pressed }) => [s.card, pressed && { opacity: 0.93 }]}
+      style={({ pressed }) => [s.card, pressed && { opacity: 0.94 }]}
       onPress={handlePress}
     >
-      {/* ── image ── */}
       <View style={s.imgWrap}>
         {imageUrl ? (
           <Image
@@ -53,104 +103,114 @@ export const RouteCard = memo(function RouteCard({ route }: { route: WaterRoute 
           />
         )}
 
-        {/* gradient overlay */}
         <LinearGradient
-          colors={['transparent', 'rgba(0,0,0,0.72)']}
-          style={[StyleSheet.absoluteFill, { top: IMG_H * 0.35 }]}
+          colors={['transparent', 'rgba(0,0,0,0.55)']}
+          style={s.gradient}
           pointerEvents="none"
         />
 
-        {/* difficulty dot — top right */}
-        <View style={[s.diffPill, { backgroundColor: diff.color }]}>
-          <Text style={s.diffTxt}>{diff.label}</Text>
-        </View>
+        <HeartBtn routeId={route.id} />
 
-        {/* name + meta on image bottom */}
-        <View style={s.overlay}>
-          <Text style={s.name} numberOfLines={2}>{route.name}</Text>
-          <View style={s.metaRow}>
-            <View style={s.metaItem}>
-              <Clock size={12} color="rgba(255,255,255,0.8)" strokeWidth={2} />
-              <Text style={s.metaTxt}>{durationLabel(route.duration_hours)}</Text>
-            </View>
-            {points.length > 0 && (
-              <View style={s.metaItem}>
-                <MapPin size={12} color="rgba(255,255,255,0.8)" strokeWidth={2} />
-                <Text style={s.metaTxt}>{points.length} точки маршрута</Text>
-              </View>
-            )}
+        <View style={s.bottomRow}>
+          <View style={s.durationPill}>
+            <Clock size={11} color={COLORS.text1} strokeWidth={2.5} />
+            <Text style={s.durationTxt}>{durationLabel(route.duration_hours)}</Text>
           </View>
         </View>
       </View>
 
-      {/* ── info strip below image ── */}
-      {(points.length > 0 || (route.highlights?.length ?? 0) > 0) && (
-        <View style={s.strip}>
-          {points.length > 0 && (
-            <Text style={s.pointsTxt} numberOfLines={1}>
-              {points.slice(0, 3).join('  →  ')}
+      <View style={s.info}>
+        <Text style={s.name} numberOfLines={3}>{route.name}</Text>
+        {points.length > 0 && (
+          <View style={s.metaRow}>
+            <MapPin size={12} color={COLORS.text3} strokeWidth={2} />
+            <Text style={s.metaTxt} numberOfLines={1}>
+              {points.slice(0, 3).join(' → ')}
             </Text>
-          )}
-          {route.highlights && route.highlights.length > 0 && (
-            <View style={s.chips}>
-              {route.highlights.slice(0, 3).map((h, i) => (
-                <View key={i} style={s.chip}>
-                  <Text style={s.chipTxt}>{h}</Text>
-                </View>
-              ))}
-            </View>
-          )}
-        </View>
-      )}
+          </View>
+        )}
+        {route.highlights && route.highlights.length > 0 && (
+          <Text style={s.metaTxt} numberOfLines={1}>
+            {route.highlights.slice(0, 2).join('  ·  ')}
+          </Text>
+        )}
+      </View>
     </Pressable>
   );
 });
 
 const s = StyleSheet.create({
-  card: {
+  card: {},
+
+  imgWrap: {
+    height: IMG_H,
     borderRadius: 16,
     overflow: 'hidden',
-    backgroundColor: '#fff',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+    backgroundColor: COLORS.muted,
   },
 
-  imgWrap: { height: IMG_H, width: '100%', backgroundColor: COLORS.muted },
-
-  diffPill: {
-    position: 'absolute',
-    top: 12, right: 12,
-    borderRadius: 8,
-    paddingHorizontal: 10, paddingVertical: 4,
-  },
-  diffTxt: { fontSize: 11, fontWeight: '700', color: '#fff' },
-
-  overlay: {
+  gradient: {
     position: 'absolute',
     bottom: 0, left: 0, right: 0,
-    padding: 16, gap: 6,
+    height: IMG_H * 0.45,
+  },
+
+  heartBtn: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  bottomRow: {
+    position: 'absolute',
+    bottom: 12,
+    left: 14,
+    right: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  durationPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: 'rgba(255,255,255,0.92)',
+    borderRadius: 20,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  durationTxt: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: COLORS.text1,
+  },
+
+  info: {
+    paddingTop: 12,
+    gap: 4,
   },
   name: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '700',
-    color: '#fff',
-    lineHeight: 24,
+    color: COLORS.text1,
+    lineHeight: 25,
+    letterSpacing: -0.2,
   },
-  metaRow:  { flexDirection: 'row', gap: 14 },
-  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  metaTxt:  { fontSize: 12, color: 'rgba(255,255,255,0.85)', fontWeight: '500' },
-
-  strip:     { paddingHorizontal: 16, paddingVertical: 12, gap: 8 },
-  pointsTxt: { fontSize: 12, color: COLORS.text3, fontWeight: '500', letterSpacing: 0.2 },
-
-  chips:   { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-  chip: {
-    backgroundColor: COLORS.muted,
-    borderRadius: 20,
-    paddingHorizontal: 10, paddingVertical: 4,
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  chipTxt: { fontSize: 11, color: COLORS.text2, fontWeight: '500' },
+  metaTxt: {
+    flex: 1,
+    fontSize: 13,
+    color: COLORS.text3,
+    lineHeight: 18,
+  },
 });

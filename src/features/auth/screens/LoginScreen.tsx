@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Linking,
   Platform,
@@ -21,6 +20,7 @@ import { TgWaitingView } from '../components/TgWaitingView';
 import { useAuth } from '../hooks/useAuth';
 import { OtpScreen } from './OtpScreen';
 import { PhoneScreen } from './PhoneScreen';
+import { Spinner } from '@/shared/components/Spinner';
 
 type ScreenView = 'main' | 'phone' | 'otp' | 'tg-waiting' | 'tg-verifying';
 
@@ -177,7 +177,7 @@ export function LoginScreen() {
         {/* Main or Waiting */}
         {view === 'tg-verifying' ? (
           <View style={styles.centerBox}>
-            <ActivityIndicator size="large" color={COLORS.brandNavy} />
+            <Spinner />
             <Text style={styles.verifyingText}>Завершаем вход...</Text>
           </View>
         ) : view === 'tg-waiting' ? (
@@ -220,7 +220,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },

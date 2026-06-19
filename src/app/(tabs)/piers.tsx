@@ -2,7 +2,6 @@ import * as Location from 'expo-location';
 import { List, Map, MapPin, Navigation, Search, X } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -16,6 +15,7 @@ import YaMap, { Circle, Marker } from "react-native-yamap";
 import { COLORS } from "@/shared/colors";
 import { publicSupabase } from "@/shared/supabase/publicClient";
 import { initYaMap } from "@/shared/yamap";
+import { Spinner } from '@/shared/components/Spinner';
 
 initYaMap();
 
@@ -157,7 +157,7 @@ export default function PiersScreen() {
 
       {loading ? (
         <View style={s.loader}>
-          <ActivityIndicator color={COLORS.brandNavy} size="large" />
+          <Spinner />
         </View>
       ) : (
         <>

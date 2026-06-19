@@ -6,8 +6,6 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '@/shared/colors';
 import { HeroSlide } from '@/store/useCatalogStore';
 
-const CARD_W = 287;
-const CARD_H = 139;
 const WEB_BASE = 'https://rbs.rent';
 
 function resolveUrl(raw: string): string {
@@ -17,17 +15,23 @@ function resolveUrl(raw: string): string {
   return raw;
 }
 
-export function BannerCard({ slide }: { slide: HeroSlide }) {
-  const router = useRouter();
-  const imageUrl = resolveUrl(slide.image_url ?? '');
-  const ctaUrl = slide.cta_primary_url || slide.cta_secondary_url;
+interface Props {
+  slide: HeroSlide;
+  width: number;
+  height: number;
+}
 
-  const hasText = !!(slide.title || slide.description);
+export function BannerCard({ slide, width, height }: Props) {
+  const router   = useRouter();
+  const imageUrl = resolveUrl(slide.image_url ?? '');
+  const ctaUrl   = slide.cta_primary_url || slide.cta_secondary_url;
+  const hasText  = !!(slide.title || slide.description);
 
   return (
     <Pressable
-      style={styles.card}
+      style={[styles.card, { width, height }]}
       onPress={() => ctaUrl && router.push(ctaUrl as any)}
+      android_ripple={null}
     >
       {imageUrl ? (
         <Image
@@ -65,9 +69,7 @@ export function BannerCard({ slide }: { slide: HeroSlide }) {
 
 const styles = StyleSheet.create({
   card: {
-    width: CARD_W,
-    height: CARD_H,
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: 'hidden',
     backgroundColor: COLORS.muted,
     justifyContent: 'flex-end',
@@ -78,19 +80,19 @@ const styles = StyleSheet.create({
   overlay: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'flex-end',
-    padding: 12,
+    padding: 16,
     gap: 3,
-    borderRadius: 16,
   },
   cardTitle: {
     color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '700',
-    lineHeight: 18,
+    fontSize: 20,
+    fontWeight: '800',
+    lineHeight: 25,
   },
   cardDesc: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 11,
+    color: 'rgba(255,255,255,0.72)',
+    fontSize: 13,
+    lineHeight: 18,
   },
   ctaTag: {
     alignSelf: 'flex-start',
@@ -98,7 +100,7 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    marginTop: 4,
+    marginTop: 6,
   },
   ctaTagText: {
     color: COLORS.brandNavy,

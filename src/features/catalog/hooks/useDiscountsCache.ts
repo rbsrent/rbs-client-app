@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
 import { publicSupabase } from '@/shared/supabase/publicClient';
+import { useEffect, useState } from 'react';
 
 interface BoatDiscount {
   boat_id: string;
@@ -53,11 +53,9 @@ export function useDiscountsCache(): Map<string, ActiveDiscount> {
         .from('boat_discounts')
         .select('*')
         .eq('is_active', true);
-      if (__DEV__) console.log('[discounts] data:', data, 'error:', error);
       if (!data) return;
       _cache = data as BoatDiscount[];
       _ts = Date.now();
-      if (__DEV__) console.log('[discounts] active after filter:', buildMap(_cache));
       setMap(buildMap(_cache));
     })();
   }, []);

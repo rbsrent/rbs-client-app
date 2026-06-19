@@ -1,4 +1,4 @@
-import { MapPin, Ruler, Shield, Users } from 'lucide-react-native';
+import { MapPin, Ruler, Users } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -45,10 +45,10 @@ function BoatDetailFeatures({ boat }: Props) {
         ) : null}
       </View>
 
-      <View style={s.banner}>
+      {/* <View style={s.banner}>
         <Shield size={14} color="#222" strokeWidth={2} />
         <Text style={s.bannerTxt}>Бесплатная отмена до начала аренды</Text>
-      </View>
+      </View> */}
     </View>
   );
 }

@@ -2,7 +2,6 @@ import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import { Check, Clock, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Dimensions,
   Pressable,
   StyleSheet,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import { COLORS } from '@/shared/colors';
 import { publicSupabase } from '@/shared/supabase/publicClient';
+import { Spinner } from '@/shared/components/Spinner';
 
 const { width: W } = Dimensions.get('window');
 
@@ -187,7 +187,7 @@ export function TimeSlotSheet({
       {/* Slot grid */}
       {loading ? (
         <View style={s.loader}>
-          <ActivityIndicator color={COLORS.brandNavy} />
+          <Spinner />
           <Text style={s.loaderTxt}>Загружаем доступное время…</Text>
         </View>
       ) : (

@@ -41,14 +41,12 @@ export function TabBar({ state, navigation, tabs }: TabBarProps) {
 const styles = StyleSheet.create({
   bar: {
     flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    backgroundColor: COLORS.greyLight,
     paddingTop: 8,
-    shadowColor: COLORS.brandNavy,
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
+    // shadowColor: COLORS.brandNavy,
+    // shadowOffset: { width: 0, height: -2 },
+    // shadowOpacity: 0.05,
+    // shadowRadius: 8,
     elevation: 8,
   },
 });

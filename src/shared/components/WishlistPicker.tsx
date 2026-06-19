@@ -181,7 +181,6 @@ const s = StyleSheet.create({
     overflow: 'hidden', backgroundColor: '#E0E0E0',
   },
   thumbNew: {
-    backgroundColor: '#F2F2F2',
     alignItems: 'center', justifyContent: 'center',
   },
   rowText: { flex: 1, gap: 2 },

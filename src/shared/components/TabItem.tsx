@@ -1,19 +1,23 @@
-import { useEffect } from 'react';
-import { Pressable, StyleSheet, Text } from 'react-native';
+import { useEffect } from "react";
+import { Pressable, StyleSheet, Text } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
-} from 'react-native-reanimated';
+} from "react-native-reanimated";
 
-import { COLORS } from '@/shared/colors';
+import { COLORS } from "@/shared/colors";
 
 const SPRING = { damping: 20, stiffness: 300, mass: 0.8 };
 
 export interface VisualTab {
   key: string;
   label: string;
-  Icon: React.ComponentType<{ size: number; color: string; strokeWidth: number }>;
+  Icon: React.ComponentType<{
+    size: number;
+    color: string;
+    strokeWidth: number;
+  }>;
 }
 
 export function TabItem({
@@ -26,10 +30,10 @@ export function TabItem({
   onPress: () => void;
 }) {
   const scale = useSharedValue(1);
-  const opacity = useSharedValue(active ? 1 : 0.4);
+  const opacity = useSharedValue(active ? 1 : 0.72);
 
   useEffect(() => {
-    opacity.value = withSpring(active ? 1 : 0.4, SPRING);
+    opacity.value = withSpring(active ? 1 : 0.72, SPRING);
   }, [active]);
 
   const animStyle = useAnimatedStyle(() => ({
@@ -40,18 +44,24 @@ export function TabItem({
   return (
     <Pressable
       style={styles.tab}
-      onPressIn={() => { scale.value = withSpring(0.85, { damping: 14, stiffness: 400 }); }}
-      onPressOut={() => { scale.value = withSpring(1, SPRING); }}
+      onPressIn={() => {
+        scale.value = withSpring(0.85, { damping: 14, stiffness: 400 });
+      }}
+      onPressOut={() => {
+        scale.value = withSpring(1, SPRING);
+      }}
       onPress={onPress}
       hitSlop={6}
     >
       <Animated.View style={[styles.tabInner, animStyle]}>
         <tab.Icon
           size={22}
-          color={active ? COLORS.brandNavy : COLORS.text2}
+          color={active ? COLORS.brandNavy : COLORS.grey}
           strokeWidth={active ? 2.2 : 1.7}
         />
-        <Text style={[styles.label, active && styles.labelActive]}>{tab.label}</Text>
+        <Text style={[styles.label, active && styles.labelActive]}>
+          {tab.label}
+        </Text>
       </Animated.View>
     </Pressable>
   );
@@ -60,19 +70,19 @@ export function TabItem({
 const styles = StyleSheet.create({
   tab: {
     flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingTop: 4,
   },
-  tabInner: { alignItems: 'center', gap: 3 },
+  tabInner: { alignItems: "center", gap: 3 },
   label: {
     fontSize: 10,
-    color: COLORS.text3,
+    color: COLORS.grey,
     letterSpacing: 0.1,
-    fontWeight: '400',
+    fontWeight: "400",
   },
   labelActive: {
     color: COLORS.brandNavy,
-    fontWeight: '700',
+    fontWeight: "700",
   },
 });

@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Calendar, ChevronRight, Clock, MapPin } from 'lucide-react-native';
 import React, { memo, useCallback, useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -19,6 +18,7 @@ import { authSupabase } from '@/shared/supabase/authClient';
 import { SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { phoneVariants } from '@/shared/utils/phone';
 import { useAuthStore } from '@/store/useAuthStore';
+import { Spinner } from '@/shared/components/Spinner';
 
 interface Booking {
   id: string;
@@ -156,19 +156,13 @@ export const BookingsScreen = memo(function BookingsScreen() {
 
   if (!session) {
     return (
-      <View style={[styles.container, { paddingTop: insets.top }]}>
-        <View style={styles.emptyState}>
-          <Text style={styles.emptyTitle}>Войдите в аккаунт</Text>
-          <Text style={styles.emptySubtitle}>Чтобы видеть свои бронирования</Text>
-          <Pressable style={styles.loginBtn} onPress={() => router.push('/auth' as any)}>
-            <LinearGradient
-              colors={[COLORS.brandCyan, COLORS.brandViolet]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.loginBtnGrad}
-            >
-              <Text style={styles.loginBtnText}>Войти</Text>
-            </LinearGradient>
+      <View style={[styles.container, styles.gateRoot, { paddingTop: insets.top }]}>
+        <Text style={styles.pageTitle}>Поездки</Text>
+        <View style={styles.gateBody}>
+          <Text style={styles.gateTitle}>Войдите, чтобы посмотреть{'\n'}свои поездки</Text>
+          <Text style={styles.gateDesc}>Для просмотра ваших бронирований необходимо войти в аккаунт.</Text>
+          <Pressable style={styles.gateBtn} onPress={() => router.push('/auth' as any)}>
+            <Text style={styles.gateBtnTxt}>Вход</Text>
           </Pressable>
         </View>
       </View>
@@ -216,6 +210,20 @@ export const BookingsScreen = memo(function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.backgroundAlt },
+  gateRoot: { backgroundColor: '#fff', paddingHorizontal: 16 },
+  pageTitle: { fontSize: 32, fontWeight: '700', color: '#000', marginTop: 8, marginBottom: 4 },
+  gateBody: { paddingTop: 24, gap: 10 },
+  gateTitle: { fontSize: 24, fontWeight: '700', color: '#000', lineHeight: 32 },
+  gateDesc: { fontSize: 15, color: '#888', lineHeight: 22 },
+  gateBtn: {
+    alignSelf: 'flex-start',
+    marginTop: 12,
+    backgroundColor: '#000',
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 14,
+  },
+  gateBtnTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },
   header: {
     backgroundColor: COLORS.white,
     paddingHorizontal: 16,
@@ -280,7 +288,4 @@ const styles = StyleSheet.create({
   emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text1 },
   emptySubtitle: { fontSize: 14, color: COLORS.text2 },
-  loginBtn: { borderRadius: 14, overflow: 'hidden', marginTop: 8 },
-  loginBtnGrad: { paddingHorizontal: 32, paddingVertical: 14 },
-  loginBtnText: { color: COLORS.white, fontSize: 16, fontWeight: '700' },
 });

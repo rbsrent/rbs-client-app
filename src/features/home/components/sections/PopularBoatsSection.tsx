@@ -205,7 +205,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 12,
   },
-  title: { fontSize: 18, fontWeight: "800", color: COLORS.text1 },
+  title: { fontSize: 18, fontWeight: "500", color: COLORS.text1 },
   titleSub: { fontSize: 12, color: COLORS.text3, marginTop: 1 },
   arrowBtn: {
     width: 32,

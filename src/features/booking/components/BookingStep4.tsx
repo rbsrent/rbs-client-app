@@ -1,6 +1,5 @@
 import { Gift } from 'lucide-react-native';
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -15,6 +14,7 @@ import { digitsToE164 } from '@/shared/utils/phone';
 import { Pier } from '../types';
 import { durLabel, fmtHour, ruFmt } from '../utils';
 import { SummaryRow, shared } from './BookingRows';
+import { Spinner } from '@/shared/components/Spinner';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -183,7 +183,7 @@ export function BookingStep4({
           disabled={!giftInput.trim() || giftLoading || !!gift}
         >
           {giftLoading
-            ? <ActivityIndicator color={COLORS.white} size="small" />
+            ? <Spinner size={20} color="#fff" trackColor="rgba(255,255,255,0.25)" />
             : <Text style={shared.applyTxt}>{gift ? '✓' : 'OK'}</Text>}
         </Pressable>
       </View>

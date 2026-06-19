@@ -1,4 +1,4 @@
-import { BoatCard } from '@/shared/components/BoatCard';
+import { BoatCard, BoatCardVariant } from '@/shared/components/BoatCard';
 import { AvailInfo } from '@/features/catalog/utils/filterUtils';
 import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
 import { Boat } from '@/store/useCatalogStore';
@@ -7,9 +7,10 @@ interface Props {
   boat:       Boat;
   availInfo?: AvailInfo;
   discount?:  ActiveDiscount;
+  variant?:   BoatCardVariant;
 }
 
-export function PromoCard({ boat, availInfo, discount }: Props) {
+export function PromoCard({ boat, availInfo, discount, variant = "catalog" }: Props) {
   return (
     <BoatCard
       boat={{
@@ -27,6 +28,7 @@ export function PromoCard({ boat, availInfo, discount }: Props) {
       route={`/catalog/${boat.id}`}
       availInfo={availInfo}
       discount={discount}
+      variant={variant}
     />
   );
 }

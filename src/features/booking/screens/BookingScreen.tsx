@@ -3,16 +3,17 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Linking from 'expo-linking';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { openAuthSessionAsync, WebBrowserResultType } from 'expo-web-browser';
-import { ChevronRight, Ruler, Users } from 'lucide-react-native';
+import { Ruler, Users, X } from 'lucide-react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
+  Animated,
   AppState,
+  Dimensions,
   KeyboardAvoidingView,
+  PanResponder,
   Platform,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
   View,
@@ -20,21 +21,22 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
-import { ScreenHeader } from '@/shared/components/ScreenHeader';
-import { digitsToE164, isValidDigits } from '@/shared/utils/phone';
 import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
+import { digitsToE164, isValidDigits } from '@/shared/utils/phone';
 
-import { TimeSlotSheet } from '../components/TimeSlotSheet';
-import { PierMapSheet } from '../components/PierMapSheet';
-import { StepProgress } from '../components/StepProgress';
 import { BookingStep1 } from '../components/BookingStep1';
 import { BookingStep2 } from '../components/BookingStep2';
 import { BookingStep3 } from '../components/BookingStep3';
 import { BookingStep4 } from '../components/BookingStep4';
+import { PierMapSheet } from '../components/PierMapSheet';
+import { STEP_LABELS, StepProgress } from '../components/StepProgress';
+import { TimeSlotSheet } from '../components/TimeSlotSheet';
 import { Boat, Pier, PricingResult } from '../types';
-import { buildDatetime, fmtHour, fmtShort, durLabel, ruFmt, uuid } from '../utils';
+import { buildDatetime, durLabel, fmtHour, fmtShort, ruFmt, uuid } from '../utils';
+import { Spinner } from '@/shared/components/Spinner';
 
-// ─── Local types (not shared) ─────────────────────────────────────────────────
+const SCREEN_W = Dimensions.get('window').width;
+const SPRING   = { useNativeDriver: true, tension: 280, friction: 32 } as const;
 
 interface PromoResult {
   id: string;
@@ -48,8 +50,6 @@ interface GiftCertResult {
   balance: number;
 }
 
-// ─── Screen ───────────────────────────────────────────────────────────────────
-
 export function BookingScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -60,11 +60,31 @@ export function BookingScreen() {
     duration: durParam,
   } = useLocalSearchParams<{ boatId: string; date?: string; startHour?: string; duration?: string }>();
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<any>(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const enterX       = useRef(new Animated.Value(0)).current;
+  const exitX        = useRef(new Animated.Value(0)).current;
+  const enterOpacity = useRef(new Animated.Value(1)).current;
+
+  const [visibleStep, setVisibleStep] = useState(1);
+  const [ghostStep, setGhostStep]     = useState<number | null>(null);
+
+  // Stable refs for PanResponder closures (created once)
+  const stepRef        = useRef(1);
+  const visibleStepRef = useRef(1);
+  const isSwipingRef   = useRef(false);
+  const isAnimatingRef = useRef(false);
+
+  const COLLAPSE_AT = 72;
+  const headerTitleOpacity = scrollY.interpolate({ inputRange: [COLLAPSE_AT * 0.5, COLLAPSE_AT], outputRange: [0, 1], extrapolate: 'clamp' });
+  const contentTitleOpacity = scrollY.interpolate({ inputRange: [0, COLLAPSE_AT * 0.5], outputRange: [1, 0], extrapolate: 'clamp' });
 
   const [step, setStep] = useState(1);
+  // Keep refs in sync so PanResponder (created once) always sees fresh values
+  stepRef.current        = step;
+  visibleStepRef.current = visibleStep;
 
-  const [boat, setBoat]               = useState<Boat | null>(null);
+  const [boat, setBoat] = useState<Boat | null>(null);
   const [loadingBoat, setLoadingBoat] = useState(true);
 
   const [date, setDate] = useState<Date>(() => {
@@ -72,34 +92,34 @@ export function BookingScreen() {
     return new Date();
   });
   const [startHour, setStartHour] = useState<number>(hourParam ? Number(hourParam) : -1);
-  const [duration, setDuration]   = useState<number>(durParam  ? Number(durParam)  : 0);
+  const [duration, setDuration] = useState<number>(durParam ? Number(durParam) : 0);
   const [timeConfirmed, setTimeConfirmed] = useState(() => !!(hourParam && durParam));
-  const [sheetOpen, setSheetOpen]       = useState(false);
-  const [pierMapOpen, setPierMapOpen]   = useState(false);
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [pierMapOpen, setPierMapOpen] = useState(false);
 
-  const [piers, setPiers]               = useState<Pier[]>([]);
+  const [piers, setPiers] = useState<Pier[]>([]);
   const [selectedPier, setSelectedPier] = useState<Pier | null>(null);
-  const [promoInput, setPromoInput]     = useState('');
-  const [promo, setPromo]               = useState<PromoResult | null>(null);
+  const [promoInput, setPromoInput] = useState('');
+  const [promo, setPromo] = useState<PromoResult | null>(null);
   const [promoLoading, setPromoLoading] = useState(false);
-  const [promoError, setPromoError]     = useState('');
-  const [pricing, setPricing]           = useState<PricingResult | null>(null);
+  const [promoError, setPromoError] = useState('');
+  const [pricing, setPricing] = useState<PricingResult | null>(null);
   const [pricingLoading, setPricingLoading] = useState(false);
 
-  const [clientName,        setClientName]        = useState('');
+  const [clientName, setClientName] = useState('');
   const [clientPhoneDigits, setClientPhoneDigits] = useState('');
-  const [clientEmail,       setClientEmail]       = useState('');
+  const [clientEmail, setClientEmail] = useState('');
 
   const [isPrepayment, setIsPrepayment] = useState(false);
-  const [giftInput, setGiftInput]       = useState('');
-  const [gift, setGift]                 = useState<GiftCertResult | null>(null);
-  const [giftLoading, setGiftLoading]   = useState(false);
-  const [giftError, setGiftError]       = useState('');
-  const [paying, setPaying]             = useState(false);
+  const [giftInput, setGiftInput] = useState('');
+  const [gift, setGift] = useState<GiftCertResult | null>(null);
+  const [giftLoading, setGiftLoading] = useState(false);
+  const [giftError, setGiftError] = useState('');
+  const [paying, setPaying] = useState(false);
 
-  const bookingIdRef   = useRef<string | null>(null);
-  const pollRef        = useRef<ReturnType<typeof setInterval> | null>(null);
-  const appStateRef    = useRef(AppState.currentState);
+  const bookingIdRef = useRef<string | null>(null);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const appStateRef = useRef(AppState.currentState);
   const awaitingReturn = useRef(false);
 
   useEffect(() => {
@@ -198,31 +218,31 @@ export function BookingScreen() {
     setPricingLoading(true);
     try {
       const startDt = buildDatetime(date, startHour);
-      const endDt   = buildDatetime(date, startHour + duration);
+      const endDt = buildDatetime(date, startHour + duration);
       const { data, error } = await publicSupabase.functions.invoke('calculate-public-booking-pricing', {
         body: { boatId, startTime: startDt.toISOString(), endTime: endDt.toISOString() },
       });
       if (!error && data?.publicPrice) {
         setPricing({
-          publicPrice:        data.publicPrice,
-          prepaymentAmount:   data.prepaymentAmount  ?? Math.round(data.publicPrice * 0.2),
-          remainingAmount:    data.remainingAmount   ?? data.publicPrice - Math.round(data.publicPrice * 0.2),
-          durationHours:      data.durationHours     ?? duration,
+          publicPrice: data.publicPrice,
+          prepaymentAmount: data.prepaymentAmount ?? Math.round(data.publicPrice * 0.2),
+          remainingAmount: data.remainingAmount ?? data.publicPrice - Math.round(data.publicPrice * 0.2),
+          durationHours: data.durationHours ?? duration,
           originalHourlyRate: data.originalHourlyRate,
-          finalHourlyRate:    data.finalHourlyRate,
-          appliedDiscount:    data.appliedDiscount ?? null,
-          totalSavings:       data.totalSavings ?? 0,
+          finalHourlyRate: data.finalHourlyRate,
+          appliedDiscount: data.appliedDiscount ?? null,
+          totalSavings: data.totalSavings ?? 0,
         });
         if ((data.prepaymentAmount ?? 0) > 0) setIsPrepayment(true);
       } else {
         const base = (boat?.price_per_hour ?? 0) * duration;
-        const dp   = Math.round(base * 0.2);
+        const dp = Math.round(base * 0.2);
         setPricing({ publicPrice: base, prepaymentAmount: dp, remainingAmount: base - dp, durationHours: duration });
         if (dp > 0) setIsPrepayment(true);
       }
     } catch {
       const base = (boat?.price_per_hour ?? 0) * duration;
-      const dp   = Math.round(base * 0.2);
+      const dp = Math.round(base * 0.2);
       setPricing({ publicPrice: base, prepaymentAmount: dp, remainingAmount: base - dp, durationHours: duration });
     }
     setPricingLoading(false);
@@ -267,70 +287,159 @@ export function BookingScreen() {
     setGiftLoading(false);
   };
 
-  const baseTotal       = pricing?.publicPrice ?? (boat?.price_per_hour ?? 0) * duration;
-  const promoDiscount   = promo ? Math.round(baseTotal * promo.discount_percent / 100) : 0;
+  const baseTotal = pricing?.publicPrice ?? (boat?.price_per_hour ?? 0) * duration;
+  const promoDiscount = promo ? Math.round(baseTotal * promo.discount_percent / 100) : 0;
   const totalAfterPromo = baseTotal - promoDiscount;
-  const prepaymentAmt   = pricing
+  const prepaymentAmt = pricing
     ? Math.max(0, pricing.prepaymentAmount - promoDiscount)
     : Math.round(totalAfterPromo * 0.2);
-  const remainingAmt    = totalAfterPromo - prepaymentAmt;
-  const payNow          = isPrepayment ? prepaymentAmt : totalAfterPromo;
-  const giftUsed        = gift ? Math.min(gift.balance, payNow, totalAfterPromo) : 0;
-  const payOnline       = Math.max(0, payNow - giftUsed);
+  const remainingAmt = totalAfterPromo - prepaymentAmt;
+  const payNow = isPrepayment ? prepaymentAmt : totalAfterPromo;
+  const giftUsed = gift ? Math.min(gift.balance, payNow, totalAfterPromo) : 0;
+  const payOnline = Math.max(0, payNow - giftUsed);
+
+  const transitionStep = useCallback((nextStep: number, dir: 1 | -1) => {
+    if (isAnimatingRef.current) return;
+    isAnimatingRef.current = true;
+    setGhostStep(visibleStep);
+    enterX.setValue(dir * SCREEN_W);
+    exitX.setValue(0);
+    setVisibleStep(nextStep);
+    setStep(nextStep);
+    scrollRef.current?.scrollTo({ y: 0, animated: false });
+    Animated.parallel([
+      Animated.spring(enterX, { ...SPRING, toValue: 0 }),
+      Animated.spring(exitX,  { ...SPRING, toValue: -dir * SCREEN_W }),
+    ]).start(() => {
+      setGhostStep(null);
+      isAnimatingRef.current = false;
+    });
+  }, [visibleStep, enterX, exitX]);
 
   const goNext = async () => {
     if (step === 1) {
       if (!timeConfirmed) { Alert.alert('', 'Выберите время начала'); return; }
       await fetchPricing();
-      setStep(2);
+      transitionStep(2, 1);
     } else if (step === 2) {
-      setStep(3);
+      transitionStep(3, 1);
     } else if (step === 3) {
-      if (!clientName.trim())              { Alert.alert('', 'Введите имя'); return; }
+      if (!clientName.trim()) { Alert.alert('', 'Введите имя'); return; }
       if (!isValidDigits(clientPhoneDigits)) { Alert.alert('', 'Введите корректный номер телефона'); return; }
-      setStep(4);
+      transitionStep(4, 1);
     }
-    scrollRef.current?.scrollTo({ y: 0, animated: false });
   };
 
   const goBack = () => {
-    if (step > 1) { setStep(step - 1); scrollRef.current?.scrollTo({ y: 0, animated: false }); }
-    else router.back();
+    if (step > 1) {
+      transitionStep(step - 1, -1);
+    } else {
+      router.back();
+    }
   };
+
+  const swipePan = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        stepRef.current > 1 && !isAnimatingRef.current &&
+        g.dx > 10 && Math.abs(g.dy) < 20 && g.dx > Math.abs(g.dy),
+
+      onPanResponderGrant: () => {
+        if (stepRef.current <= 1 || isAnimatingRef.current) return;
+        isSwipingRef.current = true;
+        isAnimatingRef.current = true;
+        setGhostStep(visibleStepRef.current - 1);
+        exitX.setValue(-SCREEN_W);
+      },
+
+      onPanResponderMove: (_, g) => {
+        if (!isSwipingRef.current) return;
+        const dx = Math.max(0, g.dx);
+        enterX.setValue(dx);
+        exitX.setValue(-SCREEN_W + dx);
+      },
+
+      onPanResponderRelease: (_, g) => {
+        if (!isSwipingRef.current) return;
+        isSwipingRef.current = false;
+        const complete = g.dx > SCREEN_W * 0.35 || g.vx > 0.5;
+        if (complete) {
+          Animated.parallel([
+            Animated.spring(enterX, { ...SPRING, toValue: SCREEN_W }),
+            Animated.spring(exitX,  { ...SPRING, toValue: 0 }),
+          ]).start(() => {
+            const prev = visibleStepRef.current - 1;
+            // Hide enter slot while swapping: ghost (prev) stays visible at center
+            // so user never sees blank. Reveal enter + drop ghost together next frame.
+            enterOpacity.setValue(0);
+            enterX.setValue(0);
+            setVisibleStep(prev);
+            setStep(prev);
+            isAnimatingRef.current = false;
+            requestAnimationFrame(() => {
+              enterOpacity.setValue(1);
+              setGhostStep(null);
+            });
+          });
+        } else {
+          Animated.parallel([
+            Animated.spring(enterX, { ...SPRING, toValue: 0 }),
+            Animated.spring(exitX,  { ...SPRING, toValue: -SCREEN_W }),
+          ]).start(() => {
+            setGhostStep(null);
+            isAnimatingRef.current = false;
+          });
+        }
+      },
+
+      onPanResponderTerminate: () => {
+        if (!isSwipingRef.current) return;
+        isSwipingRef.current = false;
+        isAnimatingRef.current = false;
+        enterOpacity.setValue(0);
+        enterX.setValue(0);
+        exitX.setValue(-SCREEN_W);
+        requestAnimationFrame(() => {
+          enterOpacity.setValue(1);
+          setGhostStep(null);
+        });
+      },
+    })
+  ).current;
 
   const handlePay = async () => {
     if (!boat || !selectedPier) return;
     const startDt = buildDatetime(date, startHour);
-    const endDt   = buildDatetime(date, startHour + duration);
+    const endDt = buildDatetime(date, startHour + duration);
 
     setPaying(true);
     try {
       const { data, error } = await publicSupabase.functions.invoke('create-yookassa-payment', {
         body: {
-          amount:          Math.round(payOnline * 100),
-          description:     `Аренда катера ${boat.name}`,
-          payment_type:    isPrepayment ? 'prepayment' : 'full_payment',
+          amount: Math.round(payOnline * 100),
+          description: `Аренда катера ${boat.name}`,
+          payment_type: isPrepayment ? 'prepayment' : 'full_payment',
           idempotency_key: uuid(),
           booking_data: {
-            boat_id:               boat.id,
-            start_datetime:        startDt.toISOString(),
-            end_datetime:          endDt.toISOString(),
-            client_name:           clientName.trim(),
-            client_phone:          digitsToE164(clientPhoneDigits),
-            client_email:          clientEmail.trim() || null,
-            total_public_price:    totalAfterPromo,
-            prepayment_amount:     isPrepayment ? prepaymentAmt : 0,
-            remaining_amount:      isPrepayment ? remainingAmt  : 0,
+            boat_id: boat.id,
+            start_datetime: startDt.toISOString(),
+            end_datetime: endDt.toISOString(),
+            client_name: clientName.trim(),
+            client_phone: digitsToE164(clientPhoneDigits),
+            client_email: clientEmail.trim() || null,
+            total_public_price: totalAfterPromo,
+            prepayment_amount: isPrepayment ? prepaymentAmt : 0,
+            remaining_amount: isPrepayment ? remainingAmt : 0,
             online_payment_amount: payOnline,
-            payment_method:        'online',
-            payment_notes:         isPrepayment ? 'Предоплата' : 'Полная оплата',
-            pier_id:               selectedPier.id,
-            pier_name:             selectedPier.name,
-            pier_address:          selectedPier.address ?? null,
-            promo_code_id:         promo?.id ?? null,
-            original_price:        baseTotal,
-            discount_amount:       promoDiscount,
-            gift_certificate_id:     gift?.id   ?? null,
+            payment_method: 'online',
+            payment_notes: isPrepayment ? 'Предоплата' : 'Полная оплата',
+            pier_id: selectedPier.id,
+            pier_name: selectedPier.name,
+            pier_address: selectedPier.address ?? null,
+            promo_code_id: promo?.id ?? null,
+            original_price: baseTotal,
+            discount_amount: promoDiscount,
+            gift_certificate_id: gift?.id ?? null,
             gift_certificate_amount: giftUsed,
           },
         },
@@ -338,7 +447,7 @@ export function BookingScreen() {
       if (error) throw error;
       if (!data?.success) throw new Error(data?.error ?? 'Ошибка создания платежа');
 
-      bookingIdRef.current   = data.public_booking_id as string;
+      bookingIdRef.current = data.public_booking_id as string;
       awaitingReturn.current = true;
 
       const returnUrl = Linking.createURL('booking/return');
@@ -356,19 +465,94 @@ export function BookingScreen() {
   };
 
   const dateLabel = `${fmtShort(date)}, ${fmtHour(startHour)} · ${durLabel(duration)}`;
+  const stepTitle = STEP_LABELS[step - 1] ?? 'Бронирование';
+
+  const onOpenSheet      = useCallback(() => setSheetOpen(true), []);
+  const onOpenMap        = useCallback(() => setPierMapOpen(true), []);
+  const onPromoChange    = useCallback((t: string) => { setPromoInput(t); setPromo(null); setPromoError(''); }, []);
+  const onGiftChange     = useCallback((t: string) => { setGiftInput(t); setGift(null); setGiftError(''); }, []);
+  const onEditDate       = useCallback(() => transitionStep(1, -1), [transitionStep]);
+
+  const renderStep = (n: number) => {
+    switch (n) {
+      case 1: return (
+        <BookingStep1
+          date={date} onDateChange={setDate} timeConfirmed={timeConfirmed}
+          startHour={startHour} duration={duration}
+          onOpenSheet={onOpenSheet}
+          totalAfterPromo={totalAfterPromo} boat={boat!}
+        />
+      );
+      case 2: return (
+        <BookingStep2
+          date={date} startHour={startHour} duration={duration} dateLabel={dateLabel}
+          piers={piers} selectedPier={selectedPier} onSelectPier={setSelectedPier}
+          onOpenMap={onOpenMap}
+          promoInput={promoInput} onPromoInputChange={onPromoChange}
+          promoLoading={promoLoading} promo={promo} promoError={promoError} onApplyPromo={applyPromo}
+          pricingLoading={pricingLoading} pricing={pricing}
+          baseTotal={baseTotal} promoDiscount={promoDiscount} totalAfterPromo={totalAfterPromo}
+          prepaymentAmt={prepaymentAmt} remainingAmt={remainingAmt}
+          boat={boat!} onEditDate={onEditDate}
+        />
+      );
+      case 3: return (
+        <BookingStep3
+          date={date} startHour={startHour} duration={duration}
+          selectedPier={selectedPier} totalAfterPromo={totalAfterPromo}
+          clientName={clientName} onNameChange={setClientName}
+          clientPhoneDigits={clientPhoneDigits} onPhoneChange={setClientPhoneDigits}
+          clientEmail={clientEmail} onEmailChange={setClientEmail}
+        />
+      );
+      case 4: return (
+        <BookingStep4
+          boat={boat!} date={date} startHour={startHour} duration={duration}
+          selectedPier={selectedPier} clientName={clientName}
+          clientPhoneDigits={clientPhoneDigits} clientEmail={clientEmail}
+          totalAfterPromo={totalAfterPromo} prepaymentAmt={prepaymentAmt} remainingAmt={remainingAmt}
+          isPrepayment={isPrepayment} onSetPrepayment={setIsPrepayment}
+          giftInput={giftInput}
+          onGiftInputChange={onGiftChange}
+          giftLoading={giftLoading} gift={gift} giftError={giftError}
+          giftUsed={giftUsed} onApplyGift={applyGift}
+          payNow={payNow} payOnline={payOnline}
+        />
+      );
+      default: return null;
+    }
+  };
 
   if (loadingBoat) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Бронирование" onBack={goBack} />
-        <View style={s.loader}><ActivityIndicator color={COLORS.brandNavy} size="large" /></View>
+        <View style={[s.navBar, { paddingTop: insets.top }]}>
+          <View style={s.navContent}>
+            <View style={{ width: 32 }} />
+            <View style={{ flex: 1 }} />
+            <Pressable style={s.closeBtn} onPress={goBack} hitSlop={12}>
+              <X size={18} color={COLORS.text1} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+        </View>
+        <View style={s.loader}>
+          <Spinner />
+        </View>
       </View>
     );
   }
   if (!boat) {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Бронирование" onBack={goBack} />
+        <View style={[s.navBar, { paddingTop: insets.top }]}>
+          <View style={s.navContent}>
+            <View style={{ width: 32 }} />
+            <View style={{ flex: 1 }} />
+            <Pressable style={s.closeBtn} onPress={goBack} hitSlop={12}>
+              <X size={18} color={COLORS.text1} strokeWidth={2.5} />
+            </Pressable>
+          </View>
+        </View>
         <View style={s.loader}><Text style={s.errTxt}>Судно не найдено</Text></View>
       </View>
     );
@@ -378,17 +562,43 @@ export function BookingScreen() {
     <KeyboardAvoidingView
       style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      enabled={step === 3}
     >
-      <ScreenHeader title="Бронирование" onBack={goBack} />
+      {/* ── Fixed header ── */}
+      <View style={[s.navBar, { paddingTop: insets.top }]}>
+        <View style={s.navContent}>
+          <View style={{ width: 32 }} />
+          <Animated.Text style={[s.navTitle, { opacity: headerTitleOpacity }]} numberOfLines={1}>
+            {stepTitle}
+          </Animated.Text>
+          <Pressable style={s.closeBtn} onPress={() => router.back()} hitSlop={12}>
+            <X size={18} color={COLORS.text1} strokeWidth={2.5} />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* ── Step progress bars ── */}
       <StepProgress step={step} />
 
-      <ScrollView
-        ref={scrollRef}
+      <View style={{ flex: 1 }} {...swipePan.panHandlers}>
+      <Animated.ScrollView
+        ref={scrollRef as any}
         style={s.scroll}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 120 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
+        scrollEventThrottle={16}
+        directionalLockEnabled
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true },
+        )}
       >
+        {/* ── Large title (fades out on scroll) ── */}
+        <Animated.Text style={[s.pageTitle, { opacity: contentTitleOpacity }]}>
+          {stepTitle}
+        </Animated.Text>
+
         {/* ── Boat card ── */}
         <View style={s.boatCard}>
           <View style={s.boatThumb}>
@@ -409,156 +619,77 @@ export function BookingScreen() {
           <View style={s.boatInfo}>
             <Text style={s.boatName} numberOfLines={2}>{boat.name}</Text>
             <View style={s.boatMeta}>
-              {boat.type ? <Text style={s.metaBadge}>{boat.type}</Text> : null}
               {boat.capacity ? (
                 <View style={s.metaItem}>
-                  <Users size={11} color={COLORS.text3} strokeWidth={2} />
-                  <Text style={s.metaTxt}>{boat.capacity} чел.</Text>
+                  <Users size={12} color={COLORS.text3} strokeWidth={2} />
+                  <Text style={s.metaTxt}>до {boat.capacity} чел.</Text>
                 </View>
               ) : null}
               {boat.length_meters ? (
                 <View style={s.metaItem}>
-                  <Ruler size={11} color={COLORS.text3} strokeWidth={2} />
+                  <Ruler size={12} color={COLORS.text3} strokeWidth={2} />
                   <Text style={s.metaTxt}>{boat.length_meters} м</Text>
                 </View>
               ) : null}
             </View>
           </View>
-          <View style={s.boatPriceBlock}>
-            <Text style={s.boatPrice}>{ruFmt(boat.price_per_hour)} ₽</Text>
-            <Text style={s.boatPriceSub}>за час</Text>
-          </View>
         </View>
 
-        {/* ════ STEP 1 ════ */}
-        {step === 1 && (
-          <BookingStep1
-            date={date}
-            onDateChange={setDate}
-            timeConfirmed={timeConfirmed}
-            startHour={startHour}
-            duration={duration}
-            onOpenSheet={() => setSheetOpen(true)}
-            totalAfterPromo={totalAfterPromo}
-            boat={boat}
-          />
-        )}
-
-        {/* ════ STEP 2 ════ */}
-        {step === 2 && (
-          <BookingStep2
-            date={date}
-            startHour={startHour}
-            duration={duration}
-            dateLabel={dateLabel}
-            piers={piers}
-            selectedPier={selectedPier}
-            onSelectPier={setSelectedPier}
-            onOpenMap={() => setPierMapOpen(true)}
-            promoInput={promoInput}
-            onPromoInputChange={(t) => { setPromoInput(t); setPromo(null); setPromoError(''); }}
-            promoLoading={promoLoading}
-            promo={promo}
-            promoError={promoError}
-            onApplyPromo={applyPromo}
-            pricingLoading={pricingLoading}
-            pricing={pricing}
-            baseTotal={baseTotal}
-            promoDiscount={promoDiscount}
-            totalAfterPromo={totalAfterPromo}
-            prepaymentAmt={prepaymentAmt}
-            remainingAmt={remainingAmt}
-            boat={boat}
-            onEditDate={() => setStep(1)}
-          />
-        )}
-
-        {/* ════ STEP 3 ════ */}
-        {step === 3 && (
-          <BookingStep3
-            date={date}
-            startHour={startHour}
-            duration={duration}
-            selectedPier={selectedPier}
-            totalAfterPromo={totalAfterPromo}
-            clientName={clientName}
-            onNameChange={setClientName}
-            clientPhoneDigits={clientPhoneDigits}
-            onPhoneChange={setClientPhoneDigits}
-            clientEmail={clientEmail}
-            onEmailChange={setClientEmail}
-          />
-        )}
-
-        {/* ════ STEP 4 ════ */}
-        {step === 4 && (
-          <BookingStep4
-            boat={boat}
-            date={date}
-            startHour={startHour}
-            duration={duration}
-            selectedPier={selectedPier}
-            clientName={clientName}
-            clientPhoneDigits={clientPhoneDigits}
-            clientEmail={clientEmail}
-            totalAfterPromo={totalAfterPromo}
-            prepaymentAmt={prepaymentAmt}
-            remainingAmt={remainingAmt}
-            isPrepayment={isPrepayment}
-            onSetPrepayment={setIsPrepayment}
-            giftInput={giftInput}
-            onGiftInputChange={(t) => { setGiftInput(t); setGift(null); setGiftError(''); }}
-            giftLoading={giftLoading}
-            gift={gift}
-            giftError={giftError}
-            giftUsed={giftUsed}
-            onApplyGift={applyGift}
-            payNow={payNow}
-            payOnline={payOnline}
-          />
-        )}
-      </ScrollView>
+        {/* ════ STEPS ════ */}
+        <View style={{ overflow: 'hidden' }}>
+          {ghostStep !== null && (
+            <Animated.View
+              pointerEvents="none"
+              style={[StyleSheet.absoluteFill, { transform: [{ translateX: exitX }] }]}
+            >
+              {renderStep(ghostStep)}
+            </Animated.View>
+          )}
+          <Animated.View style={{ transform: [{ translateX: enterX }], opacity: enterOpacity }}>
+            {renderStep(visibleStep)}
+          </Animated.View>
+        </View>
+      </Animated.ScrollView>
 
       {/* ── Bottom CTA ── */}
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 10 }]}>
+      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         {step < 4 ? (
           <Pressable
-            style={({ pressed }) => [s.ctaBtn, pricingLoading && { opacity: 0.6 }, pressed && { opacity: 0.88 }]}
+            style={({ pressed }) => [s.ctaBtn, pricingLoading && { opacity: 0.6 }, pressed && { opacity: 0.85 }]}
             onPress={goNext}
             disabled={pricingLoading}
           >
-            {pricingLoading ? (
-              <ActivityIndicator color={COLORS.white} />
-            ) : (
-              <>
-                <Text style={s.ctaTxt}>Далее</Text>
-                <ChevronRight size={18} color={COLORS.white} strokeWidth={2.5} />
-              </>
-            )}
+            {pricingLoading
+              ? <Spinner color="#fff" trackColor="rgba(255,255,255,0.25)" />
+              : <Text style={s.ctaTxt}>Далее</Text>}
           </Pressable>
         ) : (
-          <View style={s.payBar}>
-            <View>
-              <Text style={s.payLabel}>К оплате онлайн</Text>
-              <Text style={s.payAmount}>{ruFmt(payOnline)} ₽</Text>
+          <>
+            <View style={s.payBar}>
+              <View>
+                <Text style={s.payLabel}>К оплате</Text>
+                <Text style={s.payAmount}>{ruFmt(payOnline)} ₽</Text>
+              </View>
+              <Pressable
+                style={({ pressed }) => [s.payBtn, paying && { opacity: 0.6 }, pressed && { opacity: 0.85 }]}
+                onPress={handlePay}
+                disabled={paying}
+              >
+                {paying
+                  ? <Spinner color="#fff" trackColor="rgba(255,255,255,0.25)" />
+                  : <Text style={s.ctaTxt}>Оплатить</Text>}
+              </Pressable>
             </View>
-            <Pressable
-              style={({ pressed }) => [
-                s.payBtn,
-                paying && { opacity: 0.6 },
-                pressed && { opacity: 0.86 },
-              ]}
-              onPress={handlePay}
-              disabled={paying}
-            >
-              {paying ? (
-                <ActivityIndicator color={COLORS.white} />
-              ) : (
-                <Text style={s.ctaTxt}>Оплатить</Text>
-              )}
-            </Pressable>
-          </View>
+            <Text style={s.consentTxt}>
+              Совершая предоплату, вы выражаете полное и безоговорочное согласие (акцепт) с условиями{' '}
+              <Text style={s.consentLink} onPress={() => router.push('/booking/oferta' as any)} suppressHighlighting>
+                Договора-оферты
+              </Text>{' '}
+              ООО «ВИАМОБИ ВОСТОК» (ИНН 7717283732). Договор считается заключённым с момента поступления оплаты.
+            </Text>
+          </>
         )}
+      </View>
       </View>
 
       <PierMapSheet
@@ -577,6 +708,8 @@ export function BookingScreen() {
           setStartHour(h);
           setDuration(dur);
           setTimeConfirmed(true);
+          // scroll to confirmed time row after sheet dismiss animation (~300ms)
+          setTimeout(() => scrollRef.current?.scrollTo({ y: 340, animated: true }), 350);
         }}
         onClose={() => setSheetOpen(false)}
       />
@@ -584,90 +717,109 @@ export function BookingScreen() {
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: COLORS.backgroundAlt },
+  root: { flex: 1, backgroundColor: COLORS.white },
   scroll: { flex: 1 },
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   errTxt: { fontSize: 15, color: COLORS.text3 },
+
+  /* nav bar */
+  navBar: {
+    backgroundColor: COLORS.white,
+    // borderBottomWidth: StyleSheet.hairlineWidth,
+    // borderBottomColor: COLORS.border,
+  },
+  navContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 52,
+    paddingHorizontal: 16,
+  },
+  navTitle: {
+    flex: 1,
+    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '600',
+    color: COLORS.text1,
+  },
+  closeBtn: {
+    // width: 32, height: 32,
+    borderRadius: 16,
+    // backgroundColor: COLORS.muted,
+    alignItems: 'center', justifyContent: 'center',
+  },
+
+  /* large page title in scroll */
+  pageTitle: {
+    fontSize: 26,
+    fontWeight: '700',
+    color: COLORS.text1,
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 16,
+  },
 
   /* boat card */
   boatCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
-    marginHorizontal: 16,
-    marginTop: 14,
-    marginBottom: 2,
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 4,
-    elevation: 2,
+    gap: 14,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    paddingBottom: 20,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
   },
   boatThumb: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
     borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: COLORS.muted,
   },
-  boatInfo:  { flex: 1, gap: 6 },
-  boatName:  { fontSize: 15, fontWeight: '700', color: COLORS.text1, lineHeight: 20 },
-  boatMeta:  { flexDirection: 'row', gap: 8, flexWrap: 'wrap', alignItems: 'center' },
-  metaBadge: {
-    fontSize: 10,
-    fontWeight: '600',
-    color: COLORS.brandCyan,
-    backgroundColor: COLORS.brandCyan + '18',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 5,
-  },
-  metaItem:  { flexDirection: 'row', alignItems: 'center', gap: 3 },
-  metaTxt:   { fontSize: 11, color: COLORS.text3 },
-  boatPriceBlock: { alignItems: 'flex-end' },
-  boatPrice:      { fontSize: 16, fontWeight: '800', color: COLORS.brandNavy },
-  boatPriceSub:   { fontSize: 11, color: COLORS.text3, marginTop: 1 },
+  boatInfo: { flex: 1, gap: 5 },
+  boatName: { fontSize: 15, fontWeight: '600', color: COLORS.text1, lineHeight: 21 },
+  boatMeta: { flexDirection: 'row', gap: 10, flexWrap: 'wrap', alignItems: 'center' },
+  metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  metaTxt: { fontSize: 12, color: COLORS.text3 },
 
   /* bottom bar */
   bottomBar: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingHorizontal: 20,
+    paddingTop: 14,
     backgroundColor: COLORS.white,
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 8,
   },
   ctaBtn: {
     height: 54,
-    backgroundColor: COLORS.brandNavy,
+    backgroundColor: '#222',
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 6,
   },
-  ctaTxt:    { fontSize: 16, fontWeight: '700', color: COLORS.white },
-  payBar:    { flexDirection: 'row', alignItems: 'center', gap: 16 },
-  payLabel:  { fontSize: 11, color: COLORS.text3, marginBottom: 1 },
-  payAmount: { fontSize: 22, fontWeight: '800', color: COLORS.brandNavy },
+  ctaTxt: { fontSize: 16, fontWeight: '700', color: COLORS.white },
+  payBar: { flexDirection: 'row', alignItems: 'center', gap: 16 },
+  payLabel: { fontSize: 12, color: COLORS.text3, marginBottom: 2 },
+  payAmount: { fontSize: 20, fontWeight: '800', color: COLORS.text1 },
   payBtn: {
     flex: 1,
     height: 54,
-    backgroundColor: COLORS.brandNavy,
+    backgroundColor: '#222',
     borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  consentTxt: {
+    marginTop: 10,
+    fontSize: 11,
+    color: COLORS.text3,
+    lineHeight: 16,
+    textAlign: 'center',
+  },
+  consentLink: {
+    color: COLORS.brandNavy,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
 });

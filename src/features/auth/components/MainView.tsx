@@ -1,6 +1,5 @@
 import { Phone, Send } from 'lucide-react-native';
 import {
-  ActivityIndicator,
   Linking,
   Pressable,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
+import { Spinner } from '@/shared/components/Spinner';
 
 export function MainView({
   isLoading,
@@ -43,7 +43,7 @@ export function MainView({
         disabled={isLoading}
       >
         {isLoading ? (
-          <ActivityIndicator color={COLORS.white} />
+          <Spinner color="#fff" trackColor="rgba(255,255,255,0.25)" />
         ) : (
           <>
             <Send size={18} color={COLORS.white} strokeWidth={2} />

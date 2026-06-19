@@ -39,7 +39,7 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 17,
-    fontWeight: '800',
+    fontWeight: '500',
     color: COLORS.text1,
     letterSpacing: 0.1,
   },

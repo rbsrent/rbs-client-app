@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { ArrowLeft, CheckCircle2, Star } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -16,6 +15,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 import { publicSupabase } from '@/shared/supabase/publicClient';
+import { Spinner } from '@/shared/components/Spinner';
 
 // ─── star helpers ─────────────────────────────────────────────────────────────
 function StarDisplay({ value, size = 13 }: { value: number; size?: number }) {
@@ -167,7 +167,7 @@ export default function ReviewsScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {loading ? (
-            <ActivityIndicator color={COLORS.brandNavy} style={{ marginTop: 64 }} />
+            <Spinner style={{ marginTop: 64 }} />
           ) : (
             <>
               {/* Rating summary */}

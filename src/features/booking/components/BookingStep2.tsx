@@ -1,6 +1,5 @@
 import { Calendar, Map, MapPin, Tag } from 'lucide-react-native';
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -13,6 +12,7 @@ import { COLORS } from '@/shared/colors';
 import { PricingResult, Pier } from '../types';
 import { shared } from './BookingRows';
 import { PricingCard } from './PricingCard';
+import { Spinner } from '@/shared/components/Spinner';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ export function BookingStep2({
           disabled={!promoInput.trim() || promoLoading || !!promo}
         >
           {promoLoading
-            ? <ActivityIndicator color={COLORS.white} size="small" />
+            ? <Spinner size={20} color="#fff" trackColor="rgba(255,255,255,0.25)" />
             : <Text style={shared.applyTxt}>{promo ? '✓' : 'OK'}</Text>}
         </Pressable>
       </View>
@@ -136,7 +136,7 @@ export function BookingStep2({
 
       {pricingLoading ? (
         <View style={s.pricingLoader}>
-          <ActivityIndicator color={COLORS.brandNavy} size="small" />
+          <Spinner size={20} />
           <Text style={s.hintTxt}>Рассчитываем стоимость…</Text>
         </View>
       ) : pricing ? (

@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Pressable,
   StyleSheet,
   Text,
@@ -14,6 +13,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '@/shared/colors';
 
 import { useAuth } from '../hooks/useAuth';
+import { Spinner } from '@/shared/components/Spinner';
 
 interface Props {
   phone: string;
@@ -85,7 +85,7 @@ export function OtpScreen({ phone, onBack }: Props) {
         />
 
         {error ? <Text style={styles.errorText}>{error}</Text> : null}
-        {isLoading ? <ActivityIndicator color={COLORS.brandNavy} style={{ marginTop: 8 }} /> : null}
+        {isLoading ? <Spinner style={{ marginTop: 8 }} /> : null}
 
         <Pressable onPress={handleResend} disabled={resendTimer > 0}>
           <Text style={[styles.resend, resendTimer > 0 && styles.resendDisabled]}>
@@ -112,7 +112,6 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },

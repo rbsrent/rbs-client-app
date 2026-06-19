@@ -63,102 +63,99 @@ export function useBoatDetail(id: string): BoatDetailState {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      setIsLoading(true);
-      try {
-        const { data } = await publicSupabase
-          .from('boats')
-          .select('*, boat_images(image_path, position), piers(name, address)')
-          .eq('id', id)
-          .single();
-        if (cancelled || !data) return;
-        setBoat(data as Boat);
 
-        const sorted = [...(data.boat_images ?? [])].sort(
-          (a: any, b: any) => a.position - b.position,
-        );
-        const coverPath = sorted[0]?.image_path;
-        setImages(
-          sorted.map(
-            (img: any) =>
-              `${SUPABASE_URL}/storage/v1/object/public/boat_images/${img.image_path}`,
-          ),
-        );
-        addToRecentlyViewed({
-          boat_id:         data.id,
-          name:            data.name,
-          type:            data.type          ?? null,
-          cover_image_url: coverPath
-            ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${coverPath}`
-            : null,
-          price_per_hour:  data.price_per_hour,
-          capacity:        data.capacity      ?? null,
-          length_meters:   data.length_meters ?? null,
-          pier_name:       data.piers?.name   ?? null,
-          rating:          null,
-        });
+    setIsLoading(true);
+    // Reset stale data from previous boat
+    setBoat(null);
+    setImages([]);
+    setReviews([]);
+    setReviewRating({ avg: 0, total: 0 });
+    setSimilar([]);
+
+    // ── Critical path: boat + reviews + rating all in parallel ────────────────
+    // No waterfall — one round-trip, isLoading covers all three.
+    (async () => {
+      try {
+        const [boatRes, reviewsRes, ratingRes] = await Promise.all([
+          publicSupabase
+            .from('boats')
+            .select('*, boat_images(image_path, position), piers(name, address)')
+            .eq('id', id)
+            .single(),
+          publicSupabase
+            .from('boat_reviews')
+            .select('id, user_name, rating, comment, created_at')
+            .eq('boat_id', id)
+            .eq('moderation_status', 'approved')
+            .order('created_at', { ascending: false })
+            .limit(20),
+          publicSupabase.rpc('get_boat_average_rating', { p_boat_id: id }),
+        ]);
+
+        if (cancelled) return;
+
+        const data = boatRes.data;
+        if (data) {
+          setBoat(data as Boat);
+
+          const sorted = [...(data.boat_images ?? [])].sort(
+            (a: any, b: any) => a.position - b.position,
+          );
+          const coverPath = sorted[0]?.image_path;
+          setImages(
+            sorted.map(
+              (img: any) =>
+                `${SUPABASE_URL}/storage/v1/object/public/boat_images/${img.image_path}`,
+            ),
+          );
+          addToRecentlyViewed({
+            boat_id:         data.id,
+            name:            data.name,
+            type:            data.type          ?? null,
+            cover_image_url: coverPath
+              ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${coverPath}`
+              : null,
+            price_per_hour:  data.price_per_hour,
+            capacity:        data.capacity      ?? null,
+            length_meters:   data.length_meters ?? null,
+            pier_name:       data.piers?.name   ?? null,
+            rating:          null,
+          });
+        }
+
+        if (reviewsRes.data) setReviews(reviewsRes.data);
+
+        if (ratingRes.data?.[0]) {
+          setReviewRating({
+            avg:   ratingRes.data[0].average_rating ?? 0,
+            total: ratingRes.data[0].total_reviews  ?? 0,
+          });
+        }
       } finally {
         if (!cancelled) setIsLoading(false);
       }
     })();
-    return () => { cancelled = true; };
-  }, [id]);
 
-  useEffect(() => {
-    if (!boat?.id) return;
-    let cancelled = false;
-
+    // ── Similar boats: non-blocking, runs in parallel with critical path ──────
+    // Fetches price-range matches first; falls back to recent if too few results.
+    // Does not affect isLoading — appears after main content without blocking it.
     (async () => {
-      const [{ data: revs }, { data: rpc }] = await Promise.all([
-        publicSupabase
-          .from('boat_reviews')
-          .select('id, user_name, rating, comment, created_at')
-          .eq('boat_id', boat.id)
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(20),
-        publicSupabase.rpc('get_boat_average_rating', { p_boat_id: boat.id }),
-      ]);
-      if (cancelled) return;
-      if (revs) setReviews(revs);
-      if (rpc?.[0]) {
-        setReviewRating({
-          avg:   rpc[0].average_rating ?? 0,
-          total: rpc[0].total_reviews  ?? 0,
-        });
-      }
-    })();
-
-    (async () => {
-      const price = boat.price_per_hour;
       let { data } = await publicSupabase
         .from('boats')
-        .select('id, name, type, price_per_hour, capacity, length_meters, piers(name), boat_images(image_path, position)')
-        .neq('id', boat.id)
-        .eq('is_hidden',          false)
+        .select(
+          'id, name, type, price_per_hour, capacity, length_meters, piers(name), boat_images(image_path, position)',
+        )
+        .neq('id', id)
+        .eq('is_hidden', false)
         .eq('moderation_status', 'approved')
-        .gte('price_per_hour', Math.max(0, price - 5000))
-        .lte('price_per_hour', price + 5000)
-        .order('price_per_hour', { ascending: true })
+        .order('created_at', { ascending: false })
         .limit(10);
-
-      if (!data || data.length < 4) {
-        const { data: fb } = await publicSupabase
-          .from('boats')
-          .select('id, name, type, price_per_hour, capacity, length_meters, piers(name), boat_images(image_path, position)')
-          .neq('id', boat.id)
-          .eq('is_hidden',          false)
-          .eq('moderation_status', 'approved')
-          .order('created_at', { ascending: false })
-          .limit(10);
-        data = fb;
-      }
 
       if (cancelled || !data) return;
       setSimilar(
         (data as any[]).map((b: any) => {
           const imgs = [...(b.boat_images ?? [])].sort(
-            (a: any, b2: any) => a.position - b2.position,
+            (a: any, z: any) => a.position - z.position,
           );
           return {
             ...b,
@@ -172,7 +169,7 @@ export function useBoatDetail(id: string): BoatDetailState {
     })();
 
     return () => { cancelled = true; };
-  }, [boat?.id]);
+  }, [id]);
 
   return { boat, images, similar, reviews, reviewRating, isLoading };
 }

@@ -1,7 +1,6 @@
 import { SlidersHorizontal } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   FlatList,
   Pressable,
   RefreshControl,
@@ -17,6 +16,7 @@ import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { Boat } from '@/store/useCatalogStore';
 
 import { ServiceBoatCard } from '../components/ServiceBoatCard';
+import { Spinner } from '@/shared/components/Spinner';
 
 type VesselType = 'boat' | 'yacht';
 
@@ -119,7 +119,7 @@ export function BoatServiceScreen({ vesselType }: Props) {
 
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator color={COLORS.brandNavy} size="large" />
+          <Spinner />
         </View>
       ) : (
         <FlatList

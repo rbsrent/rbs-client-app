@@ -1,6 +1,6 @@
 import { Heart } from "lucide-react-native";
 import { useEffect } from "react";
-import { Pressable, StyleSheet } from "react-native";
+import { Pressable, StyleSheet, ViewStyle } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -17,9 +17,11 @@ const AnimPressable = Animated.createAnimatedComponent(Pressable);
 export function HeartButton({
   boat,
   size = 22,
+  style,
 }: {
   boat: BoatData;
   size?: number;
+  style?: ViewStyle;
 }) {
   const scale = useSharedValue(1);
   const anim = useAnimatedStyle(() => ({
@@ -51,7 +53,7 @@ export function HeartButton({
   };
 
   return (
-    <AnimPressable style={[s.btn, anim]} onPress={handlePress} hitSlop={12}>
+    <AnimPressable style={[s.btn, anim, style]} onPress={handlePress} hitSlop={12}>
       <Heart
         size={size}
         color={saved ? "#E63946" : "rgba(255,255,255,0.9)"}

@@ -1,6 +1,5 @@
 import { Send } from 'lucide-react-native';
 import {
-  ActivityIndicator,
   Linking,
   Pressable,
   StyleSheet,
@@ -9,6 +8,7 @@ import {
 } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
+import { Spinner } from '@/shared/components/Spinner';
 
 export function TgWaitingView({
   secondsLeft,
@@ -37,7 +37,7 @@ export function TgWaitingView({
       </Text>
 
       <View style={styles.timerRow}>
-        <ActivityIndicator size="small" color={COLORS.text3} />
+        <Spinner size={20} color={COLORS.text3} />
         <Text style={styles.timerText}>
           Ожидаем подтверждение... <Text style={styles.timerMono}>{formatTime(secondsLeft)}</Text>
         </Text>

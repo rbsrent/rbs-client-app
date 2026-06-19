@@ -4,7 +4,6 @@ import { useRouter } from 'expo-router';
 import { Clock } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   Pressable,
   StyleSheet,
@@ -16,6 +15,7 @@ import { COLORS } from '@/shared/colors';
 import { ScrollDots } from '@/shared/components/ScrollDots';
 import { SectionHeader } from '@/shared/components/SectionHeader';
 import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
+import { Spinner } from '@/shared/components/Spinner';
 
 const BUCKET = 'water-route-images';
 
@@ -119,7 +119,7 @@ export function RoutesPreview() {
 
       {loading ? (
         <View style={styles.loader}>
-          <ActivityIndicator color={COLORS.brandNavy} />
+          <Spinner />
         </View>
       ) : (
         <>

@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import { ArrowRight, Star } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import {
-  ActivityIndicator,
   Dimensions,
   Pressable,
   ScrollView,
@@ -15,6 +14,7 @@ import {
 import { COLORS } from "@/shared/colors";
 import { HeartButton } from "@/shared/components/HeartButton";
 import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
+import { Spinner } from '@/shared/components/Spinner';
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = W * 0.46;
@@ -279,7 +279,7 @@ export function PopularSection() {
   if (loading) {
     return (
       <View style={s.loader}>
-        <ActivityIndicator color={COLORS.brandNavy} />
+        <Spinner />
       </View>
     );
   }
@@ -328,7 +328,6 @@ const s = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: COLORS.muted,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -339,7 +338,6 @@ const s = StyleSheet.create({
   imgWrap: {
     height: IMG_H,
     borderRadius: 12,
-    backgroundColor: COLORS.muted,
     overflow: "hidden",
   },
   info: { paddingTop: 8, gap: 2 },
@@ -372,7 +370,6 @@ const s = StyleSheet.create({
     width: CARD_W,
     height: IMG_H,
     borderRadius: 12,
-    backgroundColor: "#F2F2F2",
     alignItems: "center",
     justifyContent: "center",
     gap: 16,

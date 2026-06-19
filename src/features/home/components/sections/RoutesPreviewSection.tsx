@@ -2,8 +2,8 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 
-import { SectionHeader } from '@/shared/components/SectionHeader';
 import { ScrollDots } from '@/shared/components/ScrollDots';
+import { SectionHeader } from '@/shared/components/SectionHeader';
 import { HomeRoute } from '@/store/useHomeStore';
 import { HomeRouteCard, ROUTE_CARD_H, ROUTE_CARD_W } from '../cards/HomeRouteCard';
 

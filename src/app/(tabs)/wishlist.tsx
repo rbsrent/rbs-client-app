@@ -1,8 +1,11 @@
 import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Clock, Heart, X } from "lucide-react-native";
-import { useCallback, useState } from "react";
+import { Clock, Heart, MapPin, X } from "lucide-react-native";
+import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "@/store/useAuthStore";
+import { getSavedRoutesWithDates, useRouteSavedStore } from "@/store/useRouteSavedStore";
+import { getCachedRoutes } from "@/features/routes/store";
+import { resolveRouteImage } from "@/features/routes/types";
 import {
   Dimensions,
   Pressable,
@@ -13,6 +16,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { COLORS } from "@/shared/colors";
 import {
   DEFAULT_GROUP_ID,
   deleteGroup,
@@ -158,6 +162,42 @@ function GroupCard({
   );
 }
 
+function RoutesGroupCard({
+  count,
+  coverUrl,
+  onPress,
+}: {
+  count: number;
+  coverUrl: string | null;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      style={({ pressed }) => [s.groupCard, pressed && { opacity: 0.85 }]}
+      onPress={onPress}
+    >
+      <View style={[s.singleImg, { width: CARD_W, height: CARD_W }]}>
+        {coverUrl ? (
+          <Image
+            source={{ uri: coverUrl }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+          />
+        ) : (
+          <View style={[StyleSheet.absoluteFill, s.emptyImg]}>
+            <MapPin size={34} color={COLORS.brandCyan} strokeWidth={1.5} />
+          </View>
+        )}
+      </View>
+      <Text style={s.groupName} numberOfLines={2}>Маршруты</Text>
+      <Text style={s.groupSub}>
+        {count > 0 ? `Сохранено: ${count}` : "Пусто"}
+      </Text>
+    </Pressable>
+  );
+}
+
 export default function WishlistScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -165,9 +205,24 @@ export default function WishlistScreen() {
 
   const [groups, setGroups] = useState<WishlistGroupMeta[]>([]);
   const [editing, setEditing] = useState(false);
+  const [routesCoverUrl, setRoutesCoverUrl] = useState<string | null>(null);
+
+  const hydrateRoutes  = useRouteSavedStore((s) => s.hydrate);
+  const savedRouteIds  = useRouteSavedStore((s) => s.savedIds);
+  const savedRouteCount = savedRouteIds.size;
+
+  useEffect(() => { hydrateRoutes(); }, []);
 
   const load = useCallback(() => {
     getAllGroups().then(setGroups);
+    hydrateRoutes();
+    getSavedRoutesWithDates().then((entries) => {
+      if (entries.length === 0) { setRoutesCoverUrl(null); return; }
+      const allRoutes = getCachedRoutes();
+      if (!allRoutes) return;
+      const last = allRoutes.find((r) => r.id === entries[0].route_id);
+      setRoutesCoverUrl(last ? resolveRouteImage(last.map_image_url) : null);
+    });
   }, []);
 
   useFocusEffect(load);
@@ -228,6 +283,11 @@ export default function WishlistScreen() {
         <Text style={s.pageTitle}>Вишлисты</Text>
 
         <View style={s.grid}>
+          <RoutesGroupCard
+            count={savedRouteCount}
+            coverUrl={routesCoverUrl}
+            onPress={() => router.push('/wishlist/routes' as any)}
+          />
           {recentGroup && (
             <RecentCard
               group={recentGroup}
@@ -272,7 +332,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#F2F2F2",
   },
   editBtnTxt: { fontSize: 14, fontWeight: "500", color: "#000" },
 
@@ -309,7 +368,6 @@ const s = StyleSheet.create({
   },
   emptyImg: {
     borderRadius: 14,
-    backgroundColor: "#F5F5F5",
     borderWidth: 2,
     borderColor: "#E0E0E0",
     borderStyle: "dashed",

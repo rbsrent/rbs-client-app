@@ -1,5 +1,6 @@
-import { Mail, Phone, User } from 'lucide-react-native';
-import { StyleSheet, Text, TextInput, View } from 'react-native';
+import { useRouter } from 'expo-router';
+import { BookOpen, Mail, Phone, User } from 'lucide-react-native';
+import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
 import { fmtDateFull } from '@/shared/components/CalendarPicker';
@@ -40,6 +41,8 @@ export function BookingStep3({
   clientEmail,
   onEmailChange,
 }: BookingStep3Props) {
+  const router = useRouter();
+
   return (
     <View style={s.stepBody}>
       <Text style={s.stepTitle}>Почти готово</Text>
@@ -105,19 +108,20 @@ export function BookingStep3({
         </FormField>
       </View>
 
-      <View style={shared.infoBox}>
-        <Text style={shared.infoBoxTitle}>Информация о бронировании:</Text>
-        {[
-          'После подтверждения вы получите SMS с деталями',
-          'Прибудьте к месту посадки за 15 минут до начала',
-          'При себе необходимо иметь документ, удостоверяющий личность',
-        ].map((t, i) => (
-          <View key={i} style={shared.infoBoxRow}>
-            <Text style={shared.infoBoxDot}>•</Text>
-            <Text style={shared.infoBoxTxt}>{t}</Text>
-          </View>
-        ))}
-      </View>
+      <Pressable
+        style={({ pressed }) => [s.condCard, pressed && { opacity: 0.72 }]}
+        onPress={() => router.push('/booking/conditions' as any)}
+      >
+        <View style={s.condIcon}>
+          <BookOpen size={18} color={COLORS.brandNavy} strokeWidth={2} />
+        </View>
+        <View style={s.condLeft}>
+          <Text style={s.condTitle}>Условия бронирования RBS</Text>
+          <Text style={s.condSub}>Отмена, перенос и возврат средств</Text>
+        </View>
+        <Text style={s.condChevron}>›</Text>
+      </Pressable>
+
     </View>
   );
 }
@@ -128,12 +132,24 @@ const s = StyleSheet.create({
   stepBody: { marginHorizontal: 16, marginTop: 8, gap: 4 },
   stepTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text1, marginBottom: 4 },
   secLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: COLORS.text3,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    marginTop: 18,
-    marginBottom: 8,
+    fontSize: 11, fontWeight: '700', color: COLORS.text3,
+    textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 18, marginBottom: 8,
   },
+
+  condCard: {
+    flexDirection: 'row', alignItems: 'center',
+    marginTop: 20, padding: 14, gap: 12,
+    backgroundColor: COLORS.brandNavy + '07',
+    borderRadius: 12,
+    borderWidth: 1, borderColor: COLORS.brandNavy + '18',
+  },
+  condIcon: {
+    width: 36, height: 36, borderRadius: 10,
+    backgroundColor: COLORS.brandNavy + '14',
+    alignItems: 'center', justifyContent: 'center',
+  },
+  condLeft: { flex: 1 },
+  condTitle: { fontSize: 14, fontWeight: '700', color: COLORS.brandNavy },
+  condSub: { fontSize: 12, color: COLORS.text3, marginTop: 2 },
+  condChevron: { fontSize: 22, color: COLORS.brandNavy, lineHeight: 24 },
 });

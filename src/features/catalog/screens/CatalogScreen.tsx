@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MapPin, Search, SlidersHorizontal, Users } from 'lucide-react-native';
-import React, { memo, useCallback, useMemo, useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -14,10 +14,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { COLORS } from '@/shared/colors';
-import { SUPABASE_URL } from '@/shared/supabase/publicClient';
-import { Boat } from '@/store/useCatalogStore';
 import { useHomeData } from '@/features/home/hooks/useHomeData';
+import { COLORS } from '@/shared/colors';
+import { Boat } from '@/store/useCatalogStore';
 
 function BoatGridCard({ boat, router }: { boat: Boat; router: any }) {
   return (

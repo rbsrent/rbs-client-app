@@ -1,4 +1,4 @@
-import { Boat } from '@/store/useCatalogStore';
+import { Boat } from "@/store/useCatalogStore";
 
 export interface PierWithCoords {
   id: string;
@@ -7,7 +7,10 @@ export interface PierWithCoords {
   longitude: number | null;
 }
 
-export type AvailStatus = 'fully_available' | 'partially_available' | 'not_available';
+export type AvailStatus =
+  | "fully_available"
+  | "partially_available"
+  | "not_available";
 
 export interface AvailInfo {
   status: AvailStatus;
@@ -15,7 +18,12 @@ export interface AvailInfo {
   total_hours_in_period: number;
 }
 
-function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+function haversineKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number,
+): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
@@ -34,12 +42,18 @@ export function findPiersInRadius(
 ): Set<string> {
   const result = new Set<string>();
   const activePiers = allPiers.filter(
-    (p) => activePierIds.includes(p.id) && p.latitude != null && p.longitude != null,
+    (p) =>
+      activePierIds.includes(p.id) && p.latitude != null && p.longitude != null,
   );
   for (const pier of allPiers) {
     if (pier.latitude == null || pier.longitude == null) continue;
     for (const active of activePiers) {
-      const d = haversineKm(active.latitude!, active.longitude!, pier.latitude, pier.longitude);
+      const d = haversineKm(
+        active.latitude!,
+        active.longitude!,
+        pier.latitude,
+        pier.longitude,
+      );
       if (d <= radiusKm) {
         result.add(pier.id);
         break;
@@ -78,7 +92,8 @@ export function sortBoats(
   const distCache = new Map<string, number>();
   if (hasPierFilter) {
     const activePiers = allPiers.filter(
-      (p) => pierIds.includes(p.id) && p.latitude != null && p.longitude != null,
+      (p) =>
+        pierIds.includes(p.id) && p.latitude != null && p.longitude != null,
     );
     for (const boat of boats) {
       const boatPier = allPiers.find((p) => p.id === boat.pier_id);
@@ -88,7 +103,12 @@ export function sortBoats(
       }
       let minDist = Infinity;
       for (const ap of activePiers) {
-        const d = haversineKm(ap.latitude!, ap.longitude!, boatPier.latitude, boatPier.longitude);
+        const d = haversineKm(
+          ap.latitude!,
+          ap.longitude!,
+          boatPier.latitude,
+          boatPier.longitude,
+        );
         if (d < minDist) minDist = d;
       }
       distCache.set(boat.id, minDist);
@@ -102,10 +122,50 @@ export function sortBoats(
       if (da !== db) return da - db;
     }
     if (hasAvailData) {
-      const aa = AVAIL_ORDER[availMap[a.id]?.status ?? 'not_available'];
-      const ab = AVAIL_ORDER[availMap[b.id]?.status ?? 'not_available'];
+      const aa = AVAIL_ORDER[availMap[a.id]?.status ?? "not_available"];
+      const ab = AVAIL_ORDER[availMap[b.id]?.status ?? "not_available"];
       if (aa !== ab) return aa - ab;
     }
     return a.price_per_hour - b.price_per_hour;
   });
+}
+
+import { MONTHS_GEN_RU, MONTHS_S_RU } from "../constants";
+import { DateTimeFilter, Filters } from "../types";
+
+export const dtSummary = (dt: DateTimeFilter) =>
+  `${dt.date ? fmtShort(dt.date) : "Сегодня"} · ${fmtHour(dt.startHour)} · ${durLabel(dt.durationHours)}`;
+
+export function durLabel(h: number) {
+  return h === 1 ? "1 час" : h < 5 ? `${h} часа` : `${h} часов`;
+}
+
+export function fmtShort(d: Date) {
+  return `${d.getDate()} ${MONTHS_S_RU[d.getMonth()]}`;
+}
+
+export function fmtFull(d: Date) {
+  return `${d.getDate()} ${MONTHS_GEN_RU[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+export function fmtHour(h: number) {
+  return `${String(h).padStart(2, "0")}:00`;
+}
+
+export function ruFmt(n: number) {
+  return new Intl.NumberFormat("ru-RU").format(n);
+}
+
+export function countActive(f: Filters): number {
+  return [
+    f.typeId !== "all",
+    f.capacityMin !== null,
+    f.priceMin !== null,
+    f.priceMax !== null,
+    f.hasTarp,
+    f.hasToilet,
+    f.hasHeating,
+    f.dateTime.date !== null,
+    f.pierIds.length > 0,
+  ].filter(Boolean).length;
 }

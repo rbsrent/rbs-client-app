@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
+import { X } from 'lucide-react-native';
 import { useCallback, useRef, useState } from 'react';
 import {
+  Dimensions,
   FlatList,
   Pressable,
   StyleSheet,
@@ -8,17 +10,21 @@ import {
   View,
   ViewToken,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 
-import { Dots } from '../components/Dots';
-import { SlideItem } from '../components/SlideItem';
-import { SLIDES } from '../data/slides';
+import { OnboardingDots } from '../components/OnboardingDots';
+import { OnboardingSlide } from '../components/OnboardingSlide';
+import { ONBOARDING_SLIDES } from '../data/slides';
+
+const { width: SW } = Dimensions.get('window');
 
 export function OnboardingScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const [active, setActive] = useState(0);
-  const ref = useRef<FlatList>(null);
+  const listRef = useRef<FlatList>(null);
 
   const onViewable = useCallback(
     ({ viewableItems }: { viewableItems: ViewToken[] }) => {
@@ -27,118 +33,99 @@ export function OnboardingScreen() {
     [],
   );
 
-  const goLogin = () => router.push('/auth');
-  const goRegister = () => router.push('/auth');
+  const proceed = useCallback(() => {
+    router.replace('/permissions/location' as any);
+  }, [router]);
+
+  const goNext = useCallback(() => {
+    const isLast = active === ONBOARDING_SLIDES.length - 1;
+    if (isLast) {
+      proceed();
+    } else {
+      listRef.current?.scrollToIndex({ index: active + 1, animated: true });
+    }
+  }, [active, proceed]);
 
   return (
-    <View style={styles.root}>
-      <View style={styles.topBar}>
-        <Text style={styles.logo}>RBS.RENT</Text>
-        {/* <Text style={styles.logoSub}>аренда катеров · СПб</Text> */}
-      </View>
-
+    <View style={s.root}>
       <FlatList
-        ref={ref}
-        data={SLIDES}
+        ref={listRef}
+        data={ONBOARDING_SLIDES}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(s) => s.id}
-        renderItem={({ item }) => <SlideItem item={item} />}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => <OnboardingSlide item={item} />}
         onViewableItemsChanged={onViewable}
         viewabilityConfig={{ itemVisiblePercentThreshold: 50 }}
-        style={styles.list}
+        getItemLayout={(_, i) => ({ length: SW, offset: SW * i, index: i })}
+        scrollEventThrottle={16}
+        bounces={false}
+        removeClippedSubviews={false}
       />
 
-      <Dots count={SLIDES.length} active={active} />
+      <Pressable
+        style={[s.skipBtn, { top: insets.top + 14 }]}
+        onPress={proceed}
+        hitSlop={12}
+      >
+        <X size={18} color="rgba(255,255,255,0.65)" strokeWidth={2.5} />
+      </Pressable>
 
-      <View style={styles.cta}>
-        <Pressable
-          onPress={goLogin}
-          style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.85 }]}
-        >
-          <Text style={styles.btnPrimaryText}>Войти</Text>
-        </Pressable>
+      <View style={[s.bottom, { paddingBottom: insets.bottom + 36 }]}>
+        <OnboardingDots count={ONBOARDING_SLIDES.length} active={active} />
 
         <Pressable
-          onPress={goRegister}
-          style={({ pressed }) => [styles.btnSecondary, pressed && { opacity: 0.7 }]}
+          style={({ pressed }) => [s.btn, pressed && { opacity: 0.85 }]}
+          onPress={goNext}
         >
-          <Text style={styles.btnSecondaryText}>
-            Нет аккаунта?{'  '}
-            <Text style={styles.btnSecondaryAccent}>Зарегистрироваться</Text>
+          <Text style={s.btnTxt}>
+            {active === ONBOARDING_SLIDES.length - 1 ? 'Начать' : 'Далее'}
           </Text>
         </Pressable>
-
-        <Text style={styles.terms}>
-          Продолжая, вы принимаете условия использования и политику конфиденциальности.
-        </Text>
       </View>
     </View>
   );
 }
 
-const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.white },
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: '#0D1421' },
 
-  topBar: {
-    paddingTop: 60,
-    paddingHorizontal: 20,
-    paddingBottom: 8,
-  },
-  logo: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: COLORS.brandNavy,
-    letterSpacing: 0.5,
-  },
-  logoSub: {
-    fontSize: 12,
-    color: COLORS.text3,
-    marginTop: 2,
-    letterSpacing: 0.3,
+  skipBtn: {
+    position: 'absolute',
+    right: 18,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
-  list: { flex: 1 },
-
-  cta: {
-    paddingHorizontal: 15,
-    paddingBottom: 40,
-    gap: 12,
+  bottom: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 24,
+    gap: 22,
+    alignItems: 'center',
   },
-  btnPrimary: {
-    height: 48,
-    borderRadius: 20,
+
+  btn: {
+    width: '100%',
+    height: 52,
+    borderRadius: 26,
     backgroundColor: COLORS.brandNavy,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.12)',
   },
-  btnPrimaryText: {
-    fontSize: 16,
+  btnTxt: {
+    fontSize: 17,
     fontWeight: '700',
-    color: COLORS.white,
+    color: '#fff',
     letterSpacing: 0.2,
-  },
-  btnSecondary: {
-    height: 48,
-    borderRadius: 20,
-    borderWidth: 1.5,
-    borderColor: COLORS.brandNavy,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  btnSecondaryText: {
-    fontSize: 15,
-    color: COLORS.text2,
-  },
-  btnSecondaryAccent: {
-    color: COLORS.brandNavy,
-    fontWeight: '700',
-  },
-  terms: {
-    fontSize: 11,
-    color: COLORS.text3,
-    textAlign: 'center',
-    lineHeight: 16,
   },
 });

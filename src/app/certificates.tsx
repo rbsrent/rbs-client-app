@@ -13,7 +13,6 @@ import {
 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -33,6 +32,7 @@ import { publicSupabase } from '@/shared/supabase/publicClient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { digitsToE164, isValidDigits } from '@/shared/utils/phone';
+import { Spinner } from '@/shared/components/Spinner';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -154,7 +154,7 @@ export default function CertificatesScreen() {
       <View style={s.root}>
         <ScreenHeader title="Оплата" />
         <View style={s.centered}>
-          <ActivityIndicator color={COLORS.brandNavy} size="large" />
+          <Spinner />
           <Text style={s.centeredTitle}>Ожидаем подтверждение оплаты…</Text>
           <Text style={s.centeredHint}>Не закрывайте приложение</Text>
         </View>

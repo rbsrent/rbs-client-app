@@ -2,7 +2,6 @@ import { useRouter } from 'expo-router';
 import { ArrowLeft } from 'lucide-react-native';
 import React, { useEffect, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -18,6 +17,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '@/shared/colors';
 import { authSupabase } from '@/shared/supabase/authClient';
 import { useAuthStore } from '@/store/useAuthStore';
+import { Spinner } from '@/shared/components/Spinner';
 
 export default function ProfileSettingsScreen() {
   const insets = useSafeAreaInsets();
@@ -85,7 +85,7 @@ export default function ProfileSettingsScreen() {
             disabled={isSaving}
           >
             {isSaving ? (
-              <ActivityIndicator color={COLORS.white} />
+              <Spinner color="#fff" trackColor="rgba(255,255,255,0.25)" />
             ) : (
               <Text style={styles.saveBtnText}>Сохранить</Text>
             )}
