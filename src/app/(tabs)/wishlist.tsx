@@ -1,11 +1,5 @@
-import { Image } from "expo-image";
 import { useFocusEffect, useRouter } from "expo-router";
-import { Clock, Heart, MapPin, X } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
-import { useAuthStore } from "@/store/useAuthStore";
-import { getSavedRoutesWithDates, useRouteSavedStore } from "@/store/useRouteSavedStore";
-import { getCachedRoutes } from "@/features/routes/store";
-import { resolveRouteImage } from "@/features/routes/types";
+import { useCallback, useState } from "react";
 import {
   Dimensions,
   Pressable,
@@ -16,249 +10,63 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { GroupCard } from "@/features/wishlist/components/GroupCard";
+import { RecentCard } from "@/features/wishlist/components/RecentCard";
 import { COLORS } from "@/shared/colors";
 import {
   DEFAULT_GROUP_ID,
   deleteGroup,
   getAllGroups,
   RECENT_GROUP_ID,
+  ROUTES_GROUP_ID,
   WishlistGroupMeta,
 } from "@/shared/wishlist";
 
 const W = Dimensions.get("window").width;
 const CARD_W = (W - 32 - 12) / 2;
-
 const CELL_GAP = 3;
 const CELL_RADIUS = 9;
 
-function Collage({ urls, size }: { urls: string[]; size: number }) {
-  const cell = (size - CELL_GAP) / 2;
-  const cells = Array.from({ length: 4 }, (_, i) => urls[i] ?? null);
-  const radii = [
-    { borderTopLeftRadius: CELL_RADIUS },
-    { borderTopRightRadius: CELL_RADIUS },
-    { borderBottomLeftRadius: CELL_RADIUS },
-    { borderBottomRightRadius: CELL_RADIUS },
-  ];
-  return (
-    <View
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 14,
-        overflow: "hidden",
-        backgroundColor: "#fff",
-        flexDirection: "row",
-        flexWrap: "wrap",
-        gap: CELL_GAP,
-      }}
-    >
-      {cells.map((url, i) => (
-        <View
-          key={i}
-          style={[
-            {
-              width: cell,
-              height: cell,
-              backgroundColor: "#D8D8D8",
-              overflow: "hidden",
-            },
-            radii[i],
-          ]}
-        >
-          {url ? (
-            <Image
-              source={{ uri: url }}
-              style={StyleSheet.absoluteFill}
-              contentFit="cover"
-              cachePolicy="memory-disk"
-            />
-          ) : null}
-        </View>
-      ))}
-    </View>
-  );
-}
-
-function RecentCard({
-  group,
-  onPress,
-}: {
-  group: WishlistGroupMeta;
-  onPress: () => void;
-}) {
-  const isEmpty = group.item_count === 0;
-  return (
-    <Pressable
-      style={({ pressed }) => [s.groupCard, pressed && { opacity: 0.85 }]}
-      onPress={onPress}
-    >
-      {isEmpty ? (
-        <View style={[s.emptyImg, { width: CARD_W, height: CARD_W }]}>
-          <Clock size={34} color="#AAA" strokeWidth={1.5} />
-        </View>
-      ) : (
-        <Collage urls={group.preview_urls} size={CARD_W} />
-      )}
-      <Text style={s.groupName} numberOfLines={2}>
-        {group.name}
-      </Text>
-      <Text style={s.groupSub}>
-        {isEmpty ? "Пусто" : `${group.item_count} объектов`}
-      </Text>
-    </Pressable>
-  );
-}
-
-function GroupCard({
-  group,
-  editing,
-  onPress,
-  onDelete,
-}: {
-  group: WishlistGroupMeta;
-  editing: boolean;
-  onPress: () => void;
-  onDelete: () => void;
-}) {
-  const isEmpty = group.item_count === 0;
-  const cover = group.preview_urls[0] ?? null;
-  return (
-    <Pressable
-      style={({ pressed }) => [s.groupCard, pressed && { opacity: 0.85 }]}
-      onPress={onPress}
-    >
-      <View style={[s.singleImg, { width: CARD_W, height: CARD_W }]}>
-        {isEmpty ? (
-          <View style={[StyleSheet.absoluteFill, s.emptyImg]}>
-            <Heart size={34} color="#AAA" strokeWidth={1.5} />
-          </View>
-        ) : cover ? (
-          <Image
-            source={{ uri: cover }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View
-            style={[StyleSheet.absoluteFill, { backgroundColor: "#D8D8D8" }]}
-          />
-        )}
-      </View>
-      <Text style={s.groupName} numberOfLines={2}>
-        {group.name}
-      </Text>
-      <Text style={s.groupSub}>
-        {isEmpty ? "Пусто" : `Сохранено: ${group.item_count}`}
-      </Text>
-
-      {editing && group.id !== DEFAULT_GROUP_ID && (
-        <Pressable style={s.deleteBtn} onPress={onDelete} hitSlop={6}>
-          <X size={12} color="#fff" strokeWidth={3} />
-        </Pressable>
-      )}
-    </Pressable>
-  );
-}
-
-function RoutesGroupCard({
-  count,
-  coverUrl,
-  onPress,
-}: {
-  count: number;
-  coverUrl: string | null;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      style={({ pressed }) => [s.groupCard, pressed && { opacity: 0.85 }]}
-      onPress={onPress}
-    >
-      <View style={[s.singleImg, { width: CARD_W, height: CARD_W }]}>
-        {coverUrl ? (
-          <Image
-            source={{ uri: coverUrl }}
-            style={StyleSheet.absoluteFill}
-            contentFit="cover"
-            cachePolicy="memory-disk"
-          />
-        ) : (
-          <View style={[StyleSheet.absoluteFill, s.emptyImg]}>
-            <MapPin size={34} color={COLORS.brandCyan} strokeWidth={1.5} />
-          </View>
-        )}
-      </View>
-      <Text style={s.groupName} numberOfLines={2}>Маршруты</Text>
-      <Text style={s.groupSub}>
-        {count > 0 ? `Сохранено: ${count}` : "Пусто"}
-      </Text>
-    </Pressable>
-  );
-}
 
 export default function WishlistScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { session } = useAuthStore();
 
   const [groups, setGroups] = useState<WishlistGroupMeta[]>([]);
   const [editing, setEditing] = useState(false);
-  const [routesCoverUrl, setRoutesCoverUrl] = useState<string | null>(null);
-
-  const hydrateRoutes  = useRouteSavedStore((s) => s.hydrate);
-  const savedRouteIds  = useRouteSavedStore((s) => s.savedIds);
-  const savedRouteCount = savedRouteIds.size;
-
-  useEffect(() => { hydrateRoutes(); }, []);
 
   const load = useCallback(() => {
     getAllGroups().then(setGroups);
-    hydrateRoutes();
-    getSavedRoutesWithDates().then((entries) => {
-      if (entries.length === 0) { setRoutesCoverUrl(null); return; }
-      const allRoutes = getCachedRoutes();
-      if (!allRoutes) return;
-      const last = allRoutes.find((r) => r.id === entries[0].route_id);
-      setRoutesCoverUrl(last ? resolveRouteImage(last.map_image_url) : null);
-    });
   }, []);
 
   useFocusEffect(load);
 
-  if (!session) {
-    return (
-      <View style={[s.root, s.gate, { paddingTop: insets.top }]}>
-        <Text style={s.pageTitle}>Вишлисты</Text>
-        <View style={s.gateBody}>
-          <Text style={s.gateDesc}>Войдите в аккаунт и начните сохранять понравившиеся объекты.</Text>
-          <Pressable style={s.gateBtn} onPress={() => router.push('/auth' as any)}>
-            <Text style={s.gateBtnTxt}>Войдите или зарегистрируйтесь</Text>
-          </Pressable>
-        </View>
-      </View>
-    );
-  }
-
   const recentGroup = groups.find((g) => g.id === RECENT_GROUP_ID) ?? null;
   const defaultGroup = groups.find((g) => g.id === DEFAULT_GROUP_ID) ?? null;
-  const userGroups = groups.filter(
-    (g) => g.id !== DEFAULT_GROUP_ID && g.id !== RECENT_GROUP_ID,
+  const routesGroup = groups.find((g) => g.id === ROUTES_GROUP_ID) ?? null;
+  const customBoat = groups.filter(
+    (g) =>
+      g.type === "boat" &&
+      g.id !== DEFAULT_GROUP_ID &&
+      g.id !== RECENT_GROUP_ID,
+  );
+  const customRoute = groups.filter(
+    (g) => g.type === "route" && g.id !== ROUTES_GROUP_ID,
   );
 
-  const hasUserGroups =
-    userGroups.length > 0 || (defaultGroup?.item_count ?? 0) > 0;
+  const hasAnyCustom =
+    customBoat.length > 0 ||
+    customRoute.length > 0 ||
+    (defaultGroup?.item_count ?? 0) > 0;
 
   const handleDelete = async (id: string) => {
     await deleteGroup(id);
     load();
   };
 
-  const displayGroups = [
-    ...(defaultGroup ? [defaultGroup] : []),
-    ...userGroups,
-  ];
+  const navigateBoat = (id: string) => router.push(`/wishlist/${id}` as any);
+  const navigateRoute = (id: string) =>
+    router.push(`/wishlist/route/${id}` as any);
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -268,7 +76,7 @@ export default function WishlistScreen() {
       >
         <View style={s.topBar}>
           <View style={{ flex: 1 }} />
-          {hasUserGroups && (
+          {hasAnyCustom && (
             <Pressable
               style={({ pressed }) => [s.editBtn, pressed && { opacity: 0.6 }]}
               onPress={() => setEditing((e) => !e)}
@@ -283,25 +91,48 @@ export default function WishlistScreen() {
         <Text style={s.pageTitle}>Вишлисты</Text>
 
         <View style={s.grid}>
-          <RoutesGroupCard
-            count={savedRouteCount}
-            coverUrl={routesCoverUrl}
-            onPress={() => router.push('/wishlist/routes' as any)}
-          />
-          {recentGroup && (
-            <RecentCard
-              group={recentGroup}
-              onPress={() => router.push(`/wishlist/${RECENT_GROUP_ID}` as any)}
+          {/* Route groups */}
+          {routesGroup && (
+            <GroupCard
+              group={routesGroup}
+              editing={editing}
+              isRoute
+              onPress={() => !editing && navigateRoute(ROUTES_GROUP_ID)}
+              onDelete={() => {}}
             />
           )}
-          {displayGroups.map((g) => (
+          {customRoute.map((g) => (
             <GroupCard
               key={g.id}
               group={g}
               editing={editing}
-              onPress={() => {
-                if (!editing) router.push(`/wishlist/${g.id}` as any);
-              }}
+              isRoute
+              onPress={() => !editing && navigateRoute(g.id)}
+              onDelete={() => handleDelete(g.id)}
+            />
+          ))}
+
+          {/* Boat groups */}
+          {recentGroup && (
+            <RecentCard
+              group={recentGroup}
+              onPress={() => navigateBoat(RECENT_GROUP_ID)}
+            />
+          )}
+          {defaultGroup && (
+            <GroupCard
+              group={defaultGroup}
+              editing={editing}
+              onPress={() => !editing && navigateBoat(DEFAULT_GROUP_ID)}
+              onDelete={() => {}}
+            />
+          )}
+          {customBoat.map((g) => (
+            <GroupCard
+              key={g.id}
+              group={g}
+              editing={editing}
+              onPress={() => !editing && navigateBoat(g.id)}
               onDelete={() => handleDelete(g.id)}
             />
           ))}
@@ -314,11 +145,6 @@ export default function WishlistScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
 
-  gate:     { paddingHorizontal: 0 },
-  gateBody: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 24, gap: 16 },
-  gateDesc: { fontSize: 15, color: '#666', lineHeight: 22 },
-  gateBtn:  { height: 54, borderRadius: 14, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
-  gateBtnTxt: { fontSize: 16, fontWeight: '600', color: '#fff' },
 
   topBar: {
     flexDirection: "row",
@@ -328,10 +154,11 @@ const s = StyleSheet.create({
     paddingTop: 16,
     paddingBottom: 4,
   },
-  editBtn: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+  editBtn: { 
+    paddingHorizontal: 16, 
+    paddingVertical: 8, 
     borderRadius: 20,
+    backgroundColor: COLORS.greyLight
   },
   editBtnTxt: { fontSize: 14, fontWeight: "500", color: "#000" },
 

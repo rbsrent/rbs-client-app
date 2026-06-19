@@ -88,7 +88,7 @@ const s = StyleSheet.create({
   stepBody:  { marginHorizontal: 16, marginTop: 8, gap: 4 },
   secLabel: {
     fontSize: 11,
-    fontWeight: '700',
+    fontWeight: '500',
     color: COLORS.text3,
     textTransform: 'uppercase',
     letterSpacing: 0.8,

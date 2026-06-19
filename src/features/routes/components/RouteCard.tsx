@@ -12,12 +12,11 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
-import { useAuthStore } from '@/store/useAuthStore';
+import { useRouteWishlistPicker } from '@/shared/components/RouteWishlistPickerContext';
 import { useRouteSavedStore } from '@/store/useRouteSavedStore';
 
 import { setRoutePreview } from '../store';
 import { resolveRouteImage, WaterRoute } from '../types';
-import { SaveRouteSheet, SaveRouteSheetHandle } from './SaveRouteSheet';
 
 const { width: W } = Dimensions.get('window');
 const IMG_H = Math.round(W * 0.6);
@@ -30,44 +29,38 @@ function durationLabel(h: number) {
   return `${h} часов`;
 }
 
-function HeartBtn({ routeId }: { routeId: string }) {
-  const router   = useRouter();
-  const session  = useAuthStore((s) => s.session);
-  const hydrate  = useRouteSavedStore((s) => s.hydrate);
-  const isSaved  = useRouteSavedStore((s) => s.isSaved(routeId));
-  const toggle   = useRouteSavedStore((s) => s.toggle);
-  const sheetRef = useRef<SaveRouteSheetHandle>(null);
-  const scale    = useSharedValue(1);
+function HeartBtn({ route }: { route: WaterRoute }) {
+  const hydrate          = useRouteSavedStore((s) => s.hydrate);
+  const isSaved          = useRouteSavedStore((s) => s.isSaved(route.id));
+  const { openRoutePicker } = useRouteWishlistPicker();
+  const scale            = useSharedValue(1);
 
   useEffect(() => { hydrate(); }, []);
 
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const handlePress = async () => {
-    if (!session) {
-      router.push('/auth' as any);
-      return;
-    }
+  const handlePress = () => {
     scale.value = withSequence(
       withTiming(0.82, { duration: 90 }),
       withTiming(1,    { duration: 90 }),
     );
-    const nowSaved = await toggle(routeId);
-    sheetRef.current?.show(nowSaved);
+    openRoutePicker({
+      route_id:      route.id,
+      name:          route.name,
+      map_image_url: route.map_image_url,
+      duration_hours: route.duration_hours,
+    });
   };
 
   return (
-    <>
-      <AnimPressable style={[s.heartBtn, anim]} onPress={handlePress} hitSlop={12}>
-        <Heart
-          size={18}
-          color={isSaved ? COLORS.error : 'rgba(255,255,255,0.95)'}
-          fill={isSaved ? COLORS.error : 'transparent'}
-          strokeWidth={2}
-        />
-      </AnimPressable>
-      <SaveRouteSheet ref={sheetRef} />
-    </>
+    <AnimPressable style={[s.heartBtn, anim]} onPress={handlePress} hitSlop={12}>
+      <Heart
+        size={18}
+        color={isSaved ? COLORS.error : 'rgba(255,255,255,0.95)'}
+        fill={isSaved ? COLORS.error : 'transparent'}
+        strokeWidth={2}
+      />
+    </AnimPressable>
   );
 }
 
@@ -109,7 +102,7 @@ export const RouteCard = memo(function RouteCard({ route }: { route: WaterRoute 
           pointerEvents="none"
         />
 
-        <HeartBtn routeId={route.id} />
+        <HeartBtn route={route} />
 
         <View style={s.bottomRow}>
           <View style={s.durationPill}>

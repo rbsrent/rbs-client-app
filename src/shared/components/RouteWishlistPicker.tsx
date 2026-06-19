@@ -1,79 +1,82 @@
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
 import { Image } from 'expo-image';
-import { Check, Plus } from 'lucide-react-native';
+import { Check, MapPin, Plus } from 'lucide-react-native';
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
-import { useWishlistStore } from '@/store/useWishlistStore';
+import { useRouteSavedStore } from '@/store/useRouteSavedStore';
 import {
-  BoatData,
+  addRouteToGroup,
   createGroup,
   getAllGroups,
-  getGroupsContaining,
-  RECENT_GROUP_ID,
+  getRouteGroupsContaining,
+  removeRouteFromGroup,
+  RouteData,
+  ROUTES_GROUP_ID,
   WishlistGroupMeta,
 } from '@/shared/wishlist';
 
-export interface WishlistPickerHandle {
-  open: (boat: BoatData, onClose?: () => void) => void;
+export interface RouteWishlistPickerHandle {
+  open: (route: RouteData, onClose?: () => void) => void;
 }
 
 type Page = 'list' | 'create';
 
-export const WishlistPicker = forwardRef<WishlistPickerHandle>((_, ref) => {
+export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref) => {
   const sheetRef = useRef<BottomSheetModal>(null);
   const snaps    = useMemo(() => ['55%', '80%'], []);
 
-  const [boat,     setBoat]     = useState<BoatData | null>(null);
+  const [route,    setRoute]    = useState<RouteData | null>(null);
   const [groups,   setGroups]   = useState<WishlistGroupMeta[]>([]);
   const [inGroups, setInGroups] = useState<Set<string>>(new Set());
   const [page,     setPage]     = useState<Page>('list');
   const [newName,  setNewName]  = useState('');
   const onCloseRef = useRef<(() => void) | undefined>(undefined);
 
-  const addBoatToGroup     = useWishlistStore((s) => s.addBoatToGroup);
-  const removeBoatFromGroup = useWishlistStore((s) => s.removeBoatFromGroup);
+  const refresh = useRouteSavedStore((s) => s.refresh);
 
   useImperativeHandle(ref, () => ({
-    open: (b: BoatData, onClose?: () => void) => {
-      setBoat(b);
+    open: (r: RouteData, onClose?: () => void) => {
+      setRoute(r);
       setPage('list');
       setNewName('');
       onCloseRef.current = onClose;
-      loadGroups(b.boat_id);
+      loadGroups(r.route_id);
       sheetRef.current?.present();
     },
   }));
 
-  const loadGroups = async (boatId: string) => {
-    const [all, saved] = await Promise.all([getAllGroups('boat'), getGroupsContaining(boatId)]);
-    setGroups(all.filter((g) => g.id !== RECENT_GROUP_ID));
-    setInGroups(new Set(saved.filter((g) => g !== RECENT_GROUP_ID)));
+  const loadGroups = async (routeId: string) => {
+    const [all, saved] = await Promise.all([
+      getAllGroups('route'),
+      getRouteGroupsContaining(routeId),
+    ]);
+    setGroups(all);
+    setInGroups(new Set(saved));
   };
 
   const toggle = async (groupId: string) => {
-    if (!boat) return;
-    const next = new Set(inGroups);
-    if (next.has(groupId)) {
-      await removeBoatFromGroup(groupId, boat.boat_id);
+    if (!route) return;
+    if (inGroups.has(groupId)) {
+      await removeRouteFromGroup(groupId, route.route_id);
     } else {
-      await addBoatToGroup(groupId, boat);
+      await addRouteToGroup(groupId, route);
     }
+    await refresh(route.route_id);
     sheetRef.current?.dismiss();
   };
 
   const handleCreate = async () => {
-    if (!newName.trim() || !boat) return;
-    const id = await createGroup(newName);
-    await addBoatToGroup(id, boat);
+    if (!newName.trim() || !route) return;
+    const id = await createGroup(newName, 'route');
+    await addRouteToGroup(id, route);
+    await refresh(route.route_id);
     setNewName('');
     setPage('list');
-    loadGroups(boat.boat_id);
+    loadGroups(route.route_id);
   };
-
-  const visibleGroups = groups;
 
   return (
     <BottomSheetModal
@@ -89,10 +92,10 @@ export const WishlistPicker = forwardRef<WishlistPickerHandle>((_, ref) => {
       {page === 'list' ? (
         <BottomSheetScrollView showsVerticalScrollIndicator={false}>
           <View style={s.header}>
-            <Text style={s.title}>Сохранить в список</Text>
+            <Text style={s.title}>Сохранить маршрут</Text>
           </View>
 
-          {visibleGroups.map((g) => {
+          {groups.map((g) => {
             const checked = inGroups.has(g.id);
             const cover   = g.preview_urls[0] ?? null;
             return (
@@ -102,13 +105,21 @@ export const WishlistPicker = forwardRef<WishlistPickerHandle>((_, ref) => {
                 onPress={() => toggle(g.id)}
               >
                 <View style={s.thumb}>
-                  {cover
-                    ? <Image source={{ uri: cover }} style={StyleSheet.absoluteFill} contentFit="cover" />
-                    : <View style={[StyleSheet.absoluteFill, { backgroundColor: '#E0E0E0' }]} />}
+                  {cover ? (
+                    <Image
+                      source={{ uri: cover }}
+                      style={StyleSheet.absoluteFill}
+                      contentFit="cover"
+                    />
+                  ) : (
+                    <View style={[StyleSheet.absoluteFill, s.thumbEmpty]}>
+                      <MapPin size={20} color={COLORS.brandCyan} strokeWidth={2} />
+                    </View>
+                  )}
                 </View>
                 <View style={s.rowText}>
                   <Text style={s.rowName}>{g.name}</Text>
-                  <Text style={s.rowSub}>{g.item_count} объектов</Text>
+                  <Text style={s.rowSub}>{g.item_count} маршрутов</Text>
                 </View>
                 <View style={[s.check, checked && s.checkOn]}>
                   {checked && <Check size={14} color="#fff" strokeWidth={3} />}
@@ -131,7 +142,7 @@ export const WishlistPicker = forwardRef<WishlistPickerHandle>((_, ref) => {
         </BottomSheetScrollView>
       ) : (
         <BottomSheetView style={s.createPage}>
-          <Text style={s.title}>Новый список</Text>
+          <Text style={s.title}>Новый список маршрутов</Text>
           <View style={s.inputWrap}>
             <BottomSheetTextInput
               style={s.input}
@@ -180,8 +191,13 @@ const s = StyleSheet.create({
     width: 56, height: 56, borderRadius: 10,
     overflow: 'hidden', backgroundColor: '#E0E0E0',
   },
+  thumbEmpty: {
+    alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#F0F9FC',
+  },
   thumbNew: {
     alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#E0E0E0',
   },
   rowText: { flex: 1, gap: 2 },
   rowName: { fontSize: 15, fontWeight: '600', color: '#000' },

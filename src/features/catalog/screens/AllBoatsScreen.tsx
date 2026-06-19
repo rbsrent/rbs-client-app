@@ -48,6 +48,7 @@ export function AllBoatsScreen() {
   const priceSheetRef = useRef<BottomSheetModal>(null);
   const capSheetRef   = useRef<BottomSheetModal>(null);
   const amenSheetRef  = useRef<BottomSheetModal>(null);
+  const durSheetRef   = useRef<BottomSheetModal>(null);
 
   // ── Initial filters from URL params ──
   const initialFilters = useMemo<Filters>(() => {
@@ -151,6 +152,7 @@ export function AllBoatsScreen() {
       case 'price':     priceSheetRef.current?.present(); break;
       case 'capacity':  capSheetRef.current?.present();   break;
       case 'amenities': amenSheetRef.current?.present();  break;
+      case 'duration':  durSheetRef.current?.present();   break;
     }
   }, [filters]);
 
@@ -184,8 +186,8 @@ export function AllBoatsScreen() {
             hitSlop={8}
           >
             {searchOpen
-              ? <X size={18} color={COLORS.text2} strokeWidth={2} />
-              : <Search size={18} color={COLORS.text2} strokeWidth={2} />
+              ? <X size={20} color={COLORS.brandNavy} strokeWidth={2} />
+              : <Search size={20} color={COLORS.brandNavy} strokeWidth={2} />
             }
           </Pressable>
         }
@@ -299,6 +301,14 @@ export function AllBoatsScreen() {
       <FilterMiniSheet
         modalRef={amenSheetRef}
         section="amenities"
+        draft={draft}
+        onDraftChange={setDraft}
+        onApply={handleMiniApply}
+        filteredCount={filtered.length}
+      />
+      <FilterMiniSheet
+        modalRef={durSheetRef}
+        section="duration"
         draft={draft}
         onDraftChange={setDraft}
         onApply={handleMiniApply}

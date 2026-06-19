@@ -1,4 +1,3 @@
-import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
@@ -46,8 +45,8 @@ const s = StyleSheet.create({
     paddingHorizontal: 24,
     paddingTop: 16,
     backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#DDDDDD',
+    // borderTopWidth: 1,
+    // borderTopColor: '#DDDDDD',
   },
   priceBlock: { flex: 1, gap: 2 },
   priceRow:   { flexDirection: 'row', alignItems: 'baseline' },
@@ -57,7 +56,7 @@ const s = StyleSheet.create({
 
   btn: {
     backgroundColor: COLORS.brandNavy,
-    borderRadius: 24,
+    borderRadius: 14,
     paddingVertical: 14,
     paddingHorizontal: 20,
     minWidth: 148,

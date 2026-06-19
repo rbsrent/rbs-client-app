@@ -15,10 +15,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
-import { AMENITIES, CAPACITY_OPTS, PRICE_PRESETS, TYPE_CHIPS } from '../constants';
+import { AMENITIES, CAPACITY_OPTS, DURATION_OPTS, PRICE_PRESETS, TYPE_CHIPS } from '../constants';
 import { DEFAULT, Filters } from '../types';
 
-export type FilterSection = 'type' | 'price' | 'capacity' | 'amenities';
+export type FilterSection = 'type' | 'price' | 'capacity' | 'amenities' | 'duration';
 
 interface Props {
   modalRef: React.MutableRefObject<BottomSheetModal | null>;
@@ -34,6 +34,7 @@ const SECTION_TITLES: Record<FilterSection, string> = {
   price:     'Цена за час',
   capacity:  'Вместимость',
   amenities: 'Удобства',
+  duration:  'Продолжительность',
 };
 
 const SNAP: Record<FilterSection, string[]> = {
@@ -41,6 +42,7 @@ const SNAP: Record<FilterSection, string[]> = {
   price:     ['52%'],
   capacity:  ['45%'],
   amenities: ['42%'],
+  duration:  ['42%'],
 };
 
 export const FilterMiniSheet: React.FC<Props> = ({
@@ -67,6 +69,9 @@ export const FilterMiniSheet: React.FC<Props> = ({
         break;
       case 'amenities':
         onDraftChange({ ...draft, hasTarp: false, hasToilet: false, hasHeating: false });
+        break;
+      case 'duration':
+        onDraftChange({ ...draft, dateTime: { ...draft.dateTime, durationHours: DEFAULT.dateTime.durationHours } });
         break;
     }
   };
@@ -204,6 +209,25 @@ export const FilterMiniSheet: React.FC<Props> = ({
                 />
               </View>
             ))}
+          </View>
+        )}
+
+        {/* ── Продолжительность ── */}
+        {section === 'duration' && (
+          <View style={s.optRow}>
+            {DURATION_OPTS.map((h) => {
+              const on = draft.dateTime.durationHours === h;
+              const label = h === 1 ? '1 час' : h < 5 ? `${h} часа` : `${h} часов`;
+              return (
+                <Pressable
+                  key={h}
+                  style={[s.optChip, on && s.optChipOn]}
+                  onPress={() => onDraftChange({ ...draft, dateTime: { ...draft.dateTime, durationHours: h } })}
+                >
+                  <Text style={[s.optTxt, on && s.optTxtOn]}>{label}</Text>
+                </Pressable>
+              );
+            })}
           </View>
         )}
 

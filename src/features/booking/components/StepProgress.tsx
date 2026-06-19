@@ -1,6 +1,6 @@
+import { COLORS } from "@/shared/colors";
 import { useEffect, useRef } from "react";
 import { Animated, Easing, StyleSheet, View } from "react-native";
-import { COLORS } from "@/shared/colors";
 
 export const STEP_LABELS = [
   "Дата и время",
@@ -66,7 +66,7 @@ const p = StyleSheet.create({
   fill: {
     position: "absolute",
     left: 0, top: 0, bottom: 0,
-    backgroundColor: "#222",
+    backgroundColor: COLORS.brandNavy,
     borderRadius: 2,
   },
 });

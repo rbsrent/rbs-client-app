@@ -15,12 +15,12 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '@/shared/colors';
 import { authSupabase } from '@/shared/supabase/authClient';
 
+import { Spinner } from '@/shared/components/Spinner';
 import { MainView } from '../components/MainView';
 import { TgWaitingView } from '../components/TgWaitingView';
 import { useAuth } from '../hooks/useAuth';
 import { OtpScreen } from './OtpScreen';
 import { PhoneScreen } from './PhoneScreen';
-import { Spinner } from '@/shared/components/Spinner';
 
 type ScreenView = 'main' | 'phone' | 'otp' | 'tg-waiting' | 'tg-verifying';
 
@@ -167,14 +167,15 @@ export function LoginScreen() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
       <View style={[styles.root, { paddingTop: insets.top }]}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={10} style={styles.backBtn}>
-            <X size={20} color={COLORS.text1} strokeWidth={2} />
-          </Pressable>
-        </View>
+        {/* Close — top right, floating */}
+        <Pressable
+          onPress={() => router.back()}
+          hitSlop={10}
+          style={styles.closeBtn}
+        >
+          <X size={22} color={COLORS.brandNavy} strokeWidth={2} />
+        </Pressable>
 
-        {/* Main or Waiting */}
         {view === 'tg-verifying' ? (
           <View style={styles.centerBox}>
             <Spinner />
@@ -212,14 +213,13 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
   },
-  header: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+  closeBtn: {
+    position: 'absolute',
+    top: 14,
+    right: 16,
+    zIndex: 10,
+    width: 36,
+    height: 36,
     alignItems: 'center',
     justifyContent: 'center',
   },

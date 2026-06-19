@@ -1,12 +1,13 @@
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Clock, MapPin } from "lucide-react-native";
-import { useEffect, useRef, useState } from "react";
+import { ArrowLeft, Clock, Heart, MapPin, Share2 } from "lucide-react-native";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -19,15 +20,21 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { getCachedRoute, setCachedRoute, getRoutePreview } from "@/features/routes/store";
+import {
+  getCachedRoute,
+  getRoutePreview,
+  setCachedRoute,
+} from "@/features/routes/store";
 import {
   DIFFICULTY,
   resolveRouteImage,
   WaterRoute,
 } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
+import { useRouteWishlistPicker } from "@/shared/components/RouteWishlistPickerContext";
+import { Spinner } from "@/shared/components/Spinner";
 import { publicSupabase } from "@/shared/supabase/publicClient";
-import { Spinner } from '@/shared/components/Spinner';
+import { useRouteSavedStore } from "@/store/useRouteSavedStore";
 
 const { width: W } = Dimensions.get("window");
 const HERO_H = 380;
@@ -59,8 +66,16 @@ function SnakePath({ points }: { points: string[] }) {
 
           // card slides from its side; dot pops after card settles
           const cardEnter = isRight
-            ? FadeInLeft.delay(cardDelay).duration(320).springify().damping(18).stiffness(120)
-            : FadeInRight.delay(cardDelay).duration(320).springify().damping(18).stiffness(120);
+            ? FadeInLeft.delay(cardDelay)
+                .duration(320)
+                .springify()
+                .damping(18)
+                .stiffness(120)
+            : FadeInRight.delay(cardDelay)
+                .duration(320)
+                .springify()
+                .damping(18)
+                .stiffness(120);
 
           return (
             <View key={i}>
@@ -80,7 +95,11 @@ function SnakePath({ points }: { points: string[] }) {
                 {/* dot — pops in after card */}
                 <View style={sp.dotWrap}>
                   <Animated.View
-                    entering={ZoomIn.delay(cardDelay + 180).duration(280).springify().damping(12).stiffness(180)}
+                    entering={ZoomIn.delay(cardDelay + 180)
+                      .duration(280)
+                      .springify()
+                      .damping(12)
+                      .stiffness(180)}
                     style={sp.dot}
                   >
                     <Text style={sp.dotNum}>{i + 1}</Text>
@@ -97,8 +116,12 @@ function SnakePath({ points }: { points: string[] }) {
                   entering={FadeIn.delay(cardDelay + 280).duration(80)}
                   style={[sp.connector, isRight ? sp.connRight : sp.connLeft]}
                 >
-                  <View style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]} />
-                  <View style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]} />
+                  <View
+                    style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]}
+                  />
+                  <View
+                    style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]}
+                  />
                 </Animated.View>
               )}
             </View>
@@ -127,6 +150,32 @@ export default function RouteDetailScreen() {
   const cached = useRef(getCachedRoute(slug as string)).current;
   const [route, setRoute] = useState<WaterRoute | null>(cached);
   const [loading, setLoading] = useState(!cached);
+
+  const { openRoutePicker } = useRouteWishlistPicker();
+  const isSaved = useRouteSavedStore((s) =>
+    route ? s.isSaved(route.id) : false,
+  );
+  const hydrate = useRouteSavedStore((s) => s.hydrate);
+
+  useEffect(() => {
+    hydrate();
+  }, []);
+
+  const handleShare = useCallback(async () => {
+    try {
+      await Share.share({ message: `${route?.name ?? "Маршрут"} — rbs.rent` });
+    } catch {}
+  }, [route?.name]);
+
+  const handleHeart = useCallback(() => {
+    if (!route) return;
+    openRoutePicker({
+      route_id: route.id,
+      name: route.name,
+      map_image_url: route.map_image_url,
+      duration_hours: route.duration_hours,
+    });
+  }, [route, openRoutePicker]);
 
   useEffect(() => {
     if (!slug || cached) return;
@@ -206,13 +255,29 @@ export default function RouteDetailScreen() {
             pointerEvents="none"
           />
 
+          {/* Back */}
           <Pressable
-            style={[s.backBtn, { top: insets.top + 8 }]}
+            style={[s.heroBtn, { top: insets.top + 8, left: 16 }]}
             onPress={() => router.back()}
             hitSlop={8}
           >
-            <ChevronLeft size={20} color="#fff" strokeWidth={2.5} />
+            <ArrowLeft size={20} color={COLORS.brandNavy} strokeWidth={2.5} />
           </Pressable>
+
+          {/* Share + Save */}
+          <View style={[s.heroBtnRow, { top: insets.top + 8 }]}>
+            <Pressable style={s.heroBtnItem} onPress={handleShare} hitSlop={8}>
+              <Share2 size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
+            </Pressable>
+            <Pressable style={s.heroBtnItem} onPress={handleHeart} hitSlop={8}>
+              <Heart
+                size={18}
+                color={isSaved ? "#E63946" : COLORS.brandNavy}
+                fill={isSaved ? "#E63946" : "transparent"}
+                strokeWidth={2.5}
+              />
+            </Pressable>
+          </View>
 
           <View style={s.heroContent}>
             {diff && (
@@ -414,13 +479,28 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#fff" },
 
   hero: { width: W, height: HERO_H, backgroundColor: COLORS.muted },
-  backBtn: {
+  heroBtn: {
     position: "absolute",
-    left: 16,
     width: 38,
     height: 38,
     borderRadius: 19,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    // backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: COLORS.greyLight2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  heroBtnRow: {
+    position: "absolute",
+    right: 16,
+    flexDirection: "row",
+    gap: 18,
+  },
+  heroBtnItem: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    // backgroundColor: "rgba(0,0,0,0.38)", F2F2F2
+    backgroundColor: COLORS.greyLight2,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -461,6 +541,9 @@ const s = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
+    backgroundColor: COLORS.backgroundAlt,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   chipTxt: { fontSize: 13, color: COLORS.text2, fontWeight: "500" },
 });

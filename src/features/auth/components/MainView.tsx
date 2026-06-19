@@ -1,10 +1,9 @@
 import { Phone, Send } from 'lucide-react-native';
 import {
-  Linking,
   Pressable,
   StyleSheet,
   Text,
-  View,
+  View
 } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
@@ -72,7 +71,7 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 12,
+    paddingTop: 56,
     gap: 16,
   },
   iconWrap: {

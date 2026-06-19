@@ -56,15 +56,16 @@ export const useWishlistStore = create<WishlistStore>((set, get) => ({
 
   removeBoatFromGroup: async (groupId, boatId) => {
     await removeFromGroup(groupId, boatId);
-    set((s) => {
-      const membership = new Set(s.groupMembership[boatId] ?? []);
-      membership.delete(groupId);
-      const stillSaved = membership.size > 0;
-      return {
-        saved: { ...s.saved, [boatId]: stillSaved },
-        groupMembership: { ...s.groupMembership, [boatId]: membership },
-      };
-    });
+    // re-check DB: local membership cache may be stale or unpopulated
+    const [isSaved, groups] = await Promise.all([
+      isInAnyGroup(boatId),
+      getGroupsContaining(boatId),
+    ]);
+    const membership = new Set(groups.filter((g) => g !== RECENT_GROUP_ID));
+    set((s) => ({
+      saved: { ...s.saved, [boatId]: isSaved },
+      groupMembership: { ...s.groupMembership, [boatId]: membership },
+    }));
   },
 
   removeBoatFromAll: async (boatId) => {

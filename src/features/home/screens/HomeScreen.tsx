@@ -1,6 +1,6 @@
 import { useRouter } from "expo-router";
 import { Search } from "lucide-react-native";
-import { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -28,8 +28,11 @@ export const HomeScreen = memo(function HomeScreen() {
   const { popular, katera, yakhty, routes, slides, loading } =
     useHomePageData();
   const setLoading = useHomeStore((s) => s.setLoading);
-  const lastFetch = useHomeStore((s) => s.lastFetch);
+  const lastFetch  = useHomeStore((s) => s.lastFetch);
   const isFirstLoad = loading && lastFetch === null;
+
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  useEffect(() => { if (!loading) setIsRefreshing(false); }, [loading]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -61,6 +64,7 @@ export const HomeScreen = memo(function HomeScreen() {
   );
 
   const refetch = useCallback(() => {
+    setIsRefreshing(true);
     useHomeStore.setState({ lastFetch: null });
     setLoading(true);
   }, []);
@@ -99,7 +103,7 @@ export const HomeScreen = memo(function HomeScreen() {
         onScroll={onScroll}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
+            refreshing={isRefreshing}
             onRefresh={refetch}
             tintColor={COLORS.brandCyan}
           />
@@ -111,7 +115,7 @@ export const HomeScreen = memo(function HomeScreen() {
         </View>
 
         {/* Hero banner */}
-        <PromoBanner slides={slides} />
+        <PromoBanner slides={slides} loading={isFirstLoad} />
 
         {/* Подарочный сертификат */}
         <View style={s.giftSection}>

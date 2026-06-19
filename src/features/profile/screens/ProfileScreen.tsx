@@ -15,8 +15,7 @@ import {
   Send,
   Settings,
   Tag,
-  Trash2,
-  User,
+  Trash2
 } from 'lucide-react-native';
 import { memo, useRef } from 'react';
 import {
@@ -143,14 +142,14 @@ export const ProfileScreen = memo(function ProfileScreen() {
         {/* Top bar: title + action buttons */}
         <View style={s.topBar}>
           <Text style={s.pageTitle}>Профиль</Text>
-          <View style={s.topActions}>
+          {/* <View style={s.topActions}>
             <Pressable style={({ pressed }) => [s.actionBtn, pressed && { opacity: 0.6 }]} onPress={() => router.push('/profile/settings' as any)}>
               <Settings size={18} color="#000" strokeWidth={1.8} />
             </Pressable>
             <Pressable style={({ pressed }) => [s.actionBtn, pressed && { opacity: 0.6 }]} onPress={() => {}}>
               <Send size={18} color="#000" strokeWidth={1.8} />
             </Pressable>
-          </View>
+          </View> */}
         </View>
 
         {/* ── Profile card ───────────────────────────────────────────────── */}

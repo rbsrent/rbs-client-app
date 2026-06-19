@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Clock, Heart, Star, X } from "lucide-react-native";
+import { Bookmark, ChevronLeft, X } from "lucide-react-native";
 import { memo, useCallback, useMemo, useState } from "react";
 import {
   Dimensions,
@@ -13,22 +13,23 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { getCachedRoutes, setCachedRoutes } from "@/features/routes/store";
+import { resolveRouteImage, WaterRoute } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
+import { publicSupabase } from "@/shared/supabase/publicClient";
 import {
   getGroup,
-  getGroupItems,
-  RECENT_GROUP_ID,
+  getRouteGroupItems,
+  removeRouteFromGroup,
+  RouteGroupItem,
+  ROUTES_GROUP_ID,
   WishlistGroup,
-  WishlistItem,
 } from "@/shared/wishlist";
-import { useWishlistStore } from "@/store/useWishlistStore";
+import { useRouteSavedStore } from "@/store/useRouteSavedStore";
 
 const W = Dimensions.get("window").width;
 const CARD_W = (W - 32 - 12) / 2;
 const IMG_H = Math.round(CARD_W * 1.05);
-
-const ruNum = (n: number) =>
-  new Intl.NumberFormat("ru-RU").format(Math.round(n));
 
 function dateLabel(ts: number): string {
   const d = new Date(ts);
@@ -40,38 +41,42 @@ function dateLabel(ts: number): string {
   return d.toLocaleDateString("ru-RU", { day: "numeric", month: "long" });
 }
 
+type EnrichedItem = { item: RouteGroupItem; route: WaterRoute };
 type ListRow =
   | { type: "header"; label: string; _key: string }
   | {
       type: "row";
-      left: WishlistItem;
-      right: WishlistItem | null;
+      left: EnrichedItem;
+      right: EnrichedItem | null;
       _key: string;
     };
 
-const BoatCard = memo(function BoatCard({
-  item,
+const RouteCard = memo(function RouteCard({
+  enriched,
   editing,
   onDelete,
 }: {
-  item: WishlistItem;
+  enriched: EnrichedItem;
   editing: boolean;
   onDelete: () => void;
 }) {
   const router = useRouter();
-  const hasRate = item.rating !== null && item.rating > 0;
+  const { route } = enriched;
+  const imageUrl = resolveRouteImage(route.map_image_url);
+  const pts = route.route_points?.length ?? 0;
 
   return (
     <Pressable
       style={({ pressed }) => [s.card, pressed && { opacity: 0.92 }]}
       onPress={() => {
-        if (!editing) router.push(`/catalog/${item.boat_id}` as any);
+        if (!editing)
+          router.push(`/routes/${route.seo_slug ?? route.id}` as any);
       }}
     >
       <View style={s.imgWrap}>
-        {item.cover_image_url ? (
+        {imageUrl ? (
           <Image
-            source={{ uri: item.cover_image_url }}
+            source={{ uri: imageUrl }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             cachePolicy="memory-disk"
@@ -87,88 +92,100 @@ const BoatCard = memo(function BoatCard({
           </Pressable>
         )}
       </View>
-
       <View style={s.info}>
-        <View style={s.nameRow}>
-          <Text style={s.name} numberOfLines={2}>
-            {item.name}
-          </Text>
-          {hasRate && (
-            <View style={s.ratingRow}>
-              <Star size={11} color="#F5A623" fill="#F5A623" strokeWidth={0} />
-              <Text style={s.ratingTxt}>{item.rating!.toFixed(2)}</Text>
-            </View>
-          )}
-        </View>
+        <Text style={s.name} numberOfLines={2}>
+          {route.name}
+        </Text>
         <Text style={s.sub} numberOfLines={1}>
-          {[item.type, item.capacity ? `до ${item.capacity} чел.` : null]
+          {[`${route.duration_hours} ч`, pts > 0 ? `${pts} точек` : null]
             .filter(Boolean)
             .join(" · ")}
-        </Text>
-        <Text style={s.price}>
-          <Text style={s.priceBold}>{ruNum(item.price_per_hour)} ₽</Text>
-          <Text style={s.priceUnit}> / час</Text>
         </Text>
       </View>
     </Pressable>
   );
 });
 
-export default function WishlistDetailScreen() {
+export default function RouteGroupScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { id } = useLocalSearchParams<{ id: string }>();
 
   const [group, setGroup] = useState<WishlistGroup | null>(null);
-  const [items, setItems] = useState<WishlistItem[]>([]);
+  const [items, setItems] = useState<RouteGroupItem[]>([]);
+  const [allRoutes, setAllRoutes] = useState<WaterRoute[]>(
+    () => getCachedRoutes() ?? [],
+  );
   const [editing, setEditing] = useState(false);
 
-  const removeBoatFromGroup = useWishlistStore((s) => s.removeBoatFromGroup);
+  const refresh = useRouteSavedStore((s) => s.refresh);
 
   const load = useCallback(() => {
     if (!id) return;
     getGroup(id).then((g) => {
       if (g) setGroup(g);
     });
-    getGroupItems(id).then(setItems);
+    getRouteGroupItems(id).then(setItems);
+
+    const cached = getCachedRoutes();
+    if (cached) {
+      setAllRoutes(cached);
+      return;
+    }
+    publicSupabase
+      .from("water_routes")
+      .select("*")
+      .eq("is_active", true)
+      .then(({ data }) => {
+        if (data) {
+          setCachedRoutes(data as WaterRoute[]);
+          setAllRoutes(data as WaterRoute[]);
+        }
+      });
   }, [id]);
 
   useFocusEffect(load);
 
-  const handleRemove = useCallback(
-    async (item: WishlistItem) => {
+  const handleDelete = useCallback(
+    async (routeId: string) => {
       if (!id) return;
-      // removeBoatFromGroup re-checks DB → HeartButton stays in sync
-      await removeBoatFromGroup(
-        id === RECENT_GROUP_ID ? RECENT_GROUP_ID : id,
-        item.boat_id,
-      );
-      setItems((prev) => prev.filter((i) => i.boat_id !== item.boat_id));
+      await removeRouteFromGroup(id, routeId);
+      await refresh(routeId);
+      setItems((prev) => prev.filter((i) => i.route_id !== routeId));
     },
-    [id, removeBoatFromGroup],
+    [id, refresh],
   );
 
   const listData = useMemo<ListRow[]>(() => {
-    const map = new Map<string, WishlistItem[]>();
+    const routeMap = new Map(allRoutes.map((r) => [r.id, r]));
+    const sections: { label: string; items: EnrichedItem[] }[] = [];
+
     for (const item of items) {
+      const route = routeMap.get(item.route_id);
+      if (!route) continue;
       const label = dateLabel(item.saved_at);
-      if (!map.has(label)) map.set(label, []);
-      map.get(label)!.push(item);
+      let sec = sections.find((s) => s.label === label);
+      if (!sec) {
+        sec = { label, items: [] };
+        sections.push(sec);
+      }
+      sec.items.push({ item, route });
     }
+
     const rows: ListRow[] = [];
-    for (const [label, data] of map) {
-      rows.push({ type: "header", label, _key: label });
-      for (let i = 0; i < data.length; i += 2) {
+    for (const sec of sections) {
+      rows.push({ type: "header", label: sec.label, _key: sec.label });
+      for (let i = 0; i < sec.items.length; i += 2) {
         rows.push({
           type: "row",
-          left: data[i],
-          right: data[i + 1] ?? null,
-          _key: `${label}-${i}`,
+          left: sec.items[i],
+          right: sec.items[i + 1] ?? null,
+          _key: `${sec.label}-${i}`,
         });
       }
     }
     return rows;
-  }, [items]);
+  }, [items, allRoutes]);
 
   const renderItem = useCallback<ListRenderItem<ListRow>>(
     ({ item }) => {
@@ -177,16 +194,16 @@ export default function WishlistDetailScreen() {
       }
       return (
         <View style={s.row}>
-          <BoatCard
-            item={item.left}
+          <RouteCard
+            enriched={item.left}
             editing={editing}
-            onDelete={() => handleRemove(item.left)}
+            onDelete={() => handleDelete(item.left.item.route_id)}
           />
           {item.right ? (
-            <BoatCard
-              item={item.right}
+            <RouteCard
+              enriched={item.right}
               editing={editing}
-              onDelete={() => handleRemove(item.right!)}
+              onDelete={() => handleDelete(item.right!.item.route_id)}
             />
           ) : (
             <View style={{ width: CARD_W }} />
@@ -194,13 +211,12 @@ export default function WishlistDetailScreen() {
         </View>
       );
     },
-    [editing, handleRemove],
+    [editing, handleDelete],
   );
 
   const keyExtractor = useCallback((item: ListRow) => item._key, []);
 
-  const isRecent = id === RECENT_GROUP_ID;
-  const title = group?.name ?? "...";
+  const title = group?.name ?? (id === ROUTES_GROUP_ID ? "Маршруты" : "...");
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -228,7 +244,7 @@ export default function WishlistDetailScreen() {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         ListHeaderComponent={<Text style={s.pageTitle}>{title}</Text>}
-        ListEmptyComponent={<EmptyState isRecent={isRecent} />}
+        ListEmptyComponent={<EmptyState />}
         contentContainerStyle={s.listContent}
         showsVerticalScrollIndicator={false}
         removeClippedSubviews
@@ -240,23 +256,15 @@ export default function WishlistDetailScreen() {
   );
 }
 
-function EmptyState({ isRecent }: { isRecent: boolean }) {
+function EmptyState() {
   return (
     <View style={s.empty}>
       <View style={s.emptyIconWrap}>
-        {isRecent ? (
-          <Clock size={40} color="#C8C8C8" strokeWidth={1.4} />
-        ) : (
-          <Heart size={40} color="#C8C8C8" strokeWidth={1.4} />
-        )}
+        <Bookmark size={40} color="#C8C8C8" strokeWidth={1.4} />
       </View>
-      <Text style={s.emptyTxt}>
-        {isRecent ? "Ещё ничего не смотрели" : "Список пуст"}
-      </Text>
+      <Text style={s.emptyTxt}>Список пуст</Text>
       <Text style={s.emptySub}>
-        {isRecent
-          ? "Откройте карточку судна — оно появится здесь"
-          : "Нажмите ♡ на карточке судна, чтобы сохранить"}
+        Нажмите на закладку на карточке маршрута, чтобы сохранить
       </Text>
     </View>
   );
@@ -332,30 +340,8 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   info: { paddingTop: 8, gap: 2 },
-  nameRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-  },
-  name: {
-    fontSize: 13,
-    fontWeight: "700",
-    color: "#000",
-    flex: 1,
-    marginRight: 6,
-    lineHeight: 18,
-  },
-  ratingRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-    marginTop: 1,
-  },
-  ratingTxt: { fontSize: 12, fontWeight: "600", color: "#000" },
+  name: { fontSize: 13, fontWeight: "700", color: "#000", lineHeight: 18 },
   sub: { fontSize: 12, color: "#888", lineHeight: 17 },
-  price: { marginTop: 1 },
-  priceBold: { fontSize: 12, fontWeight: "700", color: "#000" },
-  priceUnit: { fontSize: 12, color: "#888" },
 
   empty: {
     paddingTop: 72,

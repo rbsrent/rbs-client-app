@@ -8,6 +8,7 @@ export const COLORS = {
   grey: '#8E8E8E',
   greyDark: '#D9D9D9',
   greyLight: '#F7F7F7',
+  greyLight2: '#F2F2F2',
 
   gradientStart: '#2BC4E5',
   gradientMid: '#7B5CE6',
@@ -26,6 +27,7 @@ export const COLORS = {
   border: '#DDE3EC',
   divider: '#F0F4F9',
   muted: '#EEF2F7',
+
 
   text1: '#0B1120',
   text2: '#6B7A8D',

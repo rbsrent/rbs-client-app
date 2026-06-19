@@ -7,6 +7,7 @@ import { PersistGate } from 'redux-persist/integration/react';
 
 import { authSupabase } from '@/shared/supabase/authClient';
 import { WishlistPickerProvider } from '@/shared/components/WishlistPickerContext';
+import { RouteWishlistPickerProvider } from '@/shared/components/RouteWishlistPickerContext';
 import { offlineReduxStore, persistor } from '@/store/offlineStore';
 import { useAuthStore } from '@/store/useAuthStore';
 
@@ -49,6 +50,7 @@ export default function RootLayout() {
         <PersistGate loading={null} persistor={persistor}>
           <BottomSheetModalProvider>
             <WishlistPickerProvider>
+            <RouteWishlistPickerProvider>
             <AuthListener />
             <AuthRedirect />
             <Stack screenOptions={{ headerShown: false }}>
@@ -64,6 +66,7 @@ export default function RootLayout() {
               <Stack.Screen name="booking/oferta" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="bookings/[id]" options={{ presentation: 'card' }} />
               <Stack.Screen name="wishlist/routes" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="wishlist/route/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="profile/settings" options={{ presentation: 'card' }} />
               <Stack.Screen name="certificates" options={{ presentation: 'card' }} />
               <Stack.Screen name="boats/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
@@ -72,6 +75,7 @@ export default function RootLayout() {
               <Stack.Screen name="services/yacht" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/cruise" options={{ presentation: 'card', animation: 'slide_from_right' }} />
             </Stack>
+            </RouteWishlistPickerProvider>
             </WishlistPickerProvider>
           </BottomSheetModalProvider>
         </PersistGate>

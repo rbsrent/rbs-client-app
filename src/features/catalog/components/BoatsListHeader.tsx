@@ -7,7 +7,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '@/shared/colors';
 import { Spinner } from '@/shared/components/Spinner';
 import { TYPE_CHIPS } from '../constants';
-import { Filters } from '../types';
+import { DEFAULT, Filters } from '../types';
 import { ruFmt } from '../utils/filterUtils';
 import { FilterSection } from './FilterMiniSheet';
 import { DateStrip } from './DateStrip';
@@ -57,6 +57,7 @@ export const BoatsListHeader: React.FC<Props> = ({
   const priceActive = filters.priceMin !== null || filters.priceMax !== null;
   const capActive   = filters.capacityMin !== null;
   const amenActive  = filters.hasTarp || filters.hasToilet || filters.hasHeating;
+  const durActive   = filters.dateTime.durationHours !== DEFAULT.dateTime.durationHours;
 
   const typeLabel = typeActive
     ? (TYPE_CHIPS.find((c) => c.id === filters.typeId)?.label ?? 'Тип')
@@ -76,6 +77,11 @@ export const BoatsListHeader: React.FC<Props> = ({
     ? [filters.hasTarp && 'Тент', filters.hasToilet && 'Туалет', filters.hasHeating && 'Отопл.']
         .filter(Boolean).join(' · ')
     : 'Удобства';
+
+  const durH     = filters.dateTime.durationHours;
+  const durLabel = durActive
+    ? (durH === 1 ? '1 час' : durH < 5 ? `${durH} часа` : `${durH} часов`)
+    : 'Продолжительность';
 
   return (
     <View>
@@ -117,6 +123,12 @@ export const BoatsListHeader: React.FC<Props> = ({
         <Pressable style={[s.fChip, amenActive && s.fChipOn]} onPress={() => onOpenFilter('amenities')}>
           <Text style={[s.fChipTxt, amenActive && s.fChipTxtOn]}>{amenLabel}</Text>
           {!amenActive && <ChevronDown size={12} color={COLORS.text2} strokeWidth={2.5} />}
+        </Pressable>
+
+        {/* Duration */}
+        <Pressable style={[s.fChip, durActive && s.fChipOn]} onPress={() => onOpenFilter('duration')}>
+          <Text style={[s.fChipTxt, durActive && s.fChipTxtOn]}>{durLabel}</Text>
+          {!durActive && <ChevronDown size={12} color={COLORS.text2} strokeWidth={2.5} />}
         </Pressable>
       </ScrollView>
 

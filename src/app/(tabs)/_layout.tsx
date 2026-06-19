@@ -1,25 +1,23 @@
 import { Tabs } from 'expo-router';
 import {
   Heart,
+  House,
   Route,
-  Search,
-  Ship,
-  User,
+  TextSearch,
+  User
 } from 'lucide-react-native';
 
 import { TabBar } from '@/shared/components/TabBar';
 import { VisualTab } from '@/shared/components/TabItem';
 
-// ── Visual tab definitions ──────────────────────────────────
 const VISUAL_TABS: VisualTab[] = [
-  { key: 'index',    label: 'Поиск',     Icon: Search },
-  { key: 'catalog',  label: 'Каталог',   Icon: Ship },
+  { key: 'index',    label: 'Главная',     Icon: House },
+  { key: 'catalog',  label: 'Каталог',   Icon: TextSearch },
   { key: 'routes',   label: 'Маршруты',  Icon: Route },
   { key: 'wishlist', label: 'Вишлисты',  Icon: Heart },
   { key: 'profile',  label: 'Профиль',   Icon: User },
 ];
 
-// ── Layout ────────────────────────────────────────────────────
 export default function TabLayout() {
   return (
     <Tabs

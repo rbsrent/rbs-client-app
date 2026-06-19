@@ -133,17 +133,17 @@ export default function BoatDetailScreen() {
           <View style={[s.headerInner, { paddingTop: insets.top }]} pointerEvents="box-none">
             <View style={s.headerRow} pointerEvents="box-none">
               <Pressable style={s.pillBtn} onPress={() => router.back()} hitSlop={8}>
-                <ArrowLeft size={18} color="#fff" strokeWidth={2.5} />
+                <ArrowLeft size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
               </Pressable>
               {!isLoading && (
                 <View style={s.headerRight}>
                   <Pressable style={s.pillBtn} onPress={handleShare} hitSlop={8}>
-                    <Share2 size={18} color="#fff" strokeWidth={2.5} />
+                    <Share2 size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
                   </Pressable>
                   <Pressable style={s.pillBtn} onPress={handleHeart} hitSlop={8}>
                     <Heart
                       size={18}
-                      color={saved ? "#E63946" : "#fff"}
+                      color={saved ? "#E63946" : COLORS.brandNavy}
                       fill={saved ? "#E63946" : "transparent"}
                       strokeWidth={2.5}
                     />
@@ -220,10 +220,10 @@ export default function BoatDetailScreen() {
                 </View>
                 <View style={s.vSep} />
                 <View style={s.statsCell}>
-                  {boat.capacity ? (
+                  {boat?.capacity ? (
                     <Text style={s.statsBig}>{boat.capacity} чел.</Text>
                   ) : null}
-                  {boat.length_meters ? (
+                  {boat?.length_meters ? (
                     <Text style={s.statsSmall}>{boat.length_meters} м</Text>
                   ) : null}
                 </View>
@@ -244,7 +244,7 @@ export default function BoatDetailScreen() {
                   <Text style={s.hostName}>RBS Аренда</Text>
                   <View style={{ flexDirection: "row", gap: 10 }}>
                     {/* <Text style={s.hostSub}>Суперхозяин</Text> */}
-                    <Text style={s.hostSub}>{boat.piers?.name ?? "Санкт-Петербург"}</Text>
+                    <Text style={s.hostSub}>{boat?.piers?.name ?? "Санкт-Петербург"}</Text>
                   </View>
                 </View>
               </View>
@@ -255,7 +255,7 @@ export default function BoatDetailScreen() {
 
               <Divider />
 
-              {boat.description ? (
+              {boat?.description ? (
                 <>
                   <BoatDetailDescription description={boat.description} />
                   <Divider />
@@ -276,7 +276,7 @@ export default function BoatDetailScreen() {
               <BoatDetailReviews
                 reviews={reviews}
                 reviewRating={reviewRating}
-                boatId={boat.id}
+                boatId={boat?.id}
               />
             </Animated.View>
           )}
@@ -288,7 +288,10 @@ export default function BoatDetailScreen() {
         <BoatBookingBar
           pricePerHour={boat.price_per_hour}
           priceNight={boat.public_price_per_hour_night}
-          onBook={() => router.push(`/booking/${boat.id}` as any)}
+          onBook={() => {
+            const dateISO = new Date().toISOString().split('T')[0];
+            router.push(`/booking/${boat.id}?date=${dateISO}&duration=2` as any);
+          }}
           paddingBottom={insets.bottom + 8}
         />
       ) : null}
@@ -369,12 +372,13 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 18,
   },
   headerRight: { flexDirection: "row", gap: 8 },
   pillBtn: {
     width: 38, height: 38, borderRadius: 19,
-    backgroundColor: "rgba(0,0,0,0.38)",
+    // backgroundColor: "rgba(0,0,0,0.38)",
+    backgroundColor: COLORS.greyLight2,
     alignItems: "center", justifyContent: "center",
   },
   plainBtn: {
