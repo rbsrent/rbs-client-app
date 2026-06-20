@@ -140,6 +140,10 @@ export function durLabel(h: number) {
   return h === 1 ? "1 час" : h < 5 ? `${h} часа` : `${h} часов`;
 }
 
+export function toLocalDateISO(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 export function fmtShort(d: Date) {
   return `${d.getDate()} ${MONTHS_S_RU[d.getMonth()]}`;
 }
@@ -152,8 +156,9 @@ export function fmtHour(h: number) {
   return `${String(h).padStart(2, "0")}:00`;
 }
 
+const _RU_FMT = new Intl.NumberFormat("ru-RU");
 export function ruFmt(n: number) {
-  return new Intl.NumberFormat("ru-RU").format(n);
+  return _RU_FMT.format(n);
 }
 
 export function countActive(f: Filters): number {

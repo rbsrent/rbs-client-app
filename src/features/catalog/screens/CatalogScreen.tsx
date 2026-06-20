@@ -18,7 +18,7 @@ import { useHomeData } from '@/features/home/hooks/useHomeData';
 import { COLORS } from '@/shared/colors';
 import { Boat } from '@/store/useCatalogStore';
 
-function BoatGridCard({ boat, router }: { boat: Boat; router: any }) {
+const BoatGridCard = memo(function BoatGridCard({ boat, router }: { boat: Boat; router: any }) {
   return (
     <Pressable
       style={styles.gridCard}
@@ -47,13 +47,14 @@ function BoatGridCard({ boat, router }: { boat: Boat; router: any }) {
           <Text style={styles.gridMetaText}>{boat.capacity} чел.</Text>
         </View>
         <Text style={styles.gridPrice}>
-          {new Intl.NumberFormat('ru-RU').format(boat.price_per_hour)} ₽/ч
+          {_RU_FMT.format(boat.price_per_hour)} ₽/ч
         </Text>
       </View>
     </Pressable>
   );
-}
+});
 
+const _RU_FMT = new Intl.NumberFormat('ru-RU');
 const VESSEL_TYPES = ['Все', 'Катер', 'Яхта', 'Моторная яхта'];
 
 export const CatalogScreen = memo(function CatalogScreen() {
@@ -84,6 +85,19 @@ export const CatalogScreen = memo(function CatalogScreen() {
   const renderItem = useCallback(({ item }: { item: Boat }) => (
     <BoatGridCard boat={item} router={router} />
   ), [router]);
+
+  const listContentStyle = useMemo(
+    () => [styles.list, { paddingBottom: insets.bottom + 80 }],
+    [insets.bottom]
+  );
+
+  const ListEmpty = useCallback(() => (
+    !isLoadingBoats ? (
+      <View style={styles.empty}>
+        <Text style={styles.emptyText}>Суда не найдены</Text>
+      </View>
+    ) : null
+  ), [isLoadingBoats]);
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -130,19 +144,17 @@ export const CatalogScreen = memo(function CatalogScreen() {
         keyExtractor={(b) => b.id}
         renderItem={renderItem}
         numColumns={2}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
+        contentContainerStyle={listContentStyle}
         columnWrapperStyle={styles.row}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={5}
         refreshControl={
           <RefreshControl refreshing={isLoadingBoats} onRefresh={refetch} tintColor={COLORS.brandCyan} />
         }
-        ListEmptyComponent={
-          !isLoadingBoats ? (
-            <View style={styles.empty}>
-              <Text style={styles.emptyText}>Суда не найдены</Text>
-            </View>
-          ) : null
-        }
+        ListEmptyComponent={ListEmpty}
       />
     </View>
   );

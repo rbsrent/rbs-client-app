@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Calendar, ChevronRight, Clock, MapPin } from 'lucide-react-native';
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -38,6 +38,8 @@ interface Booking {
   } | null;
 }
 
+const _RU_FMT = new Intl.NumberFormat('ru-RU');
+
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   pending_payment: { label: 'Ожидает оплаты', color: COLORS.warning },
   partially_paid: { label: 'Частично оплачено', color: COLORS.brandCyan },
@@ -49,12 +51,12 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
   client_arrived: { label: 'Клиент прибыл', color: COLORS.brandViolet },
 };
 
-function BookingCard({ booking }: { booking: Booking }) {
+const BookingCard = memo(function BookingCard({ booking }: { booking: Booking }) {
   const router = useRouter();
   const status = STATUS_LABELS[booking.booking_status] ?? { label: booking.booking_status, color: COLORS.text3 };
   const startDate = new Date(booking.start_datetime);
   const endDate = new Date(booking.end_datetime);
-  const firstImg = booking.boats?.boat_images?.sort((a, b) => a.position - b.position)[0]?.image_path;
+  const firstImg = booking.boats?.boat_images?.slice().sort((a, b) => a.position - b.position)[0]?.image_path;
   const imgUrl = firstImg ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${firstImg}` : null;
 
   const duration = Math.round((endDate.getTime() - startDate.getTime()) / 3600000);
@@ -97,11 +99,11 @@ function BookingCard({ booking }: { booking: Booking }) {
         ) : null}
         <View style={styles.cardFooter}>
           <Text style={styles.price}>
-            {new Intl.NumberFormat('ru-RU').format(booking.total_price)} ₽
+            {_RU_FMT.format(booking.total_price)} ₽
           </Text>
           {booking.remaining_amount > 0 ? (
             <Text style={styles.remaining}>
-              Остаток: {new Intl.NumberFormat('ru-RU').format(booking.remaining_amount)} ₽
+              Остаток: {_RU_FMT.format(booking.remaining_amount)} ₽
             </Text>
           ) : null}
           <ChevronRight size={16} color={COLORS.text3} strokeWidth={2} />
@@ -109,7 +111,7 @@ function BookingCard({ booking }: { booking: Booking }) {
       </View>
     </Pressable>
   );
-}
+});
 
 export const BookingsScreen = memo(function BookingsScreen() {
   const insets = useSafeAreaInsets();
@@ -146,13 +148,32 @@ export const BookingsScreen = memo(function BookingsScreen() {
     fetchBookings();
   }, [fetchBookings]);
 
-  const now = new Date();
-  const filtered = bookings.filter((b) => {
-    const end = new Date(b.end_datetime);
-    if (tab === 'upcoming') return end >= now && b.booking_status !== 'cancelled';
-    if (tab === 'past') return end < now || b.booking_status === 'cancelled';
-    return true;
-  });
+  const filtered = useMemo(() => {
+    const now = new Date();
+    return bookings.filter((b) => {
+      const end = new Date(b.end_datetime);
+      if (tab === 'upcoming') return end >= now && b.booking_status !== 'cancelled';
+      if (tab === 'past') return end < now || b.booking_status === 'cancelled';
+      return true;
+    });
+  }, [bookings, tab]);
+
+  const renderItem = useCallback(({ item }: { item: Booking }) => (
+    <BookingCard booking={item} />
+  ), []);
+
+  const listContentStyle = useMemo(
+    () => [styles.list, { paddingBottom: insets.bottom + 80 }],
+    [insets.bottom]
+  );
+
+  const listEmpty = useMemo(() => (
+    <View style={styles.emptyState}>
+      <Text style={styles.emptyTitle}>
+        {isLoading ? 'Загрузка...' : 'Бронирований нет'}
+      </Text>
+    </View>
+  ), [isLoading]);
 
   if (!session) {
     return (
@@ -190,19 +211,17 @@ export const BookingsScreen = memo(function BookingsScreen() {
       <FlatList
         data={filtered}
         keyExtractor={(b) => b.id}
-        renderItem={({ item }) => <BookingCard booking={item} />}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
+        renderItem={renderItem}
+        contentContainerStyle={listContentStyle}
         showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={5}
         refreshControl={
           <RefreshControl refreshing={isLoading} onRefresh={fetchBookings} tintColor={COLORS.brandCyan} />
         }
-        ListEmptyComponent={
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyTitle}>
-              {isLoading ? 'Загрузка...' : 'Бронирований нет'}
-            </Text>
-          </View>
-        }
+        ListEmptyComponent={listEmpty}
       />
     </View>
   );

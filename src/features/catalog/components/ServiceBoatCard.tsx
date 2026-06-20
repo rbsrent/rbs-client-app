@@ -7,6 +7,8 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '@/shared/colors';
 import { Boat } from '@/store/useCatalogStore';
 
+const _RU_FMT = new Intl.NumberFormat('ru-RU');
+
 export function ServiceBoatCard({ boat }: { boat: Boat }) {
   const router = useRouter();
 
@@ -64,7 +66,7 @@ export function ServiceBoatCard({ boat }: { boat: Boat }) {
           <View>
             <Text style={styles.priceLabel}>от</Text>
             <Text style={styles.price}>
-              {new Intl.NumberFormat('ru-RU').format(boat.price_per_hour)} ₽/ч
+              {_RU_FMT.format(boat.price_per_hour)} ₽/ч
             </Text>
           </View>
           <Pressable

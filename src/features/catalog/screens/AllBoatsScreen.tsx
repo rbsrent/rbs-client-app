@@ -3,9 +3,7 @@ import { useLocalSearchParams } from 'expo-router';
 import { Search, X } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
-  Animated,
   FlatList,
-  FlatListProps,
   Pressable,
   RefreshControl,
   StyleSheet,
@@ -16,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHomeData } from '@/features/home/hooks/useHomeData';
 import { COLORS } from '@/shared/colors';
+import { clearSelectedDate, saveSelectedDate } from '@/shared/selectedDate';
 import { ScreenHeader } from '@/shared/components/ScreenHeader';
 import { Spinner } from '@/shared/components/Spinner';
 import { Boat } from '@/store/useCatalogStore';
@@ -30,11 +29,7 @@ import { useAvailabilityCache } from '../hooks/useAvailabilityCache';
 import { useDiscountsCache } from '../hooks/useDiscountsCache';
 import { usePiersCache } from '../hooks/usePiersCache';
 import { DEFAULT, Filters } from '../types';
-import { countActive, findPiersInRadius, sortBoats } from '../utils/filterUtils';
-
-const AnimatedFlatList = Animated.createAnimatedComponent(FlatList) as React.ComponentType<
-  FlatListProps<Boat> & { ref?: React.Ref<FlatList<Boat>> }
->;
+import { countActive, findPiersInRadius, sortBoats, toLocalDateISO } from '../utils/filterUtils';
 
 export function AllBoatsScreen() {
   const insets = useSafeAreaInsets();
@@ -162,6 +157,8 @@ export function AllBoatsScreen() {
 
   const handleWeekDate = useCallback((date: Date | null) => {
     setFilters((f) => ({ ...f, dateTime: { ...f.dateTime, date } }));
+    if (date) saveSelectedDate(date).catch(() => {});
+    else clearSelectedDate().catch(() => {});
   }, []);
 
   const renderBoat = useCallback(
@@ -170,10 +167,43 @@ export function AllBoatsScreen() {
         boat={item}
         availInfo={availMap[item.id]}
         discount={discountsMap.get(item.id)}
+        selectedDate={filters.dateTime.date ? toLocalDateISO(filters.dateTime.date) : undefined}
       />
     ),
-    [availMap, discountsMap]
+    [availMap, discountsMap, filters.dateTime.date]
   );
+
+  const listContentStyle = useMemo(
+    () => [s.list, { paddingBottom: insets.bottom + 90 }],
+    [insets.bottom]
+  );
+
+  // useMemo element (not useCallback component) — FlatList reconciles without remounting,
+  // so DateStrip scroll position is preserved when filters change.
+  const listHeader = useMemo(() => (
+    <BoatsListHeader
+      filters={filters}
+      setFilters={setFilters}
+      onDateSelect={handleWeekDate}
+      onOpenFilter={openFilter}
+      viewMode={viewMode}
+      setView={setViewMode}
+      filteredCount={filtered.length}
+      total={total}
+      availLoading={availLoading}
+      sortBy={sortBy}
+      onSortChange={setSortBy}
+    />
+  ), [filters, setFilters, handleWeekDate, openFilter, viewMode, filtered.length, total, availLoading, sortBy]);
+
+  const handleResetFilters = useCallback(() => { setFilters(DEFAULT); setSearch(''); }, []);
+
+  const ListEmpty = useCallback(() => (
+    <BoatEmpty
+      hasActive={hasActive}
+      onReset={handleResetFilters}
+    />
+  ), [hasActive, handleResetFilters]);
 
   return (
     <View style={s.root}>
@@ -220,15 +250,14 @@ export function AllBoatsScreen() {
           <Spinner />
         </View>
       ) : (
-        <AnimatedFlatList
+        <FlatList
           data={filtered}
           keyExtractor={(b) => b.id}
           numColumns={2}
           renderItem={renderBoat}
           columnWrapperStyle={s.row}
-          contentContainerStyle={[s.list, { paddingBottom: insets.bottom + 90 }]}
+          contentContainerStyle={listContentStyle}
           showsVerticalScrollIndicator={false}
-          scrollEventThrottle={16}
           removeClippedSubviews
           initialNumToRender={6}
           maxToRenderPerBatch={4}
@@ -236,30 +265,8 @@ export function AllBoatsScreen() {
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandNavy} />
           }
-          ListHeaderComponent={
-            <BoatsListHeader
-              filters={filters}
-              setFilters={setFilters}
-              onDateSelect={handleWeekDate}
-              onOpenFilter={openFilter}
-              viewMode={viewMode}
-              setView={setViewMode}
-              filteredCount={filtered.length}
-              total={total}
-              availLoading={availLoading}
-              sortBy={sortBy}
-              onSortChange={setSortBy}
-            />
-          }
-          ListEmptyComponent={
-            <BoatEmpty
-              hasActive={hasActive}
-              onReset={() => {
-                setFilters(DEFAULT);
-                setSearch('');
-              }}
-            />
-          }
+          ListHeaderComponent={listHeader as any}
+          ListEmptyComponent={ListEmpty}
         />
       )}
 

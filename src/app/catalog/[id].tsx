@@ -32,8 +32,8 @@ import BoatDetailAmenities from "@/features/catalog/components/detail/BoatDetail
 import BoatDetailDescription from "@/features/catalog/components/detail/BoatDetailDescription";
 import BoatDetailFeatures from "@/features/catalog/components/detail/BoatDetailFeatures";
 import BoatDetailReviews from "@/features/catalog/components/detail/BoatDetailReviews";
+import { BoatDetailSkeleton } from "@/features/catalog/components/detail/BoatDetailSkeleton";
 import { useBoatDetail } from "@/features/catalog/hooks/useBoatDetail";
-import { Spinner } from '@/shared/components/Spinner';
 
 const CARD_OVERLAP = 28;
 
@@ -42,7 +42,7 @@ function Divider() {
 }
 
 export default function BoatDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, selectedDate } = useLocalSearchParams<{ id: string; selectedDate?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
@@ -203,9 +203,9 @@ export default function BoatDetailScreen() {
             {boat?.piers?.name ? <Text style={s.boatSub}>{boat.piers.name}</Text> : null}
           </View>
 
-          {/* loading state — spinner only */}
+          {/* loading state — skeleton */}
           {isLoading ? (
-            <Spinner size={20} style={{ marginBottom: 36 }} />
+            <BoatDetailSkeleton />
           ) : (
             <Animated.View entering={FadeIn.duration(260)}>
               <View style={s.statsRow}>
@@ -289,8 +289,10 @@ export default function BoatDetailScreen() {
           pricePerHour={boat.price_per_hour}
           priceNight={boat.public_price_per_hour_night}
           onBook={() => {
-            const dateISO = new Date().toISOString().split('T')[0];
-            router.push(`/booking/${boat.id}?date=${dateISO}&duration=2` as any);
+            const params = selectedDate
+              ? `?boatId=${boat.id}&date=${selectedDate}`
+              : `?boatId=${boat.id}`;
+            router.push((`/booking/date-select${params}`) as any);
           }}
           paddingBottom={insets.bottom + 8}
         />

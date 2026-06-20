@@ -9,8 +9,9 @@ export interface BoatBookingBarProps {
   paddingBottom: number;
 }
 
+const _RU_FMT = new Intl.NumberFormat('ru-RU');
 function ruFmt(n: number) {
-  return new Intl.NumberFormat('ru-RU').format(Math.round(n));
+  return _RU_FMT.format(Math.round(n));
 }
 
 export default function BoatBookingBar({ pricePerHour, priceNight, onBook, paddingBottom }: BoatBookingBarProps) {
