@@ -122,11 +122,6 @@ export const HomeCarousel = memo(function HomeCarousel() {
     };
   }, []);
 
-  // Scroll to middle copy on first layout (avoids flash of wrong position)
-  const onLayout = useCallback(() => {
-    flatRef.current?.scrollToOffset({ offset: N * SW, animated: false });
-  }, []);
-
   // scheduleNext and advance reference each other, so use refs to avoid circular deps
   const scheduleRef = useRef<() => void>(() => {});
   const advanceRef  = useRef<() => void>(() => {});
@@ -224,18 +219,19 @@ export const HomeCarousel = memo(function HomeCarousel() {
         pagingEnabled
         showsHorizontalScrollIndicator={false}
         getItemLayout={getItemLayout}
-        // Performance
-        removeClippedSubviews
-        maxToRenderPerBatch={3}
-        windowSize={3}
-        initialNumToRender={3}
+        initialScrollIndex={N}
+        // All 12 slides are lightweight gradients — render them all upfront
+        // to avoid VirtualizedList "slow to update" false-positive from 4.2s timer
+        removeClippedSubviews={false}
+        maxToRenderPerBatch={12}
+        windowSize={21}
+        initialNumToRender={12}
         // Scroll behaviour
         bounces={false}
         overScrollMode="never"
         scrollEventThrottle={32}
         decelerationRate="fast"
         // Event handlers
-        onLayout={onLayout}
         onScrollBeginDrag={onScrollBeginDrag}
         onMomentumScrollEnd={onMomentumScrollEnd}
       />

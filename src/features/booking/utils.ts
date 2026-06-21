@@ -48,3 +48,56 @@ export function buildDatetime(date: Date, hour: number): Date {
   d.setHours(hour, 0, 0, 0);
   return d;
 }
+
+/**
+ * Compute the next selectedHours array when a slot is tapped,
+ * respecting the minimum booking duration.
+ */
+export function computeSlotSelection(
+  prev: number[],
+  hour: number,
+  minDur: number,
+  unavailable: (h: number) => boolean,
+): number[] {
+  const makeRange = (start: number, len: number) =>
+    Array.from({ length: len }, (_, i) => start + i);
+
+  const tryRange = (start: number, len: number): number[] | null => {
+    const r = makeRange(start, len);
+    return r.some(unavailable) ? null : r;
+  };
+
+  if (prev.length === 0) {
+    // First tap — auto-extend to minDur
+    return tryRange(hour, minDur) ?? [hour];
+  }
+
+  const min = prev[0];
+  const max = prev[prev.length - 1];
+
+  if (hour >= min && hour <= max) {
+    // Tapping within existing selection
+    if (hour === min && hour === max) return []; // single slot → deselect
+    if (hour === max) {
+      const next = prev.slice(0, -1);
+      return next.length >= minDur ? next : prev;
+    }
+    if (hour === min) {
+      const next = prev.slice(1);
+      return next.length >= minDur ? next : prev;
+    }
+    // Middle tap — start fresh from here
+    return tryRange(hour, minDur) ?? [hour];
+  }
+
+  // Extending the range
+  const extended = hour > max
+    ? makeRange(min, hour - min + 1)
+    : makeRange(hour, max - hour + 1);
+
+  if (extended.some(unavailable)) {
+    // Can't extend to this hour — start fresh
+    return tryRange(hour, minDur) ?? prev;
+  }
+  return extended;
+}

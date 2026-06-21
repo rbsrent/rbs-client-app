@@ -1,8 +1,28 @@
 import { ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import {
+  Dimensions,
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+} from 'react-native';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
+
+if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 const SCREEN_W  = Dimensions.get('window').width;
 const CELL_SIZE = Math.floor((SCREEN_W - 40 - 16) / 7);
@@ -18,17 +38,34 @@ export function fmtDateFull(d: Date) {
 interface Props {
   selected: Date | null;
   onSelect: (d: Date) => void;
-  /** When true, shows a collapsed pill that re-expands on tap */
   collapsible?: boolean;
+  initialOpen?: boolean;
 }
 
-export function CalendarPicker({ selected, onSelect, collapsible = true }: Props) {
+const EXPAND_CONFIG = {
+  duration: 320,
+  create:   { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.scaleXY, springDamping: 0.85 },
+  update:   { type: LayoutAnimation.Types.spring, springDamping: 0.85 },
+  delete:   { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+};
+
+const COLLAPSE_CONFIG = {
+  duration: 240,
+  create:   { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+  update:   { type: LayoutAnimation.Types.easeInEaseOut },
+  delete:   { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+};
+
+export function CalendarPicker({ selected, onSelect, collapsible = true, initialOpen = true }: Props) {
   const today = useMemo(() => { const d = new Date(); d.setHours(0,0,0,0); return d; }, []);
   const [viewMonth, setViewMonth] = useState(() => {
     const b = selected ?? new Date();
     return new Date(b.getFullYear(), b.getMonth(), 1);
   });
-  const [open, setOpen] = useState(true);
+  const [open, setOpen] = useState(initialOpen);
+
+  // 0 = collapsed, 1 = expanded — persists across conditional re-mounts
+  const fade = useSharedValue(initialOpen ? 1 : 0);
 
   const year = viewMonth.getFullYear(), month = viewMonth.getMonth();
 
@@ -47,29 +84,59 @@ export function CalendarPicker({ selected, onSelect, collapsible = true }: Props
     return arr;
   }, [year, month]);
 
-  const isSel  = (d: Date) => selected !== null &&
+  const isSel = (d: Date) =>
+    selected !== null &&
     d.getFullYear() === selected.getFullYear() &&
     d.getMonth()    === selected.getMonth()    &&
     d.getDate()     === selected.getDate();
 
+  // Pill fades in as fade goes 1→0 (opacity = 1 - fade)
+  const pillStyle = useAnimatedStyle(() => ({
+    opacity:   interpolate(fade.value, [0, 0.5], [1, 0], 'clamp'),
+    transform: [{ translateY: interpolate(fade.value, [0, 0.4], [0, -6], 'clamp') }],
+  }));
+
+  // Calendar fades in as fade goes 0→1
+  const calStyle = useAnimatedStyle(() => ({
+    opacity:   interpolate(fade.value, [0.2, 1], [0, 1], 'clamp'),
+    transform: [{ translateY: interpolate(fade.value, [0, 1], [10, 0], 'clamp') }],
+  }));
+
+  const expand = () => {
+    LayoutAnimation.configureNext(EXPAND_CONFIG);
+    fade.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+    setOpen(true);
+  };
+
+  const collapse = (date?: Date) => {
+    if (date) onSelect(date);
+    LayoutAnimation.configureNext(COLLAPSE_CONFIG);
+    fade.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.cubic) });
+    setOpen(false);
+  };
+
+  // ── Collapsed pill ───────────────────────────────────────────────────────
   if (collapsible && !open) {
     return (
-      <Pressable style={s.collapsed} onPress={() => setOpen(true)}>
-        <Text style={s.collapsedLabel}>Выбранная дата</Text>
-        <View style={s.collapsedRow}>
-          <Text style={s.collapsedDate}>{selected ? fmtDateFull(selected) : 'Выберите дату'}</Text>
-          <ChevronRight size={15} color={COLORS.brandNavy} strokeWidth={2} />
-        </View>
-      </Pressable>
+      <Animated.View style={pillStyle}>
+        <Pressable style={s.collapsed} onPress={expand}>
+          <Text style={s.collapsedLabel}>Выбранная дата</Text>
+          <View style={s.collapsedRow}>
+            <Text style={s.collapsedDate}>{selected ? fmtDateFull(selected) : 'Выберите дату'}</Text>
+            <ChevronRight size={15} color={COLORS.brandNavy} strokeWidth={2} />
+          </View>
+        </Pressable>
+      </Animated.View>
     );
   }
 
+  // ── Full calendar ────────────────────────────────────────────────────────
   const weeks = Array.from({ length: Math.ceil(cells.length / 7) }, (_, w) =>
     cells.slice(w * 7, w * 7 + 7),
   );
 
   return (
-    <View>
+    <Animated.View style={calStyle}>
       <View style={s.monthNav}>
         <Pressable onPress={() => setViewMonth(new Date(year, month - 1, 1))} hitSlop={14}>
           <ChevronLeft size={20} color={COLORS.text2} strokeWidth={2} />
@@ -98,8 +165,8 @@ export function CalendarPicker({ selected, onSelect, collapsible = true }: Props
                 style={[s.cell, s.cellP, sel && s.cellSel, tod && !sel && s.cellToday]}
                 onPress={() => {
                   if (!past && cell.thisMonth) {
-                    onSelect(cell.date);
-                    if (collapsible) setOpen(false);
+                    if (collapsible) collapse(cell.date);
+                    else onSelect(cell.date);
                   }
                 }}
                 disabled={past || !cell.thisMonth}
@@ -118,7 +185,7 @@ export function CalendarPicker({ selected, onSelect, collapsible = true }: Props
           })}
         </View>
       ))}
-    </View>
+    </Animated.View>
   );
 }
 
@@ -136,8 +203,16 @@ const s = StyleSheet.create({
   cellSelTxt:   { color: COLORS.white, fontWeight: '700' },
   cellToday:    { borderWidth: 1.5, borderColor: COLORS.brandNavy },
   cellTodayTxt: { color: COLORS.brandNavy, fontWeight: '700' },
-  collapsed:    { paddingVertical: 14, paddingHorizontal: 16, borderRadius: 14, backgroundColor: COLORS.backgroundAlt, borderWidth: 1, borderColor: COLORS.border },
-  collapsedLabel: { fontSize: 11, fontWeight: '600', color: COLORS.text3, marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.6 },
-  collapsedRow:   { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  collapsedDate:  { fontSize: 16, fontWeight: '700', color: COLORS.brandNavy },
+  collapsed:    {
+    paddingVertical: 14, paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.backgroundAlt,
+    borderWidth: 1, borderColor: COLORS.border,
+  },
+  collapsedLabel: {
+    fontSize: 11, fontWeight: '600', color: COLORS.text3,
+    marginBottom: 4, textTransform: 'uppercase', letterSpacing: 0.6,
+  },
+  collapsedRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  collapsedDate: { fontSize: 16, fontWeight: '700', color: COLORS.brandNavy },
 });

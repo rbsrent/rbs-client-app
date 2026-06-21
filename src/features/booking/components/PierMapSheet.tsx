@@ -17,7 +17,6 @@ import YaMap, { Marker } from 'react-native-yamap';
 import { COLORS } from '@/shared/colors';
 import { initYaMap } from '@/shared/yamap';
 
-initYaMap();
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import type { Pier } from '../types';
 
@@ -50,6 +49,8 @@ export function PierMapSheet({
   const [focused, setFocused] = useState<Pier | null>(null);
 
   const snapPoints = useMemo(() => ['92%'], []);
+
+  useEffect(() => { initYaMap(); }, []);
 
   useEffect(() => {
     if (visible) {

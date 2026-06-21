@@ -93,31 +93,33 @@ const s = StyleSheet.create({
 
   cta: {
     paddingHorizontal: 20,
-    gap: 4,
+    gap: 8,
   },
   primaryBtn: {
     height: 52,
-    borderRadius: 26,
+    borderRadius: 10,
     backgroundColor: COLORS.brandNavy,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.1)',
+    // borderWidth: 1,
+    // borderColor: 'rgba(255,255,255,0.1)',
   },
   primaryTxt: {
     fontSize: 17,
-    fontWeight: '700',
+    fontWeight: '500',
     color: '#fff',
     letterSpacing: 0.2,
   },
   secondaryBtn: {
     height: 52,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(255,255,255,0.1)'
   },
   secondaryTxt: {
     fontSize: 16,
-    color: 'rgba(255,255,255,0.45)',
+    color: COLORS.white,
     fontWeight: '500',
   },
 });

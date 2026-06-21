@@ -6,9 +6,14 @@ interface Props {
   count: number;
   scrollX: Animated.Value;
   itemInterval: number;
+  activeColor?: string;
+  inactiveColor?: string;
 }
 
-export function ScrollDots({ count, scrollX, itemInterval }: Props) {
+export function ScrollDots({ count, scrollX, itemInterval, activeColor, inactiveColor }: Props) {
+  const active   = activeColor   ?? COLORS.brandNavy;
+  const inactive = inactiveColor ?? '#C0C0C0';
+
   if (count <= 1) return null;
   return (
     <View style={styles.row}>
@@ -21,7 +26,7 @@ export function ScrollDots({ count, scrollX, itemInterval }: Props) {
         });
         const bg = scrollX.interpolate({
           inputRange,
-          outputRange: ['#C0C0C0', COLORS.brandNavy, '#C0C0C0'],
+          outputRange: [inactive, active, inactive],
           extrapolate: 'clamp',
         });
         return (

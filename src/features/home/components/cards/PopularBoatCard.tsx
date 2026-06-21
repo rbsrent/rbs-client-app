@@ -1,8 +1,8 @@
-import { Dimensions } from 'react-native';
 import { memo } from 'react';
+import { Dimensions } from 'react-native';
 
-import { BoatCard } from '@/shared/components/BoatCard';
 import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
+import { BoatCard } from '@/shared/components/BoatCard';
 import { HomeBoat } from '@/store/useHomeStore';
 
 const { width: W } = Dimensions.get('window');
@@ -24,6 +24,7 @@ export const PopularBoatCard = memo(function PopularBoatCard({ boat, badge, disc
         type:            boat.type,
         cover_image_url: boat.cover_image_url,
         price_per_hour:  boat.price_per_hour,
+        public_price_per_hour_night: boat.public_price_per_hour_night,
         capacity:        boat.capacity,
         length_meters:   boat.length_meters,
         pier_name:       boat.pier_name,

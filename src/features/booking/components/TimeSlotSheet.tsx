@@ -14,6 +14,7 @@ import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import { COLORS } from '@/shared/colors';
 import { publicSupabase } from '@/shared/supabase/publicClient';
 import { Spinner } from '@/shared/components/Spinner';
+import { computeSlotSelection, durLabel as durLabelUtil } from '../utils';
 
 const { width: W } = Dimensions.get('window');
 
@@ -30,6 +31,7 @@ interface TimeSlotSheetProps {
   visible: boolean;
   date: Date;
   boatId: string;
+  minDuration?: number;
   onConfirm: (startHour: number, duration: number) => void;
   onClose: () => void;
 }
@@ -38,6 +40,7 @@ export function TimeSlotSheet({
   visible,
   date,
   boatId,
+  minDuration = 1,
   onConfirm,
   onClose,
 }: TimeSlotSheetProps) {
@@ -107,34 +110,16 @@ export function TimeSlotSheet({
 
   const handleSlot = useCallback((hour: number) => {
     if (unavailable(hour)) return;
+    setSelectedHours((prev) => computeSlotSelection(prev, hour, minDuration, unavailable));
+  }, [unavailable, minDuration]);
 
-    setSelectedHours((prev) => {
-      if (prev.length === 0) return [hour];
-
-      const min = prev[0];
-      const max = prev[prev.length - 1];
-
-      if (hour >= min && hour <= max) {
-        if (prev.length === 1) return [];
-        if (hour === max) return prev.slice(0, -1);
-        if (hour === min) return prev.slice(1);
-        return [hour];
-      }
-
-      const newRange = hour > max
-        ? Array.from({ length: hour - min + 1 }, (_, i) => min + i)
-        : Array.from({ length: max - hour + 1 }, (_, i) => hour + i);
-
-      if (newRange.some((h) => unavailable(h))) return [hour];
-      return newRange;
-    });
-  }, [unavailable]);
+  const canConfirm = selectedHours.length >= minDuration;
 
   const handleConfirm = useCallback(() => {
-    if (selectedHours.length === 0) return;
+    if (!canConfirm) return;
     ref.current?.dismiss();
     onConfirm(selectedHours[0], selectedHours.length);
-  }, [selectedHours, onConfirm]);
+  }, [canConfirm, selectedHours, onConfirm]);
 
   const handleDismiss = useCallback(() => {
     onClose();
@@ -161,7 +146,10 @@ export function TimeSlotSheet({
       <View style={s.header}>
         <View>
           <Text style={s.sheetTitle}>Выберите время</Text>
-          <Text style={s.sheetDate}>{fmtDateShort(date)}</Text>
+          <Text style={s.sheetDate}>
+            {fmtDateShort(date)}
+            {minDuration > 1 ? `  ·  мин. ${durLabelUtil(minDuration)}` : ''}
+          </Text>
         </View>
         <Pressable style={s.closeBtn} onPress={() => ref.current?.dismiss()} hitSlop={8}>
           <X size={18} color={COLORS.text2} strokeWidth={2} />
@@ -256,11 +244,11 @@ export function TimeSlotSheet({
         <Pressable
           style={({ pressed }) => [
             s.confirmBtn,
-            selectedHours.length === 0 && s.confirmBtnDim,
-            pressed && selectedHours.length > 0 && { opacity: 0.85 },
+            !canConfirm && s.confirmBtnDim,
+            pressed && canConfirm && { opacity: 0.85 },
           ]}
           onPress={handleConfirm}
-          disabled={selectedHours.length === 0}
+          disabled={!canConfirm}
         >
           <Text style={s.confirmTxt}>Выбрать</Text>
         </Pressable>

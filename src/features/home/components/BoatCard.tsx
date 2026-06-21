@@ -7,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
+import { getBoatPriceInfo } from '@/shared/utils/boatPrice';
 import { Boat } from '@/store/useCatalogStore';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
@@ -16,9 +17,12 @@ interface Props {
   width?: number;
 }
 
+const _RU_FMT = new Intl.NumberFormat('ru-RU');
+
 export const BoatCard = memo(function BoatCard({ boat, width }: Props) {
   const router = useRouter();
   const scale = useSharedValue(1);
+  const { displayPrice } = getBoatPriceInfo(boat.price_per_hour, boat.public_price_per_hour_night);
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -77,7 +81,7 @@ export const BoatCard = memo(function BoatCard({ boat, width }: Props) {
         <View style={styles.footer}>
           <View>
             <Text style={styles.price}>
-              {new Intl.NumberFormat('ru-RU').format(boat.price_per_hour)} ₽
+              {_RU_FMT.format(displayPrice)} ₽
             </Text>
             <Text style={styles.perHour}>/час</Text>
           </View>

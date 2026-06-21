@@ -74,6 +74,9 @@ export default function RootLayout() {
               <Stack.Screen name="services/boat" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/yacht" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/cruise" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="piers" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="booking/date-select" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
+              <Stack.Screen name="booking/edit-trip" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
             </Stack>
             </RouteWishlistPickerProvider>
             </WishlistPickerProvider>

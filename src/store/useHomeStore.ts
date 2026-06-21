@@ -11,6 +11,7 @@ export interface HomeBoat {
   capacity: number | null;
   length_meters: number | null;
   price_per_hour: number;
+  public_price_per_hour_night: number | null;
   average_rating: number;
   pier_name: string | null;
   cover_image_url: string | null;
@@ -34,7 +35,7 @@ interface HomeStore {
   loading:   boolean;
   lastFetch: number | null;
 
-  setAll: (data: Omit<HomeStore, 'loading' | 'lastFetch' | 'setAll'>) => void;
+  setAll: (data: Omit<HomeStore, 'loading' | 'lastFetch' | 'setAll' | 'setLoading'>) => void;
   setLoading: (v: boolean) => void;
 }
 

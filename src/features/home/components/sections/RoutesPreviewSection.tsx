@@ -1,3 +1,4 @@
+import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { memo, useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, View } from 'react-native';
@@ -12,18 +13,25 @@ const INTERVAL = ROUTE_CARD_W + GAP;
 const SKEL     = '#E8E8E8';
 
 function SkeletonRouteCard() {
-  const anim = useRef(new Animated.Value(0)).current;
+  const tx = useRef(new Animated.Value(-ROUTE_CARD_W)).current;
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, { toValue: 1, duration: 750, useNativeDriver: true }),
-        Animated.timing(anim, { toValue: 0, duration: 750, useNativeDriver: true }),
-      ]),
-    ).start();
+    const anim = Animated.loop(
+      Animated.timing(tx, { toValue: ROUTE_CARD_W, duration: 1100, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
   }, []);
-  const opacity = anim.interpolate({ inputRange: [0, 1], outputRange: [0.45, 1] });
   return (
-    <Animated.View style={[sk.card, { opacity }]} />
+    <View style={sk.card}>
+      <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
+        <LinearGradient
+          colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
+          start={{ x: 0, y: 0.5 }}
+          end={{ x: 1, y: 0.5 }}
+          style={StyleSheet.absoluteFill}
+        />
+      </Animated.View>
+    </View>
   );
 }
 
@@ -97,7 +105,7 @@ const s = StyleSheet.create({
 });
 
 const sk = StyleSheet.create({
-  card:     { width: ROUTE_CARD_W, height: ROUTE_CARD_H, borderRadius: 16, backgroundColor: SKEL },
+  card:     { width: ROUTE_CARD_W, height: ROUTE_CARD_H, borderRadius: 16, backgroundColor: SKEL, overflow: 'hidden' },
   titleBar: { width: 160, height: 16, borderRadius: 6, backgroundColor: SKEL },
   subBar:   { width: 100, height: 12, borderRadius: 5, backgroundColor: SKEL },
 });

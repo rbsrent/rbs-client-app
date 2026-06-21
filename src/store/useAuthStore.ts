@@ -25,6 +25,7 @@ interface AuthState {
   setLoading: (loading: boolean) => void;
   signOut: () => Promise<void>;
   hydrate: () => Promise<void>;
+  fetchProfile: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -42,8 +43,21 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ session: null, smsUser: null });
   },
 
+  fetchProfile: async () => {
+    try {
+      const { data, error } = await authSupabase.rpc('get_sms_client_profile');
+      if (!error && data) set({ smsUser: data });
+    } catch {}
+  },
+
   hydrate: async () => {
     const { data } = await authSupabase.auth.getSession();
     set({ session: data.session, isHydrated: true });
+    if (data.session) {
+      try {
+        const { data: profile, error } = await authSupabase.rpc('get_sms_client_profile');
+        if (!error && profile) set({ smsUser: profile });
+      } catch {}
+    }
   },
 }));

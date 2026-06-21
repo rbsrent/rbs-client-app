@@ -32,7 +32,6 @@ export default function TabLayout() {
 
       {/* Hidden — accessible via stack push */}
       <Tabs.Screen name="bookings" options={{ href: null }} />
-      <Tabs.Screen name="piers"    options={{ href: null }} />
       <Tabs.Screen name="cruises"  options={{ href: null }} />
     </Tabs>
   );

@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
+import { getBoatPriceInfo, ruFmtPrice } from '@/shared/utils/boatPrice';
 
 export interface BoatBookingBarProps {
   pricePerHour:  number;
@@ -9,22 +10,20 @@ export interface BoatBookingBarProps {
   paddingBottom: number;
 }
 
-const _RU_FMT = new Intl.NumberFormat('ru-RU');
-function ruFmt(n: number) {
-  return _RU_FMT.format(Math.round(n));
-}
-
 export default function BoatBookingBar({ pricePerHour, priceNight, onBook, paddingBottom }: BoatBookingBarProps) {
+  const { displayPrice, isNight } = getBoatPriceInfo(pricePerHour, priceNight);
   return (
     <View style={[s.bar, { paddingBottom }]}>
       {/* Price block */}
       <View style={s.priceBlock}>
         <View style={s.priceRow}>
-          <Text style={s.priceMain}>{ruFmt(pricePerHour)} ₽</Text>
+          <Text style={s.priceMain}>{ruFmtPrice(displayPrice)} ₽</Text>
           <Text style={s.priceUnit}> / час</Text>
         </View>
-        {priceNight ? (
-          <Text style={s.priceSub}>{ruFmt(priceNight)} ₽ / час ночью</Text>
+        {isNight && priceNight ? (
+          <Text style={s.priceSub}>ночной тариф</Text>
+        ) : priceNight ? (
+          <Text style={s.priceSub}>ночью {ruFmtPrice(priceNight)} ₽/ч</Text>
         ) : (
           <Text style={s.priceSub}>за 1 час · день</Text>
         )}

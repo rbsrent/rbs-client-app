@@ -1,8 +1,21 @@
 // features/catalog/components/BoatsListHeader.tsx
 
-import { ArrowUpDown, ChevronDown, LayoutList, Map } from "lucide-react-native";
+import { ArrowUpDown, ChevronDown, LayoutList, Map, X } from "lucide-react-native";
 import React from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+} from "react-native";
+
+if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
 
 import { COLORS } from "@/shared/colors";
 import { Spinner } from "@/shared/components/Spinner";
@@ -19,6 +32,13 @@ const SORT_OPTS: { key: SortBy; label: string }[] = [
   { key: "price_asc", label: "Цена ↑" },
   { key: "price_desc", label: "Цена ↓" },
 ];
+
+const SLIDE_ANIM = {
+  duration: 260,
+  create: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+  update: { type: LayoutAnimation.Types.easeInEaseOut },
+  delete: { type: LayoutAnimation.Types.easeInEaseOut, property: LayoutAnimation.Properties.opacity },
+};
 
 interface Props {
   filters: Filters;
@@ -52,13 +72,19 @@ export const BoatsListHeader: React.FC<Props> = ({
     onSortChange(SORT_OPTS[(idx + 1) % SORT_OPTS.length].key);
   };
 
-  const sortActive = sortBy !== "popular";
-  const typeActive = filters.typeId !== "all";
+  const sortActive  = sortBy !== "popular";
+  const typeActive  = filters.typeId !== "all";
   const priceActive = filters.priceMin !== null || filters.priceMax !== null;
-  const capActive = filters.capacityMin !== null;
-  const amenActive = filters.hasTarp || filters.hasToilet || filters.hasHeating;
-  const durActive =
-    filters.dateTime.durationHours !== DEFAULT.dateTime.durationHours;
+  const capActive   = filters.capacityMin !== null;
+  const amenActive  = filters.hasTarp || filters.hasToilet || filters.hasHeating;
+  const durActive   = filters.dateTime.durationHours !== DEFAULT.dateTime.durationHours;
+  const anyActive = sortActive || typeActive || priceActive || capActive || amenActive || durActive;
+
+  const clearAll = () => {
+    LayoutAnimation.configureNext(SLIDE_ANIM);
+    setFilters(DEFAULT);
+    onSortChange("popular");
+  };
 
   const typeLabel = typeActive
     ? (TYPE_CHIPS.find((c) => c.id === filters.typeId)?.label ?? "Тип")
@@ -72,25 +98,21 @@ export const BoatsListHeader: React.FC<Props> = ({
         : `от ${ruFmt(filters.priceMin!)} ₽`
     : "Цена";
 
-  const capLabel = capActive ? `от ${filters.capacityMin} чел.` : "Вместимость";
+  const capLabel  = capActive   ? `от ${filters.capacityMin} чел.` : "Вместимость";
 
   const amenLabel = amenActive
     ? [
-        filters.hasTarp && "Тент",
-        filters.hasToilet && "Туалет",
+        filters.hasTarp    && "Тент",
+        filters.hasToilet  && "Туалет",
         filters.hasHeating && "Отопл.",
       ]
         .filter(Boolean)
         .join(" · ")
     : "Удобства";
 
-  const durH = filters.dateTime.durationHours;
+  const durH     = filters.dateTime.durationHours;
   const durLabel = durActive
-    ? durH === 1
-      ? "1 час"
-      : durH < 5
-        ? `${durH} часа`
-        : `${durH} часов`
+    ? durH === 1 ? "1 час" : durH < 5 ? `${durH} часа` : `${durH} часов`
     : "Продолжительность";
 
   return (
@@ -103,7 +125,12 @@ export const BoatsListHeader: React.FC<Props> = ({
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.filterStrip}
       >
-        {/* Sort */}
+        {anyActive && (
+          <Pressable style={s.fChipClear} onPress={clearAll} hitSlop={6}>
+            <X size={14} color={COLORS.white} strokeWidth={2.5} />
+          </Pressable>
+        )}
+
         <Pressable
           style={[s.fChip, sortActive && s.fChipOn]}
           onPress={cycleSortBy}
@@ -118,69 +145,44 @@ export const BoatsListHeader: React.FC<Props> = ({
           </Text>
         </Pressable>
 
-        {/* Type */}
         <Pressable
           style={[s.fChip, typeActive && s.fChipOn]}
           onPress={() => onOpenFilter("type")}
         >
-          <Text style={[s.fChipTxt, typeActive && s.fChipTxtOn]}>
-            {typeLabel}
-          </Text>
-          {!typeActive && (
-            <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />
-          )}
+          <Text style={[s.fChipTxt, typeActive && s.fChipTxtOn]}>{typeLabel}</Text>
+          {!typeActive && <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />}
         </Pressable>
 
-        {/* Price */}
         <Pressable
           style={[s.fChip, priceActive && s.fChipOn]}
           onPress={() => onOpenFilter("price")}
         >
-          <Text style={[s.fChipTxt, priceActive && s.fChipTxtOn]}>
-            {priceLabel}
-          </Text>
-          {!priceActive && (
-            <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />
-          )}
+          <Text style={[s.fChipTxt, priceActive && s.fChipTxtOn]}>{priceLabel}</Text>
+          {!priceActive && <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />}
         </Pressable>
 
-        {/* Capacity */}
         <Pressable
           style={[s.fChip, capActive && s.fChipOn]}
           onPress={() => onOpenFilter("capacity")}
         >
-          <Text style={[s.fChipTxt, capActive && s.fChipTxtOn]}>
-            {capLabel}
-          </Text>
-          {!capActive && (
-            <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />
-          )}
+          <Text style={[s.fChipTxt, capActive && s.fChipTxtOn]}>{capLabel}</Text>
+          {!capActive && <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />}
         </Pressable>
 
-        {/* Amenities */}
         <Pressable
           style={[s.fChip, amenActive && s.fChipOn]}
           onPress={() => onOpenFilter("amenities")}
         >
-          <Text style={[s.fChipTxt, amenActive && s.fChipTxtOn]}>
-            {amenLabel}
-          </Text>
-          {!amenActive && (
-            <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />
-          )}
+          <Text style={[s.fChipTxt, amenActive && s.fChipTxtOn]}>{amenLabel}</Text>
+          {!amenActive && <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />}
         </Pressable>
 
-        {/* Duration */}
         <Pressable
           style={[s.fChip, durActive && s.fChipOn]}
           onPress={() => onOpenFilter("duration")}
         >
-          <Text style={[s.fChipTxt, durActive && s.fChipTxtOn]}>
-            {durLabel}
-          </Text>
-          {!durActive && (
-            <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />
-          )}
+          <Text style={[s.fChipTxt, durActive && s.fChipTxtOn]}>{durLabel}</Text>
+          {!durActive && <ChevronDown size={12} color={COLORS.brandNavy} strokeWidth={2.5} />}
         </Pressable>
       </ScrollView>
 
@@ -198,17 +200,9 @@ export const BoatsListHeader: React.FC<Props> = ({
               onPress={() => setView(m)}
             >
               {m === "list" ? (
-                <LayoutList
-                  size={14}
-                  color={viewMode === m ? COLORS.brandNavy : COLORS.text3}
-                  strokeWidth={2}
-                />
+                <LayoutList size={14} color={viewMode === m ? COLORS.brandNavy : COLORS.text3} strokeWidth={2} />
               ) : (
-                <Map
-                  size={14}
-                  color={viewMode === m ? COLORS.brandNavy : COLORS.text3}
-                  strokeWidth={2}
-                />
+                <Map size={14} color={viewMode === m ? COLORS.brandNavy : COLORS.text3} strokeWidth={2} />
               )}
               <Text style={[s.tTxt, viewMode === m && s.tTxtOn]}>
                 {m === "list" ? "Список" : "Карта"}
@@ -224,6 +218,7 @@ export const BoatsListHeader: React.FC<Props> = ({
 const s = StyleSheet.create({
   filterStrip: {
     paddingVertical: 8,
+    paddingHorizontal: 16,
     gap: 8,
     alignItems: "center",
   },
@@ -236,11 +231,18 @@ const s = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: COLORS.greyLight2,
   },
-  fChipOn: { backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
+  fChipOn: { backgroundColor: COLORS.brandNavy },
   fChipTxt: { fontSize: 13, fontWeight: "500", color: COLORS.brandNavy },
   fChipTxtOn: { color: COLORS.white, fontWeight: "600" },
+  fChipClear: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: COLORS.brandNavy,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
-  // ── Counter + toggle ──
   barRow: {
     flexDirection: "row",
     alignItems: "center",

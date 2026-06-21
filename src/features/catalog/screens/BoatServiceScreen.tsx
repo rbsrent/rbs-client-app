@@ -15,6 +15,7 @@ import { ScreenHeader } from '@/shared/components/ScreenHeader';
 import { publicSupabase, SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { Boat } from '@/store/useCatalogStore';
 
+import { useDiscountsCache } from '../hooks/useDiscountsCache';
 import { ServiceBoatCard } from '../components/ServiceBoatCard';
 import { Spinner } from '@/shared/components/Spinner';
 
@@ -44,6 +45,7 @@ export function BoatServiceScreen({ vesselType }: Props) {
   const [boats, setBoats] = useState<Boat[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const discountsMap = useDiscountsCache();
 
   const fetchBoats = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -125,7 +127,7 @@ export function BoatServiceScreen({ vesselType }: Props) {
         <FlatList
           data={boats}
           keyExtractor={(b) => b.id}
-          renderItem={({ item }) => <ServiceBoatCard boat={item} />}
+          renderItem={({ item }) => <ServiceBoatCard boat={item} discount={discountsMap.get(item.id)} />}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={

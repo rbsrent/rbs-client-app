@@ -2,7 +2,7 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { MapPin } from "lucide-react-native";
-import { memo } from "react";
+import { memo, useCallback, useMemo } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, { Easing, SharedTransition } from "react-native-reanimated";
 
@@ -10,6 +10,7 @@ import { ActiveDiscount } from "@/features/catalog/hooks/useDiscountsCache";
 import { AvailInfo } from "@/features/catalog/utils/filterUtils";
 import { setBoatPreview } from "@/shared/boatPreviewStore";
 import { COLORS } from "@/shared/colors";
+import { getBoatPriceInfo, ruFmtPrice } from "@/shared/utils/boatPrice";
 import { HeartButton } from "./HeartButton";
 
 const heroTransition = SharedTransition
@@ -28,6 +29,7 @@ export interface BoatCardData {
   cover_image_url?: string | null;
   cover_image_path?: string | null;
   price_per_hour: number;
+  public_price_per_hour_night?: number | null;
   capacity?: number | null;
   length_meters?: number | null;
   pier_name?: string | null;
@@ -50,7 +52,8 @@ const STRIP_W = Math.round(W * 0.83);
 const GRID_IMG_H  = Math.round(GRID_W  * 1.05);
 const STRIP_IMG_H = Math.round(STRIP_W * 0.58);
 
-const ruNum = (n: number) => new Intl.NumberFormat("ru-RU").format(Math.round(n));
+const _RU_FMT = new Intl.NumberFormat("ru-RU");
+const ruNum = (n: number) => _RU_FMT.format(Math.round(n));
 
 function availBadgeLabel(info: AvailInfo): string | null {
   if (info.status === "fully_available") return `Свободен ${info.available_hours}ч`;
@@ -77,11 +80,14 @@ export const BoatCard = memo(function BoatCard({
   const cardSrc     = boat.cover_image_url ?? null;
   const availLabel  = availInfo ? availBadgeLabel(availInfo) : null;
   const topBadge    = availLabel ?? badge ?? null;
-  const originalPrice = discount
-    ? Math.round(boat.price_per_hour / (1 - discount.percentage / 100))
-    : null;
 
-  const heartData = {
+  const { displayPrice, originalPrice, discountPct } = getBoatPriceInfo(
+    boat.price_per_hour,
+    boat.public_price_per_hour_night,
+    discount,
+  );
+
+  const heartData = useMemo(() => ({
     boat_id:         boat.id,
     name:            boat.name,
     type:            boat.type            ?? null,
@@ -91,19 +97,19 @@ export const BoatCard = memo(function BoatCard({
     length_meters:   boat.length_meters   ?? null,
     pier_name:       boat.pier_name       ?? null,
     rating:          boat.rating          ?? null,
-  };
+  }), [boat.id, boat.name, boat.type, boat.cover_image_url, boat.price_per_hour, boat.capacity, boat.length_meters, boat.pier_name, boat.rating]);
+
+  const handlePress = useCallback(() => {
+    setBoatPreview({ id: boat.id, name: boat.name, cover: boat.cover_image_url ?? null });
+    router.push((route ?? `/catalog/${boat.id}`) as any);
+  }, [boat.id, boat.name, boat.cover_image_url, route, router]);
+
+  const cardStyle = layout === "strip" ? s.cardStrip : s.cardFlex;
 
   return (
     <Pressable
-      style={({ pressed }) => [
-        s.card,
-        layout === "strip" ? { width: STRIP_W } : { flex: 1 },
-        pressed && { opacity: 0.93 },
-      ]}
-      onPress={() => {
-        setBoatPreview({ id: boat.id, name: boat.name, cover: boat.cover_image_url ?? null });
-        router.push((route ?? `/catalog/${boat.id}`) as any);
-      }}
+      style={({ pressed }) => [s.card, cardStyle, pressed && s.cardPressed]}
+      onPress={handlePress}
     >
       <Animated.View
         style={[s.imgWrap, { height: imgH }, isCatalog && s.imgWrapCatalog]}
@@ -149,13 +155,13 @@ export const BoatCard = memo(function BoatCard({
               pointerEvents="none"
             />
             <View style={s.bottomOverlay}>
-              <Text style={s.price}>От {ruNum(boat.price_per_hour)} ₽</Text>
+              <Text style={s.price}>{ruFmtPrice(displayPrice)} ₽</Text>
               {originalPrice ? (
-                <Text style={s.priceOld}>{ruNum(originalPrice)} ₽</Text>
+                <Text style={s.priceOld}>{ruFmtPrice(originalPrice!)} ₽</Text>
               ) : null}
-              {discount ? (
+              {discountPct ? (
                 <View style={s.discountPill}>
-                  <Text style={s.discountTxt}>−{discount.percentage}%</Text>
+                  <Text style={s.discountTxt}>−{discountPct}%</Text>
                 </View>
               ) : null}
             </View>
@@ -182,13 +188,13 @@ export const BoatCard = memo(function BoatCard({
           ) : null}
           <View style={s.catalogPriceRow}>
             <Text style={s.catalogMetaTxt} numberOfLines={1}>
-              От {ruNum(boat.price_per_hour)} ₽/ч
+              {ruFmtPrice(displayPrice)} ₽/ч
             </Text>
             {originalPrice ? (
-              <Text style={[s.catalogMetaTxt, s.catalogOld]}>{ruNum(originalPrice)} ₽</Text>
+              <Text style={[s.catalogMetaTxt, s.catalogOld]}>{ruFmtPrice(originalPrice!)} ₽</Text>
             ) : null}
-            {discount ? (
-              <Text style={s.catalogDiscount}>−{discount.percentage}%</Text>
+            {discountPct ? (
+              <Text style={s.catalogDiscount}>−{discountPct}%</Text>
             ) : null}
             {hasRate ? (
               <Text style={s.catalogMetaTxt}>★ {boat.rating!.toFixed(1)}</Text>
@@ -218,7 +224,10 @@ export const BoatCard = memo(function BoatCard({
 });
 
 const s = StyleSheet.create({
-  card: {},
+  card:        {},
+  cardFlex:    { flex: 1 },
+  cardStrip:   { width: STRIP_W },
+  cardPressed: { opacity: 0.93 },
 
   imgWrap: {
     borderRadius: 14,

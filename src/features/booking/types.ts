@@ -38,4 +38,5 @@ export interface Boat {
   length_meters: number | null;
   price_per_hour: number;
   cover_image_url: string | null;
+  min_duration_hours: number | null;
 }

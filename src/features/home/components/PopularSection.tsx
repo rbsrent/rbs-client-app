@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { useRouter } from "expo-router";
 import { ArrowRight, Star } from "lucide-react-native";
-import { useEffect, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   Pressable,
@@ -11,10 +11,12 @@ import {
   View,
 } from "react-native";
 
+import { ActiveDiscount, useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
 import { COLORS } from "@/shared/colors";
 import { HeartButton } from "@/shared/components/HeartButton";
-import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
 import { Spinner } from '@/shared/components/Spinner';
+import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
+import { getBoatPriceInfo, ruFmtPrice } from "@/shared/utils/boatPrice";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = W * 0.46;
@@ -28,6 +30,7 @@ interface PopularBoat {
   capacity: number | null;
   length_meters: number | null;
   price_per_hour: number;
+  public_price_per_hour_night: number | null;
   average_rating: number;
   total_reviews: number;
   pier_name: string | null;
@@ -51,14 +54,15 @@ function resolveCoverImage(images: any): string | null {
   }
 }
 
-// ─── Single boat card ─────────────────────────────────────────────────────────
-
-function BoatCard({ boat }: { boat: PopularBoat }) {
+const BoatCard = memo(function BoatCard({ boat, discount }: { boat: PopularBoat; discount?: ActiveDiscount }) {
   const router = useRouter();
   const cover = resolveCoverImage(boat.images);
   const hasRate = boat.average_rating > 0;
-  const ruNum = (n: number) =>
-    new Intl.NumberFormat("ru-RU").format(Math.round(n));
+  const { displayPrice, originalPrice, discountPct } = getBoatPriceInfo(
+    boat.price_per_hour,
+    boat.public_price_per_hour_night,
+    discount,
+  );
 
   return (
     <Pressable
@@ -113,18 +117,24 @@ function BoatCard({ boat }: { boat: PopularBoat }) {
             .filter(Boolean)
             .join(" · ")}
         </Text>
-        <Text style={s.price}>
-          <Text style={s.priceBold}>{ruNum(boat.price_per_hour)} ₽</Text>
-          <Text style={s.priceUnit}> / час</Text>
-        </Text>
+        <View style={s.priceRow}>
+          {originalPrice ? (
+            <Text style={s.priceOld}>{ruFmtPrice(originalPrice)} ₽</Text>
+          ) : null}
+          <Text style={s.priceBold}>{ruFmtPrice(displayPrice)} ₽</Text>
+          {discountPct ? (
+            <View style={s.discountPill}>
+              <Text style={s.discountTxt}>−{discountPct}%</Text>
+            </View>
+          ) : null}
+          <Text style={s.priceUnit}>/ч</Text>
+        </View>
       </View>
     </Pressable>
   );
-}
+});
 
-// ─── "See all" card ───────────────────────────────────────────────────────────
-
-function SeeAllCard({
+const SeeAllCard = memo(function SeeAllCard({
   previews,
   onPress,
 }: {
@@ -158,26 +168,26 @@ function SeeAllCard({
       <Text style={s.seeAllTxt}>Показать все</Text>
     </Pressable>
   );
-}
-
-// ─── One horizontal row ───────────────────────────────────────────────────────
+});
 
 interface RowProps {
   title: string;
   subtitle: string;
   typeRoute: string;
   boats: PopularBoat[];
+  discountsMap: Map<string, ActiveDiscount>;
 }
 
-function PopularRow({ title, subtitle, typeRoute, boats }: RowProps) {
+const PopularRow = memo(function PopularRow({ title, subtitle, typeRoute, boats, discountsMap }: RowProps) {
   const router   = useRouter();
-  const filtered = boats;
-  const previews = filtered
-    .slice(0, 3)
-    .map((b) => resolveCoverImage(b.images))
-    .filter(Boolean) as string[];
+  const previews = useMemo(
+    () => boats.slice(0, 3).map((b) => resolveCoverImage(b.images)).filter(Boolean) as string[],
+    [boats],
+  );
+  const handleSeeAll = useCallback(() => router.push("/boats" as any), [router]);
+  const handleArrow  = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
 
-  if (filtered.length === 0) return null;
+  if (boats.length === 0) return null;
 
   return (
     <View style={s.rowRoot}>
@@ -188,7 +198,7 @@ function PopularRow({ title, subtitle, typeRoute, boats }: RowProps) {
         </View>
         <Pressable
           style={({ pressed }) => [s.arrowBtn, pressed && { opacity: 0.7 }]}
-          onPress={() => router.push(typeRoute as any)}
+          onPress={handleArrow}
         >
           <ArrowRight size={15} color={COLORS.text1} strokeWidth={2.5} />
         </Pressable>
@@ -201,26 +211,26 @@ function PopularRow({ title, subtitle, typeRoute, boats }: RowProps) {
         decelerationRate="fast"
         snapToInterval={CARD_W + 12}
         snapToAlignment="start"
+        removeClippedSubviews
       >
-        {filtered.map((b) => (
-          <BoatCard key={b.boat_id} boat={b} />
+        {boats.map((b) => (
+          <BoatCard key={b.boat_id} boat={b} discount={discountsMap.get(b.boat_id)} />
         ))}
         <SeeAllCard
           previews={previews}
-          onPress={() => router.push("/boats" as any)}
+          onPress={handleSeeAll}
         />
       </ScrollView>
     </View>
   );
-}
-
-// ─── Export ───────────────────────────────────────────────────────────────────
+});
 
 export function PopularSection() {
   const [popular, setPopular] = useState<PopularBoat[]>([]);
   const [katера,  setKatera]  = useState<PopularBoat[]>([]);
   const [yakhty,  setYakhty]  = useState<PopularBoat[]>([]);
   const [loading, setLoading] = useState(true);
+  const discountsMap = useDiscountsCache();
 
   useEffect(() => {
     let cancelled = false;
@@ -230,14 +240,14 @@ export function PopularSection() {
           publicSupabase.rpc('get_popular_boats', { limit_count: 8 }),
           publicSupabase
             .from('boats')
-            .select('id,name,type,price_per_hour,capacity,length_meters,boat_images(image_path,position)')
+            .select('id,name,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
             .eq('is_hidden', false)
             .eq('moderation_status', 'approved')
             .eq('type', 'катер')
             .order('display_order', { ascending: true }),
           publicSupabase
             .from('boats')
-            .select('id,name,type,price_per_hour,capacity,length_meters,boat_images(image_path,position)')
+            .select('id,name,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
             .eq('is_hidden', false)
             .eq('moderation_status', 'approved')
             .eq('type', 'яхта')
@@ -253,6 +263,7 @@ export function PopularSection() {
             capacity: b.capacity ?? null,
             length_meters: b.length_meters ?? null,
             price_per_hour: b.price_per_hour,
+            public_price_per_hour_night: b.public_price_per_hour_night ?? null,
             average_rating: 0,
             total_reviews: 0,
             pier_name: null,
@@ -263,7 +274,7 @@ export function PopularSection() {
         };
 
         if (!cancelled) {
-          setPopular((popRes.data as PopularBoat[]) ?? []);
+          setPopular(((popRes.data ?? []) as any[]).map((b) => ({ ...b, public_price_per_hour_night: b.public_price_per_hour_night ?? null })));
           setKatera((kateraRes.data ?? []).map(mapBoat));
           setYakhty((yakhtaRes.data ?? []).map(mapBoat));
         }
@@ -283,7 +294,6 @@ export function PopularSection() {
       </View>
     );
   }
-
   return (
     <View>
       <PopularRow
@@ -291,24 +301,25 @@ export function PopularSection() {
         subtitle="На основе бронирований за 30 дней"
         typeRoute="/boats"
         boats={popular}
+        discountsMap={discountsMap}
       />
       <PopularRow
         title="Катера"
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=boat"
         boats={katера}
+        discountsMap={discountsMap}
       />
       <PopularRow
         title="Яхты"
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=yacht"
         boats={yakhty}
+        discountsMap={discountsMap}
       />
     </View>
   );
 }
-
-// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   loader: { height: 120, alignItems: "center", justifyContent: "center" },
@@ -362,9 +373,23 @@ const s = StyleSheet.create({
   },
   ratingTxt: { fontSize: 12, fontWeight: "600", color: COLORS.text1 },
   sub: { fontSize: 12, color: COLORS.text3, lineHeight: 17 },
-  price: { marginTop: 1 },
+  priceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 1,
+  },
+  priceOld: { fontSize: 10, color: COLORS.text3, textDecorationLine: "line-through" },
   priceBold: { fontSize: 12, fontWeight: "700", color: COLORS.text1 },
-  priceUnit: { fontSize: 12, color: COLORS.text3 },
+  priceUnit: { fontSize: 11, color: COLORS.text3 },
+  discountPill: {
+    backgroundColor: "#E53935",
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  discountTxt: { fontSize: 10, fontWeight: "700", color: "#fff" },
 
   seeAllCard: {
     width: CARD_W,

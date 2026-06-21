@@ -1,8 +1,7 @@
 import * as Location from 'expo-location';
 import { List, Map, MapPin, Navigation, Search, X } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,11 +13,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import YaMap, { Circle, Marker } from "react-native-yamap";
 
 import { COLORS } from "@/shared/colors";
+import { Spinner } from '@/shared/components/Spinner';
 import { publicSupabase } from "@/shared/supabase/publicClient";
 import { initYaMap } from "@/shared/yamap";
-import { Spinner } from '@/shared/components/Spinner';
-
-initYaMap();
 
 interface Pier {
   id: string;
@@ -36,9 +33,49 @@ const PIER_RADIUS = 350;
 const INITIAL_ZOOM = 13.5;
 const PIER_ZOOM = 15.5;
 
-// Heights for overlay math
-const HEADER_H = 56;
-const SEARCH_H = 64;
+const TOOLBAR_H = 48;
+const SEARCH_H = 52;
+
+// Memoized marker — only re-renders when active changes, prevents full map re-render on focus
+const PierMarker = memo(function PierMarker({
+  pier,
+  active,
+  onPress,
+}: {
+  pier: Pier;
+  active: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Marker
+      point={{ lat: pier.latitude!, lon: pier.longitude! }}
+      scale={active ? 1.25 : 1}
+      onPress={onPress}
+    >
+      <View style={[s.pin, active && s.pinActive]}>
+        <MapPin size={active ? 17 : 14} color="#fff" strokeWidth={2.5} />
+      </View>
+    </Marker>
+  );
+});
+
+const PierCircle = memo(function PierCircle({
+  pier,
+  active,
+}: {
+  pier: Pier;
+  active: boolean;
+}) {
+  return (
+    <Circle
+      center={{ lat: pier.latitude!, lon: pier.longitude! }}
+      radius={PIER_RADIUS}
+      fillColor={active ? 'rgba(43,196,229,0.18)' : 'rgba(27,42,65,0.06)'}
+      strokeColor={active ? 'rgba(43,196,229,0.55)' : 'rgba(27,42,65,0.18)'}
+      strokeWidth={active ? 2 : 1}
+    />
+  );
+});
 
 export default function PiersScreen() {
   const insets = useSafeAreaInsets();
@@ -51,7 +88,8 @@ export default function PiersScreen() {
   const [focused, setFocused] = useState<Pier | null>(null);
   const [userLoc, setUserLoc] = useState<{ lat: number; lon: number } | null>(null);
 
-  // Fetch piers
+  useEffect(() => { initYaMap(); }, []);
+
   useEffect(() => {
     publicSupabase
       .from("piers")
@@ -64,7 +102,6 @@ export default function PiersScreen() {
       });
   }, []);
 
-  // Request location permission on mount
   useEffect(() => {
     Location.requestForegroundPermissionsAsync().then(({ status }) => {
       if (status !== 'granted') return;
@@ -114,7 +151,6 @@ export default function PiersScreen() {
   const focusPier = useCallback((pier: Pier) => {
     if (!pier.latitude || !pier.longitude) return;
     if (userLoc) {
-      // fit both user and pier
       mapRef.current?.fitMarkers([
         { lat: userLoc.lat, lon: userLoc.lon },
         { lat: pier.latitude, lon: pier.longitude },
@@ -129,7 +165,6 @@ export default function PiersScreen() {
 
   const handleMarkerPress = useCallback((pier: Pier) => {
     setFocused(pier);
-    // zoom to pier on marker tap
     if (pier.latitude && pier.longitude) {
       mapRef.current?.setCenter(
         { lat: pier.latitude, lon: pier.longitude },
@@ -138,23 +173,28 @@ export default function PiersScreen() {
     }
   }, []);
 
-  const handleListTap = useCallback(
-    (pier: Pier) => {
-      setFocused(pier);
-      setMode("map");
-      setTimeout(() => {
-        if (pier.latitude && pier.longitude) {
-          mapRef.current?.setCenter(
-            { lat: pier.latitude, lon: pier.longitude },
-            PIER_ZOOM, 0, 0, 0.4,
-          );
-        }
-      }, 250);
-    },
-    [],
+  // Stable per-marker press handlers to avoid PierMarker re-renders
+  const markerPressHandlers = useMemo(
+    () => Object.fromEntries(
+      filteredWithCoords.map((p) => [p.id, () => handleMarkerPress(p)])
+    ),
+    [filteredWithCoords, handleMarkerPress],
   );
 
-  const topPad = insets.top + HEADER_H + SEARCH_H + 8;
+  const handleListTap = useCallback((pier: Pier) => {
+    setFocused(pier);
+    setMode("map");
+    setTimeout(() => {
+      if (pier.latitude && pier.longitude) {
+        mapRef.current?.setCenter(
+          { lat: pier.latitude, lon: pier.longitude },
+          PIER_ZOOM, 0, 0, 0.4,
+        );
+      }
+    }, 250);
+  }, []);
+
+  const topPad = insets.top + TOOLBAR_H + SEARCH_H;
 
   return (
     <View style={s.root}>
@@ -171,49 +211,33 @@ export default function PiersScreen() {
               azimuth: 0,
               tilt: 0,
             }}
-            showUserPosition
-            userLocationAccuracyFillColor="rgba(43,196,229,0.12)"
-            userLocationAccuracyStrokeColor="rgba(43,196,229,0.5)"
-            userLocationAccuracyStrokeWidth={1.5}
             onMapPress={() => setFocused(null)}
           >
-            {filteredWithCoords.map((pier) => {
-              const active = focused?.id === pier.id;
-              return (
-                <Marker
-                  key={pier.id}
-                  point={{ lat: pier.latitude!, lon: pier.longitude! }}
-                  scale={active ? 1.25 : 1}
-                  onPress={() => handleMarkerPress(pier)}
-                >
-                  <View style={[s.pin, active && s.pinActive]}>
-                    <MapPin
-                      size={active ? 17 : 14}
-                      color="#fff"
-                      strokeWidth={2.5}
-                    />
-                  </View>
-                </Marker>
-              );
-            })}
+            {/* Custom user location pin */}
+            {userLoc && (
+              <Marker point={{ lat: userLoc.lat, lon: userLoc.lon }}>
+                <View style={s.userPin}>
+                  <Navigation size={14} color="#fff" strokeWidth={2.5} />
+                </View>
+              </Marker>
+            )}
 
-            {filteredWithCoords.map((pier) => {
-              const active = focused?.id === pier.id;
-              return (
-                <Circle
-                  key={`c-${pier.id}`}
-                  center={{ lat: pier.latitude!, lon: pier.longitude! }}
-                  radius={PIER_RADIUS}
-                  fillColor={active
-                    ? 'rgba(43,196,229,0.18)'
-                    : 'rgba(27,42,65,0.06)'}
-                  strokeColor={active
-                    ? 'rgba(43,196,229,0.55)'
-                    : 'rgba(27,42,65,0.18)'}
-                  strokeWidth={active ? 2 : 1}
-                />
-              );
-            })}
+            {filteredWithCoords.map((pier) => (
+              <PierMarker
+                key={pier.id}
+                pier={pier}
+                active={focused?.id === pier.id}
+                onPress={markerPressHandlers[pier.id]}
+              />
+            ))}
+
+            {filteredWithCoords.map((pier) => (
+              <PierCircle
+                key={`c-${pier.id}`}
+                pier={pier}
+                active={focused?.id === pier.id}
+              />
+            ))}
           </YaMap>
         )}
 
@@ -225,7 +249,7 @@ export default function PiersScreen() {
 
         {/* Count badge */}
         {!loading && (
-          <View style={[s.countBadge, { top: topPad }]}>
+          <View style={[s.countBadge, { top: topPad + 8 }]}>
             <MapPin size={11} color={COLORS.brandNavy} strokeWidth={2} />
             <Text style={s.countTxt}>
               {filteredWithCoords.length} причал
@@ -336,10 +360,9 @@ export default function PiersScreen() {
         </ScrollView>
       )}
 
-      {/* ── Floating header ── */}
-      <View style={[s.headerWrap, { paddingTop: insets.top }]} pointerEvents="box-none">
-        <View style={s.header}>
-          <Text style={s.headerTitle}>Причалы</Text>
+      {/* ── Floating toolbar (toggle only, no title) ── */}
+      <View style={[s.toolbarWrap, { paddingTop: insets.top }]} pointerEvents="box-none">
+        <View style={s.toolbar}>
           <View style={s.modeToggle}>
             <Pressable
               style={[s.modeBtn, mode === "map" && s.modeBtnOn]}
@@ -358,23 +381,25 @@ export default function PiersScreen() {
           </View>
         </View>
 
-        {/* Search */}
-        <View style={s.searchWrap}>
-          <Search size={15} color={COLORS.text3} strokeWidth={2} />
-          <TextInput
-            style={s.searchInput}
-            placeholder="Поиск по названию или адресу"
-            placeholderTextColor={COLORS.text3}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
-          {query.length > 0 && (
-            <Pressable onPress={() => setQuery("")} hitSlop={8}>
-              <X size={14} color={COLORS.text3} strokeWidth={2} />
-            </Pressable>
-          )}
+        {/* Search — with horizontal margin, no border radius */}
+        <View style={s.searchOuter}>
+          <View style={s.searchInner}>
+            <Search size={15} color={COLORS.text3} strokeWidth={2} />
+            <TextInput
+              style={s.searchInput}
+              placeholder="Поиск по названию или адресу"
+              placeholderTextColor={COLORS.text3}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+              clearButtonMode="while-editing"
+            />
+            {query.length > 0 && (
+              <Pressable onPress={() => setQuery("")} hitSlop={8}>
+                <X size={14} color={COLORS.text3} strokeWidth={2} />
+              </Pressable>
+            )}
+          </View>
         </View>
       </View>
     </View>
@@ -385,8 +410,17 @@ const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.backgroundAlt },
   hidden: { display: 'none' },
 
-  // ── Map
+  // Map
   mapLoader: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#fff' },
+
+  userPin: {
+    width: 30, height: 30, borderRadius: 15,
+    backgroundColor: COLORS.brandCyan,
+    alignItems: 'center', justifyContent: 'center',
+    borderWidth: 2, borderColor: '#fff',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25, shadowRadius: 4, elevation: 5,
+  },
 
   pin: {
     width: 36, height: 36, borderRadius: 18,
@@ -458,54 +492,51 @@ const s = StyleSheet.create({
     alignItems: 'center', justifyContent: 'center',
   },
 
-  // ── Floating header
-  headerWrap: {
+  // Toolbar
+  toolbarWrap: {
     position: 'absolute', top: 0, left: 0, right: 0,
     pointerEvents: 'box-none',
   },
-  header: {
-    flexDirection: 'row', alignItems: 'center',
-    justifyContent: 'space-between',
-    height: HEADER_H,
+  toolbar: {
+    height: TOOLBAR_H,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
     paddingHorizontal: 16,
     backgroundColor: COLORS.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 6,
   },
-  headerTitle: { fontSize: 20, fontWeight: '800', color: COLORS.text1 },
   modeToggle: {
-    flexDirection: 'row', gap: 6,
+    flexDirection: 'row', gap: 4,
     backgroundColor: COLORS.backgroundAlt,
-    borderRadius: 12, padding: 4,
+    borderRadius: 10, padding: 3,
     borderWidth: 1, borderColor: COLORS.border,
   },
   modeBtn: {
-    width: 32, height: 32, borderRadius: 8,
+    width: 30, height: 30, borderRadius: 7,
     alignItems: 'center', justifyContent: 'center',
   },
   modeBtnOn: { backgroundColor: COLORS.brandNavy },
 
-  searchWrap: {
-    flexDirection: 'row', alignItems: 'center', gap: 8,
-    height: SEARCH_H,
+  // Search — horizontal margin, no border radius
+  searchOuter: {
     paddingHorizontal: 16,
+    paddingVertical: 8,
     backgroundColor: COLORS.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: COLORS.border,
-    shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04, shadowRadius: 4, elevation: 3,
   },
-  searchInputInner: {
-    flex: 1, flexDirection: 'row', alignItems: 'center', gap: 8,
+  searchInner: {
+    flexDirection: 'row', alignItems: 'center', gap: 8,
+    height: SEARCH_H - 16,
+    paddingHorizontal: 12,
     backgroundColor: COLORS.backgroundAlt,
-    borderRadius: 12, borderWidth: 1, borderColor: COLORS.border,
-    paddingHorizontal: 12, height: 42,
+    borderWidth: 1, borderColor: COLORS.border,
   },
-  searchInput: { flex: 1, fontSize: 14, color: COLORS.text1, height: 42 },
+  searchInput: { flex: 1, fontSize: 14, color: COLORS.text1, height: '100%' },
 
-  // ── List
+  // List
   list: { flex: 1 },
   listContent: {},
   listLoader: { paddingTop: 40, alignItems: 'center' },

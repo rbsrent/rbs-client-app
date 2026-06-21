@@ -4,13 +4,18 @@ import { useRouter } from 'expo-router';
 import { MapPin, Users } from 'lucide-react-native';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
 import { COLORS } from '@/shared/colors';
+import { getBoatPriceInfo, ruFmtPrice } from '@/shared/utils/boatPrice';
 import { Boat } from '@/store/useCatalogStore';
 
-const _RU_FMT = new Intl.NumberFormat('ru-RU');
-
-export function ServiceBoatCard({ boat }: { boat: Boat }) {
+export function ServiceBoatCard({ boat, discount }: { boat: Boat; discount?: ActiveDiscount }) {
   const router = useRouter();
+  const { displayPrice, originalPrice, discountPct } = getBoatPriceInfo(
+    boat.price_per_hour,
+    boat.public_price_per_hour_night,
+    discount,
+  );
 
   return (
     <Pressable
@@ -63,11 +68,18 @@ export function ServiceBoatCard({ boat }: { boat: Boat }) {
         </View>
 
         <View style={styles.footer}>
-          <View>
-            <Text style={styles.priceLabel}>от</Text>
-            <Text style={styles.price}>
-              {_RU_FMT.format(boat.price_per_hour)} ₽/ч
-            </Text>
+          <View style={styles.priceBlock}>
+            {originalPrice ? (
+              <Text style={styles.priceOld}>{ruFmtPrice(originalPrice)} ₽</Text>
+            ) : null}
+            <View style={styles.priceRow}>
+              <Text style={styles.price}>{ruFmtPrice(displayPrice)} ₽/ч</Text>
+              {discountPct ? (
+                <View style={styles.discountPill}>
+                  <Text style={styles.discountTxt}>−{discountPct}%</Text>
+                </View>
+              ) : null}
+            </View>
           </View>
           <Pressable
             style={({ pressed }) => [styles.bookBtn, pressed && { opacity: 0.85 }]}
@@ -150,12 +162,26 @@ const styles = StyleSheet.create({
     color: COLORS.text3,
     lineHeight: 13,
   },
+  priceBlock: { gap: 1 },
+  priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  priceOld: {
+    fontSize: 12,
+    color: COLORS.text3,
+    textDecorationLine: 'line-through',
+  },
   price: {
     fontSize: 16,
     fontWeight: '800',
     color: COLORS.brandNavy,
     letterSpacing: 0.1,
   },
+  discountPill: {
+    backgroundColor: '#E53935',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  discountTxt: { fontSize: 11, fontWeight: '700', color: '#fff' },
   bookBtn: {
     backgroundColor: COLORS.brandNavy,
     borderRadius: 10,

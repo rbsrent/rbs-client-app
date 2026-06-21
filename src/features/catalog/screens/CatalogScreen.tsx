@@ -14,11 +14,19 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { useDiscountsCache } from '@/features/catalog/hooks/useDiscountsCache';
+import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
 import { useHomeData } from '@/features/home/hooks/useHomeData';
 import { COLORS } from '@/shared/colors';
+import { getBoatPriceInfo, ruFmtPrice } from '@/shared/utils/boatPrice';
 import { Boat } from '@/store/useCatalogStore';
 
-const BoatGridCard = memo(function BoatGridCard({ boat, router }: { boat: Boat; router: any }) {
+const BoatGridCard = memo(function BoatGridCard({ boat, discount, router }: { boat: Boat; discount?: ActiveDiscount; router: any }) {
+  const { displayPrice, originalPrice, discountPct } = getBoatPriceInfo(
+    boat.price_per_hour,
+    boat.public_price_per_hour_night,
+    discount,
+  );
   return (
     <Pressable
       style={styles.gridCard}
@@ -46,9 +54,17 @@ const BoatGridCard = memo(function BoatGridCard({ boat, router }: { boat: Boat; 
           <Users size={10} color={COLORS.text3} strokeWidth={2} />
           <Text style={styles.gridMetaText}>{boat.capacity} чел.</Text>
         </View>
-        <Text style={styles.gridPrice}>
-          {_RU_FMT.format(boat.price_per_hour)} ₽/ч
-        </Text>
+        <View style={styles.gridPriceRow}>
+          {originalPrice ? (
+            <Text style={styles.gridPriceOld}>{ruFmtPrice(originalPrice)} ₽</Text>
+          ) : null}
+          <Text style={styles.gridPrice}>{ruFmtPrice(displayPrice)} ₽/ч</Text>
+          {discountPct ? (
+            <View style={styles.gridDiscountPill}>
+              <Text style={styles.gridDiscountTxt}>−{discountPct}%</Text>
+            </View>
+          ) : null}
+        </View>
       </View>
     </Pressable>
   );
@@ -64,6 +80,7 @@ export const CatalogScreen = memo(function CatalogScreen() {
   const [activeType, setActiveType] = useState(params.type ?? 'Все');
   const router = useRouter();
   const { boats, isLoadingBoats, refetch } = useHomeData();
+  const discountsMap = useDiscountsCache();
 
   const filtered = useMemo(() => {
     let list = boats;
@@ -83,8 +100,8 @@ export const CatalogScreen = memo(function CatalogScreen() {
   }, [boats, activeType, search]);
 
   const renderItem = useCallback(({ item }: { item: Boat }) => (
-    <BoatGridCard boat={item} router={router} />
-  ), [router]);
+    <BoatGridCard boat={item} discount={discountsMap.get(item.id)} router={router} />
+  ), [router, discountsMap]);
 
   const listContentStyle = useMemo(
     () => [styles.list, { paddingBottom: insets.bottom + 80 }],
@@ -295,10 +312,28 @@ const styles = StyleSheet.create({
     color: COLORS.text3,
     flex: 1,
   },
+  gridPriceRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+    marginTop: 2,
+  },
+  gridPriceOld: {
+    fontSize: 11,
+    color: COLORS.text3,
+    textDecorationLine: 'line-through',
+  },
   gridPrice: {
     fontSize: 13,
     fontWeight: '700',
     color: COLORS.brandNavy,
-    marginTop: 2,
   },
+  gridDiscountPill: {
+    backgroundColor: '#E53935',
+    borderRadius: 5,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+  },
+  gridDiscountTxt: { fontSize: 10, fontWeight: '700', color: '#fff' },
 });

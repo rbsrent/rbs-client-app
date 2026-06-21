@@ -1,6 +1,7 @@
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowRight } from "lucide-react-native";
-import { memo, useEffect, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef } from "react";
 import {
   Animated,
   Pressable,
@@ -17,32 +18,43 @@ import { CARD_W, PopularBoatCard } from "../cards/PopularBoatCard";
 import { PopularSeeAllCard } from "../cards/PopularSeeAllCard";
 
 function SkeletonCard() {
-  const anim = useRef(new Animated.Value(0)).current;
+  const tx = useRef(new Animated.Value(-CARD_W)).current;
   useEffect(() => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(anim, {
-          toValue: 1,
-          duration: 750,
-          useNativeDriver: true,
-        }),
-        Animated.timing(anim, {
-          toValue: 0,
-          duration: 750,
-          useNativeDriver: true,
-        }),
-      ]),
-    ).start();
+    const anim = Animated.loop(
+      Animated.timing(tx, { toValue: CARD_W, duration: 1100, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
   }, []);
-  const opacity = anim.interpolate({
-    inputRange: [0, 1],
-    outputRange: [0.45, 1],
-  });
   return (
     <View style={sk.card}>
-      <Animated.View style={[sk.img, { opacity }]} />
-      <Animated.View style={[sk.line1, { opacity }]} />
-      <Animated.View style={[sk.line2, { opacity }]} />
+      <View style={sk.img}>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
+          <LinearGradient
+            colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </View>
+      <View style={sk.line1}>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
+          <LinearGradient
+            colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </View>
+      <View style={sk.line2}>
+        <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
+          <LinearGradient
+            colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
+            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
+            style={StyleSheet.absoluteFill}
+          />
+        </Animated.View>
+      </View>
     </View>
   );
 }
@@ -88,10 +100,12 @@ const PopularRow = memo(function PopularRow({
   discountsMap,
 }: RowProps) {
   const router = useRouter();
-  const previews = boats
-    .slice(0, 3)
-    .map((b) => b.cover_image_url)
-    .filter(Boolean) as string[];
+  const previews = useMemo(
+    () => boats.slice(0, 3).map((b) => b.cover_image_url).filter(Boolean) as string[],
+    [boats],
+  );
+  const handleSeeAll = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
+  const handleArrow  = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
 
   if (boats.length === 0) return null;
 
@@ -104,7 +118,7 @@ const PopularRow = memo(function PopularRow({
         </View>
         <Pressable
           style={({ pressed }) => [s.arrowBtn, pressed && { opacity: 0.7 }]}
-          onPress={() => router.push(typeRoute as any)}
+          onPress={handleArrow}
           hitSlop={8}
         >
           <ArrowRight size={15} color={COLORS.text1} strokeWidth={2.5} />
@@ -115,9 +129,6 @@ const PopularRow = memo(function PopularRow({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
-        decelerationRate="fast"
-        snapToInterval={CARD_W + 12}
-        snapToAlignment="start"
         removeClippedSubviews
       >
         {boats.map((b) => (
@@ -130,7 +141,7 @@ const PopularRow = memo(function PopularRow({
         ))}
         <PopularSeeAllCard
           previews={previews}
-          onPress={() => router.push(typeRoute as any)}
+          onPress={handleSeeAll}
         />
       </ScrollView>
     </View>
@@ -221,21 +232,9 @@ const s = StyleSheet.create({
 const SKEL = "#E8E8E8";
 const sk = StyleSheet.create({
   card: { width: 148, gap: 0 },
-  img: { width: 148, height: 110, borderRadius: 12, backgroundColor: SKEL },
-  line1: {
-    width: 100,
-    height: 12,
-    borderRadius: 5,
-    backgroundColor: SKEL,
-    marginTop: 8,
-  },
-  line2: {
-    width: 70,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: SKEL,
-    marginTop: 5,
-  },
+  img:   { width: 148, height: 110, borderRadius: 12, backgroundColor: SKEL, overflow: 'hidden' },
+  line1: { width: 100, height: 12, borderRadius: 5, backgroundColor: SKEL, marginTop: 8, overflow: 'hidden' },
+  line2: { width: 70,  height: 10, borderRadius: 5, backgroundColor: SKEL, marginTop: 5, overflow: 'hidden' },
   titleBar: { width: 150, height: 14, borderRadius: 5, backgroundColor: SKEL },
-  subBar: { width: 100, height: 10, borderRadius: 5, backgroundColor: SKEL },
+  subBar:   { width: 100, height: 10, borderRadius: 5, backgroundColor: SKEL },
 });

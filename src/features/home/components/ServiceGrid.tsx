@@ -79,7 +79,7 @@ const ALL: Service[] = [
     label: "Причалы",
     icon: <MapPin size={22} color={IC} strokeWidth={2} />,
     bg: "",
-    route: "/(tabs)/piers",
+    route: "/piers",
   },
   {
     key: "catalog",
@@ -113,7 +113,7 @@ const GROUPS: ServiceGroup[] = [
 
 const AnimPressable = Animated.createAnimatedComponent(Pressable);
 
-function ServiceItem({
+const ServiceItem = memo(function ServiceItem({
   item,
   iconSize = 56,
   onPress,
@@ -156,7 +156,7 @@ function ServiceItem({
       </Text>
     </AnimPressable>
   );
-}
+});
 
 export const ServiceGrid = memo(function ServiceGrid() {
   const router = useRouter();

@@ -78,10 +78,18 @@ const DateCell = React.memo(
       }
     }, [sel]);
 
-    const handlePress = useCallback(
-      () => onSelect(sel ? null : day),
-      [sel, day, onSelect],
-    );
+    const handlePress = useCallback(() => {
+      if (sel) {
+        scale.setValue(0.88);
+        Animated.spring(scale, {
+          toValue: 1,
+          speed: 20,
+          bounciness: 6,
+          useNativeDriver: true,
+        }).start();
+      }
+      onSelect(sel ? null : day);
+    }, [sel, day, onSelect]);
 
     const accent = tod || wknd;
     const abbrColor = sel ? "#fff" : accent ? RED : "#999";
@@ -371,7 +379,7 @@ const s = StyleSheet.create({
   },
 
   cell: {
-    width: CELL_W,
+    width: CELL_W - 4,
     alignItems: "center",
     paddingVertical: 8,
     borderRadius: 10,

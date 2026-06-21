@@ -69,6 +69,8 @@ export const HomeScreen = memo(function HomeScreen() {
     setLoading(true);
   }, []);
 
+  console.log(popular);
+
   return (
     <View style={s.root}>
       <Animated.View
