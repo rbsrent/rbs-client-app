@@ -6,17 +6,21 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Pressable,
-  ScrollView,
   Share,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import Animated, {
+  Extrapolation,
   FadeIn,
   FadeInLeft,
   FadeInRight,
   ZoomIn,
+  interpolate,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -37,14 +41,17 @@ import { publicSupabase } from "@/shared/supabase/publicClient";
 import { useRouteSavedStore } from "@/store/useRouteSavedStore";
 
 const { width: W } = Dimensions.get("window");
-const HERO_H = 380;
+const IMG_H = 280;
 const NAVY = COLORS.brandNavy;
+const TITLE_THRESHOLD = IMG_H + 60;
 
 function durationLabel(h: number) {
   if (h === 1) return "1 час";
   if (h < 5) return `${h} часа`;
   return `${h} часов`;
 }
+
+// ── SnakePath — animations kept exactly as-is ──────────────────────────────
 
 function SnakePath({ points }: { points: string[] }) {
   if (points.length === 0) return null;
@@ -64,24 +71,13 @@ function SnakePath({ points }: { points: string[] }) {
           const STEP = 340;
           const cardDelay = i * STEP;
 
-          // card slides from its side; dot pops after card settles
           const cardEnter = isRight
-            ? FadeInLeft.delay(cardDelay)
-                .duration(320)
-                .springify()
-                .damping(18)
-                .stiffness(120)
-            : FadeInRight.delay(cardDelay)
-                .duration(320)
-                .springify()
-                .damping(18)
-                .stiffness(120);
+            ? FadeInLeft.delay(cardDelay).duration(320).springify().damping(18).stiffness(120)
+            : FadeInRight.delay(cardDelay).duration(320).springify().damping(18).stiffness(120);
 
           return (
             <View key={i}>
-              {/* waypoint row */}
               <View style={[sp.row, isRight ? sp.rowRight : sp.rowLeft]}>
-                {/* label card */}
                 <Animated.View
                   entering={cardEnter}
                   style={[sp.labelCard, isRight ? sp.labelRight : sp.labelLeft]}
@@ -92,36 +88,25 @@ function SnakePath({ points }: { points: string[] }) {
                   <Text style={sp.label}>{name}</Text>
                 </Animated.View>
 
-                {/* dot — pops in after card */}
                 <View style={sp.dotWrap}>
                   <Animated.View
-                    entering={ZoomIn.delay(cardDelay + 180)
-                      .duration(280)
-                      .springify()
-                      .damping(12)
-                      .stiffness(180)}
+                    entering={ZoomIn.delay(cardDelay + 180).duration(280).springify().damping(12).stiffness(180)}
                     style={sp.dot}
                   >
                     <Text style={sp.dotNum}>{i + 1}</Text>
                   </Animated.View>
                 </View>
 
-                {/* spacer opposite side */}
                 <View style={sp.spacer} />
               </View>
 
-              {/* connector fades in after dot */}
               {!isLast && (
                 <Animated.View
                   entering={FadeIn.delay(cardDelay + 280).duration(80)}
                   style={[sp.connector, isRight ? sp.connRight : sp.connLeft]}
                 >
-                  <View
-                    style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]}
-                  />
-                  <View
-                    style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]}
-                  />
+                  <View style={[sp.arc, isRight ? sp.arcTopRight : sp.arcTopLeft]} />
+                  <View style={[sp.arc, isRight ? sp.arcBotRight : sp.arcBotLeft]} />
                 </Animated.View>
               )}
             </View>
@@ -131,6 +116,8 @@ function SnakePath({ points }: { points: string[] }) {
     </View>
   );
 }
+
+// ── RouteDescription ────────────────────────────────────────────────────────
 
 function RouteDescription({ text }: { text: string }) {
   return (
@@ -142,6 +129,8 @@ function RouteDescription({ text }: { text: string }) {
   );
 }
 
+// ── Main screen ─────────────────────────────────────────────────────────────
+
 export default function RouteDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const router = useRouter();
@@ -152,14 +141,10 @@ export default function RouteDetailScreen() {
   const [loading, setLoading] = useState(!cached);
 
   const { openRoutePicker } = useRouteWishlistPicker();
-  const isSaved = useRouteSavedStore((s) =>
-    route ? s.isSaved(route.id) : false,
-  );
+  const isSaved = useRouteSavedStore((s) => (route ? s.isSaved(route.id) : false));
   const hydrate = useRouteSavedStore((s) => s.hydrate);
 
-  useEffect(() => {
-    hydrate();
-  }, []);
+  useEffect(() => { hydrate(); }, []);
 
   const handleShare = useCallback(async () => {
     try {
@@ -194,34 +179,72 @@ export default function RouteDetailScreen() {
         setLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [slug]);
+
+  // scroll → header title
+  const scrollY = useSharedValue(0);
+  const scrollHandler = useAnimatedScrollHandler((e) => {
+    scrollY.value = e.contentOffset.y;
+  });
+  const headerTitleStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(
+      scrollY.value,
+      [TITLE_THRESHOLD, TITLE_THRESHOLD + 40],
+      [0, 1],
+      Extrapolation.CLAMP,
+    ),
+  }));
 
   const imageUrl = route
     ? resolveRouteImage(route.map_image_url)
     : (preview?.imageUrl ?? null);
   const diff = route
-    ? (DIFFICULTY[route.difficulty_level] ?? {
-        label: route.difficulty_level,
-        color: COLORS.text3,
-      })
+    ? (DIFFICULTY[route.difficulty_level] ?? { label: route.difficulty_level, color: COLORS.text3 })
     : null;
   const points = (route?.route_points ?? []).map((p) => p.name).filter(Boolean);
+  const routeName = route?.name ?? preview?.name ?? "";
 
   return (
     <View style={s.root}>
-      <ScrollView
+      {/* ── always-white header ── */}
+      <View style={[s.header, { paddingTop: insets.top }]}>
+        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={10}>
+          <ArrowLeft size={22} color={COLORS.text1} strokeWidth={2} />
+        </Pressable>
+
+        <Animated.Text style={[s.headerTitle, headerTitleStyle]} numberOfLines={1}>
+          {routeName}
+        </Animated.Text>
+
+        <View style={s.headerRight}>
+          <Pressable style={s.headerIconBtn} onPress={handleShare} hitSlop={10}>
+            <Share2 size={20} color={COLORS.text1} strokeWidth={2} />
+          </Pressable>
+          <Pressable style={s.headerIconBtn} onPress={handleHeart} hitSlop={10}>
+            <Heart
+              size={20}
+              color={isSaved ? "#E63946" : COLORS.text1}
+              fill={isSaved ? "#E63946" : "transparent"}
+              strokeWidth={2}
+            />
+          </Pressable>
+        </View>
+      </View>
+
+      {/* ── scroll content ── */}
+      <Animated.ScrollView
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 40 }}
       >
-        {/* ── hero ── */}
-        <View style={s.hero}>
+        {/* image */}
+        <View style={s.imgWrap}>
           {imageUrl ? (
             <Image
               source={{ uri: imageUrl }}
-              style={StyleSheet.absoluteFill}
+              style={s.img}
               contentFit="cover"
               cachePolicy="memory-disk"
             />
@@ -231,93 +254,52 @@ export default function RouteDetailScreen() {
               style={StyleSheet.absoluteFill}
             />
           )}
-
-          <LinearGradient
-            colors={["rgba(0,0,0,0.52)", "transparent"]}
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              right: 0,
-              height: 130,
-            }}
-            pointerEvents="none"
-          />
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.78)"]}
-            style={{
-              position: "absolute",
-              bottom: 0,
-              left: 0,
-              right: 0,
-              height: HERO_H * 0.58,
-            }}
-            pointerEvents="none"
-          />
-
-          {/* Back */}
-          <Pressable
-            style={[s.heroBtn, { top: insets.top + 8, left: 16 }]}
-            onPress={() => router.back()}
-            hitSlop={8}
-          >
-            <ArrowLeft size={20} color={COLORS.brandNavy} strokeWidth={2.5} />
-          </Pressable>
-
-          {/* Share + Save */}
-          <View style={[s.heroBtnRow, { top: insets.top + 8 }]}>
-            <Pressable style={s.heroBtnItem} onPress={handleShare} hitSlop={8}>
-              <Share2 size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
-            </Pressable>
-            <Pressable style={s.heroBtnItem} onPress={handleHeart} hitSlop={8}>
-              <Heart
-                size={18}
-                color={isSaved ? "#E63946" : COLORS.brandNavy}
-                fill={isSaved ? "#E63946" : "transparent"}
-                strokeWidth={2.5}
-              />
-            </Pressable>
-          </View>
-
-          <View style={s.heroContent}>
-            {diff && (
-              <View style={[s.diffPill, { backgroundColor: diff.color }]}>
-                <Text style={s.diffTxt}>{diff.label}</Text>
-              </View>
-            )}
-            <Text style={s.heroName} numberOfLines={3}>
-              {route?.name ?? preview?.name ?? ""}
-            </Text>
-            {route && (
-              <View style={s.heroMeta}>
-                <View style={s.heroMetaItem}>
-                  <Clock
-                    size={13}
-                    color="rgba(255,255,255,0.8)"
-                    strokeWidth={2}
-                  />
-                  <Text style={s.heroMetaTxt}>
-                    {durationLabel(route.duration_hours)}
-                  </Text>
-                </View>
-                {points.length > 0 && (
-                  <View style={s.heroMetaItem}>
-                    <MapPin
-                      size={13}
-                      color="rgba(255,255,255,0.8)"
-                      strokeWidth={2}
-                    />
-                    <Text style={s.heroMetaTxt}>
-                      {points.length} точек маршрута
-                    </Text>
-                  </View>
-                )}
-              </View>
-            )}
-          </View>
         </View>
 
-        {/* ── content ── */}
+        {/* top content block — same style as TourDetailScreen */}
+        <View style={s.content}>
+          {/* tags */}
+          <View style={s.tagsRow}>
+            {diff && (
+              <View style={[s.tagFilled, { backgroundColor: diff.color }]}>
+                <Text style={s.tagFilledTxt}>{diff.label}</Text>
+              </View>
+            )}
+            <View style={s.tagOutline}>
+              <Text style={s.tagOutlineTxt}>Маршрут</Text>
+            </View>
+          </View>
+
+          {/* title */}
+          <Text style={s.title}>{routeName}</Text>
+
+          {/* info cards */}
+          {route && (
+            <>
+              <View style={s.infoCard}>
+                <View style={s.infoIconWrap}>
+                  <Clock size={22} color={NAVY} strokeWidth={2} />
+                </View>
+                <Text style={s.infoTxt}>
+                  Продолжительность: {durationLabel(route.duration_hours)}
+                </Text>
+              </View>
+
+              {points.length > 0 && (
+                <View style={s.infoCard}>
+                  <View style={s.infoIconWrap}>
+                    <MapPin size={22} color={COLORS.brandViolet} strokeWidth={2} />
+                  </View>
+                  <Text style={s.infoTxt}>
+                    {points.length} точек маршрута — от старта до финиша
+                  </Text>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+
+        {/* loading / error */}
         {loading ? (
           <View style={s.loadingBlock}>
             <Spinner size={20} />
@@ -327,21 +309,21 @@ export default function RouteDetailScreen() {
             <Text style={{ color: COLORS.text3 }}>Маршрут не найден</Text>
           </View>
         ) : (
-          <Animated.View entering={FadeIn.duration(260)} style={s.content}>
-            {/* ── snake path ── */}
+          <Animated.View entering={FadeIn.duration(260)} style={s.sections}>
+            <View style={s.divider} />
+
+            {/* snake path */}
             {points.length > 0 && <SnakePath points={points} />}
 
-            {/* ── description ── */}
+            {/* description */}
             {route.detailed_description ? (
               <RouteDescription text={route.detailed_description} />
             ) : null}
 
-            {/* ── highlights ── */}
+            {/* highlights */}
             {route.highlights && route.highlights.length > 0 && (
-              <View style={s.section}>
-                <View style={s.sectionRow}>
-                  <Text style={s.sectionTitle}>Что увидите</Text>
-                </View>
+              <View style={s.highlightsSection}>
+                <Text style={s.sectionTitle}>Что увидите</Text>
                 <View style={s.chips}>
                   {route.highlights.map((h, i) => (
                     <View key={i} style={s.chip}>
@@ -353,18 +335,20 @@ export default function RouteDetailScreen() {
             )}
           </Animated.View>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
 
+// ── SnakePath styles (unchanged) ────────────────────────────────────────────
+
 const DOT_SIZE = 36;
-const SIDE_W = (W - 48 - DOT_SIZE) / 2; // available per side
-const CONN_H = 28; // half-arc height
+const SIDE_W = (W - 48 - DOT_SIZE) / 2;
+const CONN_H = 28;
 const CONN_W = SIDE_W * 0.55;
 
 const sp = StyleSheet.create({
-  wrap: { marginHorizontal: 0 },
+  wrap: {},
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -373,13 +357,10 @@ const sp = StyleSheet.create({
     paddingHorizontal: 20,
   },
   headerTxt: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
-
   body: { paddingHorizontal: 24 },
-
   row: { flexDirection: "row", alignItems: "center" },
   rowRight: { flexDirection: "row" },
   rowLeft: { flexDirection: "row-reverse" },
-
   labelCard: {
     width: SIDE_W,
     backgroundColor: "#F8F9FB",
@@ -389,7 +370,6 @@ const sp = StyleSheet.create({
   },
   labelRight: { marginRight: 12 },
   labelLeft: { marginLeft: 12 },
-
   badge: {
     fontSize: 10,
     fontWeight: "700",
@@ -397,13 +377,7 @@ const sp = StyleSheet.create({
     textTransform: "uppercase",
     letterSpacing: 0.8,
   },
-  label: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: COLORS.text1,
-    lineHeight: 18,
-  },
-
+  label: { fontSize: 13, fontWeight: "600", color: COLORS.text1, lineHeight: 18 },
   dotWrap: { width: DOT_SIZE, alignItems: "center" },
   dot: {
     width: DOT_SIZE,
@@ -414,128 +388,102 @@ const sp = StyleSheet.create({
     justifyContent: "center",
   },
   dotNum: { fontSize: 13, fontWeight: "700", color: "#fff" },
-
   spacer: { width: SIDE_W },
-
-  // connector: sits between two waypoint rows, centered on dot column
-  connector: {
-    width: CONN_W,
-    alignSelf: "flex-start", // overridden per direction below
-  },
-  connRight: {
-    alignSelf: "flex-end",
-    marginRight: SIDE_W + DOT_SIZE / 2 - CONN_W / 2,
-  },
-  connLeft: {
-    alignSelf: "flex-start",
-    marginLeft: SIDE_W + DOT_SIZE / 2 - CONN_W / 2,
-  },
-
-  // each arc is half the S-curve
+  connector: { width: CONN_W, alignSelf: "flex-start" },
+  connRight: { alignSelf: "flex-end", marginRight: SIDE_W + DOT_SIZE / 2 - CONN_W / 2 },
+  connLeft: { alignSelf: "flex-start", marginLeft: SIDE_W + DOT_SIZE / 2 - CONN_W / 2 },
   arc: { width: CONN_W, height: CONN_H },
-
-  // right-side S-curve: top arc curves RIGHT, bottom curves back LEFT
-  arcTopRight: {
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    borderBottomRightRadius: CONN_W * 0.7,
-    borderColor: NAVY,
-  },
-  arcBotRight: {
-    borderLeftWidth: 2,
-    borderBottomWidth: 2,
-    borderBottomLeftRadius: CONN_W * 0.7,
-    borderColor: NAVY,
-  },
-
-  // left-side S-curve: mirror
-  arcTopLeft: {
-    borderLeftWidth: 2,
-    borderBottomWidth: 2,
-    borderBottomLeftRadius: CONN_W * 0.7,
-    borderColor: NAVY,
-  },
-  arcBotLeft: {
-    borderRightWidth: 2,
-    borderBottomWidth: 2,
-    borderBottomRightRadius: CONN_W * 0.7,
-    borderColor: NAVY,
-  },
+  arcTopRight: { borderRightWidth: 2, borderBottomWidth: 2, borderBottomRightRadius: CONN_W * 0.7, borderColor: NAVY },
+  arcBotRight: { borderLeftWidth: 2, borderBottomWidth: 2, borderBottomLeftRadius: CONN_W * 0.7, borderColor: NAVY },
+  arcTopLeft: { borderLeftWidth: 2, borderBottomWidth: 2, borderBottomLeftRadius: CONN_W * 0.7, borderColor: NAVY },
+  arcBotLeft: { borderRightWidth: 2, borderBottomWidth: 2, borderBottomRightRadius: CONN_W * 0.7, borderColor: NAVY },
 });
+
+// ── RouteDescription styles ──────────────────────────────────────────────────
 
 const rd = StyleSheet.create({
   wrap: { paddingHorizontal: 20, gap: 12 },
   title: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
-  quoteBar: {
-    width: 36,
-    height: 3,
-    borderRadius: 2,
-    backgroundColor: NAVY,
-  },
+  quoteBar: { width: 36, height: 3, borderRadius: 2, backgroundColor: NAVY },
   body: { fontSize: 15, color: COLORS.text2, lineHeight: 24 },
 });
 
-const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: "#fff" },
+// ── Screen styles ────────────────────────────────────────────────────────────
 
-  hero: { width: W, height: HERO_H, backgroundColor: COLORS.muted },
-  heroBtn: {
-    position: "absolute",
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    // backgroundColor: "rgba(0,0,0,0.38)",
-    backgroundColor: COLORS.greyLight2,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  heroBtnRow: {
-    position: "absolute",
-    right: 16,
+const s = StyleSheet.create({
+  root: { flex: 1, backgroundColor: COLORS.white },
+
+  // header
+  header: {
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingBottom: 12,
     flexDirection: "row",
-    gap: 18,
-  },
-  heroBtnItem: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    // backgroundColor: "rgba(0,0,0,0.38)", F2F2F2
-    backgroundColor: COLORS.greyLight2,
     alignItems: "center",
-    justifyContent: "center",
   },
-  heroContent: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 20,
-    gap: 8,
+  backBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  headerTitle: { flex: 1, fontSize: 16, fontWeight: "600", color: COLORS.text1 },
+  headerRight: { flexDirection: "row", alignItems: "center", gap: 4 },
+  headerIconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+
+  // image
+  imgWrap: {
+    marginHorizontal: 16,
+    borderRadius: 16,
+    overflow: "hidden",
+    height: IMG_H,
+    backgroundColor: COLORS.muted,
   },
-  diffPill: {
-    alignSelf: "flex-start",
+  img: { width: "100%", height: IMG_H },
+
+  // top content (same as TourDetailScreen)
+  content: {
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    gap: 12,
+  },
+  tagsRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
+  tagFilled: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
+  tagFilledTxt: { fontSize: 12, fontWeight: "700", color: "#fff" },
+  tagOutline: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    marginBottom: 2,
   },
-  diffTxt: { fontSize: 11, fontWeight: "700", color: "#fff" },
-  heroName: { fontSize: 26, fontWeight: "800", color: "#fff", lineHeight: 32 },
-  heroMeta: { flexDirection: "row", gap: 14, marginTop: 2 },
-  heroMetaItem: { flexDirection: "row", alignItems: "center", gap: 5 },
-  heroMetaTxt: {
-    fontSize: 12,
-    color: "rgba(255,255,255,0.85)",
-    fontWeight: "500",
+  tagOutlineTxt: { fontSize: 12, fontWeight: "500", color: COLORS.text2 },
+  title: { fontSize: 22, fontWeight: "800", color: COLORS.text1, lineHeight: 29 },
+  infoCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 14,
+    backgroundColor: COLORS.greyLight,
+    borderRadius: 10,
+    padding: 14,
   },
+  infoIconWrap: {
+    width: 36,
+    height: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+    marginTop: 1,
+  },
+  infoTxt: { flex: 1, fontSize: 13, lineHeight: 20, color: COLORS.text1 },
 
+  // sections below
   loadingBlock: { paddingTop: 40, alignItems: "center" },
-  content: { paddingVertical: 28, gap: 28 },
+  sections: { paddingTop: 4, gap: 28, paddingBottom: 8 },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+    marginHorizontal: 16,
+    marginBottom: 4,
+  },
 
-  section: { paddingHorizontal: 20, gap: 12 },
-  sectionRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  highlightsSection: { paddingHorizontal: 20, gap: 12 },
   sectionTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
-
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {
     borderRadius: 20,

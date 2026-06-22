@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { memo, useEffect, useRef } from 'react';
 import { Animated, ScrollView, StyleSheet, View } from 'react-native';
 
-import { ScrollDots } from '@/shared/components/ScrollDots';
 import { SectionHeader } from '@/shared/components/SectionHeader';
 import { HomeRoute } from '@/store/useHomeStore';
 import { HomeRouteCard, ROUTE_CARD_H, ROUTE_CARD_W } from '../cards/HomeRouteCard';
@@ -66,7 +65,7 @@ export const RoutesPreviewSection = memo(function RoutesPreviewSection({ routes,
         <SectionHeader
           title="Куда отправиться"
           sub="в сезон 2026"
-          seeAllLabel="Все маршруты"
+          seeAllLabel="Все"
           onSeeAll={() => router.push('/(tabs)/routes' as any)}
         />
       </View>
@@ -90,9 +89,9 @@ export const RoutesPreviewSection = memo(function RoutesPreviewSection({ routes,
         ))}
       </Animated.ScrollView>
 
-      <View style={s.dotsWrap}>
+      {/* <View style={s.dotsWrap}>
         <ScrollDots count={routes.length} scrollX={scrollX} itemInterval={INTERVAL} />
-      </View>
+      </View> */}
     </View>
   );
 });
@@ -101,7 +100,7 @@ const s = StyleSheet.create({
   root:       { marginTop: 24 },
   headerWrap: { paddingHorizontal: 16, marginBottom: 12 },
   strip:      { paddingLeft: 16, paddingRight: 8, gap: GAP },
-  dotsWrap:   { paddingLeft: 16, paddingTop: 10 },
+  // dotsWrap:   { paddingLeft: 16, paddingTop: 10 },
 });
 
 const sk = StyleSheet.create({

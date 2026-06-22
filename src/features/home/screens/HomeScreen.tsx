@@ -18,6 +18,7 @@ import { useHomeStore } from "@/store/useHomeStore";
 import { GiftCertCard } from "../components/GiftCertCard";
 import { PromoBanner } from "../components/PromoBanner";
 import { ServiceGrid } from "../components/ServiceGrid";
+import { TourCard } from "../components/TourCrad";
 import { PopularBoatsSection } from "../components/sections/PopularBoatsSection";
 import { RoutesPreviewSection } from "../components/sections/RoutesPreviewSection";
 import { useHomePageData } from "../hooks/useHomePageData";
@@ -68,8 +69,6 @@ export const HomeScreen = memo(function HomeScreen() {
     useHomeStore.setState({ lastFetch: null });
     setLoading(true);
   }, []);
-
-  console.log(popular);
 
   return (
     <View style={s.root}>
@@ -136,6 +135,11 @@ export const HomeScreen = memo(function HomeScreen() {
             loading={isFirstLoad}
           />
         </View>
+
+        {/* Теплоходы — скоро */}
+        <View style={s.tepSection}>
+          <TourCard />
+        </View>
       </ScrollView>
     </View>
   );
@@ -182,4 +186,5 @@ const s = StyleSheet.create({
   },
   giftSection: { marginTop: 24 },
   popularSection: { marginTop: 24 },
+  tepSection: { marginTop: 8, paddingHorizontal: 16, paddingBottom: 8 },
 });

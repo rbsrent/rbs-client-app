@@ -1,14 +1,12 @@
-import { Image } from 'expo-image';
 import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
 import { memo, useCallback, useRef } from 'react';
 import {
   Animated,
   Pressable,
-  ScrollView,
   StyleSheet,
   Text,
-  View,
+  View
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -92,7 +90,7 @@ export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
   return (
     <View style={s.root}>
       <Animated.ScrollView
-        contentContainerStyle={[s.list, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 100 }]}
+        contentContainerStyle={[s.list, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 10 }]} //100
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}
@@ -106,6 +104,7 @@ export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
                 onPress={() => router.push(item.route as any)}
               >
                 <Text style={s.allTitle}>{item.title}</Text>
+                {/* <View style={s.thumb} /> */}
               </Pressable>
             );
           }
@@ -116,7 +115,7 @@ export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
               onPress={() => router.push(item.route as any)}
             >
               <Text style={s.cardTitle}>{item.title}</Text>
-              <View style={s.thumb}>
+              {/* <View style={s.thumb}>
                 {item.imageUrl ? (
                   <Image
                     source={{ uri: item.imageUrl }}
@@ -127,7 +126,7 @@ export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
                 ) : (
                   <View style={[StyleSheet.absoluteFill, s.thumbPlaceholder]} />
                 )}
-              </View>
+              </View> */}
             </Pressable>
           );
         })}
@@ -193,18 +192,15 @@ const s = StyleSheet.create({
     paddingVertical: 14,
     minHeight: THUMB + 28,
   },
-  allCard: {
-    minHeight: 0,
-    paddingVertical: 20,
-  },
+  allCard: {},
   pressed: {
     opacity: 0.82,
   },
 
   allTitle: {
     fontSize: 20,
-    fontWeight: '700',
-    color: COLORS.brandCyan,
+    fontWeight: '500',
+    color: COLORS.brandBlue,
   },
 
   cardTitle: {

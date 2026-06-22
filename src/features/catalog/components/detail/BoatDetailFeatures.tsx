@@ -1,4 +1,4 @@
-import { MapPin, Ruler, Users } from 'lucide-react-native';
+import { Ruler, Users } from 'lucide-react-native';
 import React, { memo } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 
@@ -36,13 +36,13 @@ function BoatDetailFeatures({ boat }: Props) {
             desc="Просторное судно с удобным размещением"
           />
         ) : null}
-        {boat.piers?.name ? (
+        {/* {boat.piers?.name ? (
           <FeatureRow
             icon={<MapPin size={22} color="#222" strokeWidth={1.8} />}
             title={boat.piers.name}
             desc={boat.piers.address ?? 'Удобное расположение в Санкт-Петербурге'}
           />
-        ) : null}
+        ) : null} */}
       </View>
 
       {/* <View style={s.banner}>

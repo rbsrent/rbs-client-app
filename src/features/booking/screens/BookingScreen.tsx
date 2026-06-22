@@ -1,3 +1,4 @@
+import { BottomSheetModal, BottomSheetView } from "@gorhom/bottom-sheet";
 import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Linking from "expo-linking";
@@ -6,11 +7,11 @@ import { openAuthSessionAsync, WebBrowserResultType } from "expo-web-browser";
 import {
   ArrowLeft,
   Clock,
-  CreditCard,
   Edit2,
   MessageCircle,
-  Percent,
+  Phone,
   Plus,
+  Send,
   Tag,
   X,
 } from "lucide-react-native";
@@ -19,25 +20,28 @@ import {
   Alert,
   AppState,
   KeyboardAvoidingView,
-  LayoutAnimation,
   Platform,
   Pressable,
   ScrollView,
   StyleSheet,
   Text,
   TextInput,
-  UIManager,
   View,
 } from "react-native";
-
-if (Platform.OS === "android" && UIManager.setLayoutAnimationEnabledExperimental) {
-  UIManager.setLayoutAnimationEnabledExperimental(true);
-}
+import Animated, {
+  Easing,
+  interpolate,
+  runOnJS,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
 import { fmtDateFull } from "@/shared/components/CalendarPicker";
 import { PhoneInput } from "@/shared/components/PhoneInput";
+import { SheetBackdrop } from "@/shared/components/SheetBackdrop";
 import { Spinner } from "@/shared/components/Spinner";
 import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
 import {
@@ -141,7 +145,32 @@ export function BookingScreen() {
 
   const bookingIdRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const contactSheetRef = useRef<BottomSheetModal>(null);
   const appStateRef = useRef(AppState.currentState);
+
+  // ── Promo slide animation (reanimated, same pattern as BoatSearchScreen) ─
+  const codeProgress = useSharedValue(0);
+  const [codeToggleH, setCodeToggleH] = useState(0);
+  const [codeInputH, setCodeInputH] = useState(0);
+
+  const PROMO_TIMING = { duration: 280, easing: Easing.inOut(Easing.ease) };
+
+  const codeContainerStyle = useAnimatedStyle(() => ({
+    height: interpolate(codeProgress.value, [0, 1], [codeToggleH || 48, codeInputH || 68]),
+    overflow: "hidden" as const,
+  }));
+  const codeToggleStyle = useAnimatedStyle(() => ({
+    position: "absolute" as const,
+    width: "100%" as const,
+    opacity: interpolate(codeProgress.value, [0, 0.4], [1, 0]),
+    transform: [{ translateX: interpolate(codeProgress.value, [0, 1], [0, -80]) }],
+  }));
+  const codeInputStyle = useAnimatedStyle(() => ({
+    position: "absolute" as const,
+    width: "100%" as const,
+    opacity: interpolate(codeProgress.value, [0.4, 1], [0, 1]),
+    transform: [{ translateX: interpolate(codeProgress.value, [0, 1], [80, 0]) }],
+  }));
   const awaitingReturn = useRef(false);
   const skipDateReset = useRef(false);
 
@@ -417,8 +446,15 @@ export function BookingScreen() {
 
   // ── Price math ───────────────────────────────────────────────────────────
   const {
-    baseTotal, promoDiscount, totalAfterPromo,
-    prepaymentAmt, remainingAmt, isPrepayment, payNow, giftUsed, payOnline,
+    baseTotal,
+    promoDiscount,
+    totalAfterPromo,
+    prepaymentAmt,
+    remainingAmt,
+    isPrepayment,
+    payNow,
+    giftUsed,
+    payOnline,
   } = useMemo(() => {
     const baseTotal =
       pricing?.publicPrice ?? (boat?.price_per_hour ?? 0) * duration;
@@ -432,15 +468,27 @@ export function BookingScreen() {
     const remainingAmt = totalAfterPromo - prepaymentAmt;
     const isPrepayment = paymentMode === "prepayment";
     const payNow = isPrepayment ? prepaymentAmt : totalAfterPromo;
-    const giftUsed = gift
-      ? Math.min(gift.balance, payNow, totalAfterPromo)
-      : 0;
+    const giftUsed = gift ? Math.min(gift.balance, payNow, totalAfterPromo) : 0;
     const payOnline = Math.max(0, payNow - giftUsed);
     return {
-      baseTotal, promoDiscount, totalAfterPromo,
-      prepaymentAmt, remainingAmt, isPrepayment, payNow, giftUsed, payOnline,
+      baseTotal,
+      promoDiscount,
+      totalAfterPromo,
+      prepaymentAmt,
+      remainingAmt,
+      isPrepayment,
+      payNow,
+      giftUsed,
+      payOnline,
     };
   }, [pricing, promo, paymentMode, gift, boat?.price_per_hour, duration]);
+
+  // Auto-switch to "full" when prepayment option is not available
+  useEffect(() => {
+    if (prepaymentAmt === 0 && paymentMode === "prepayment") {
+      setPaymentMode("full");
+    }
+  }, [prepaymentAmt]);
 
   // ── Pay / Contact ────────────────────────────────────────────────────────
   const handleAction = async () => {
@@ -554,14 +602,18 @@ export function BookingScreen() {
     return (
       <View style={s.root}>
         {header}
-        <View style={s.loader}><Spinner /></View>
+        <View style={s.loader}>
+          <Spinner />
+        </View>
       </View>
     );
   if (!boat)
     return (
       <View style={s.root}>
         {header}
-        <View style={s.loader}><Text style={s.errTxt}>Судно не найдено</Text></View>
+        <View style={s.loader}>
+          <Text style={s.errTxt}>Судно не найдено</Text>
+        </View>
       </View>
     );
 
@@ -574,7 +626,10 @@ export function BookingScreen() {
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={[s.content, { paddingBottom: insets.bottom + 40 }]}
+        contentContainerStyle={[
+          s.content,
+          { paddingBottom: insets.bottom + 40 },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -614,97 +669,129 @@ export function BookingScreen() {
               style={[s.payCard, paymentMode === "prepayment" && s.payCardOn]}
               onPress={() => setPaymentMode("prepayment")}
             >
-              <Percent size={26} color={COLORS.text1} strokeWidth={1.8} />
+              <Image source={require("@/../assets/images/yu.png")} style={s.yuImg} contentFit="contain" />
               <Text style={s.payCardLabel}>Предоплата</Text>
-              <Text style={s.payCardSub}>{ruFmt(prepaymentAmt)} ₽</Text>
+              <Text style={s.payCardSub}>Часть сейчас, остаток на месте</Text>
             </Pressable>
           )}
           <Pressable
             style={[s.payCard, paymentMode === "full" && s.payCardOn]}
             onPress={() => setPaymentMode("full")}
           >
-            <CreditCard size={26} color={COLORS.text1} strokeWidth={1.8} />
+            <Image source={require("@/../assets/images/yu.png")} style={s.yuImg} contentFit="contain" />
             <Text style={s.payCardLabel}>{"Полная\nоплата"}</Text>
-          </Pressable>
-          <Pressable
-            style={[s.payCard, paymentMode === "contact" && s.payCardOn]}
-            onPress={() => setPaymentMode("contact")}
-          >
-            <MessageCircle size={26} color={COLORS.text1} strokeWidth={1.8} />
-            <Text style={s.payCardLabel}>Менеджер</Text>
+            <Text style={s.payCardSub}>Всё сейчас онлайн</Text>
           </Pressable>
         </View>
 
+        {/* ── Менеджер button ───────────────────────────────────────────── */}
+        <Pressable
+          style={({ pressed }) => [s.managerBtn, pressed && { opacity: 0.7 }]}
+          onPress={() => contactSheetRef.current?.present()}
+        >
+          <MessageCircle size={18} color={COLORS.text2} strokeWidth={1.8} />
+          <Text style={s.managerBtnTxt}>Связаться с менеджером</Text>
+        </Pressable>
+
         {/* ══ 3. Promo / Gift (unified) ════════════════════════════════════ */}
         <View style={s.codeSpacer} />
-        {!codeExpanded ? (
-          <Pressable
-            style={s.codeToggleRow}
-            onPress={() => {
-              LayoutAnimation.configureNext({
-                duration: 260,
-                create:  { type: "easeInEaseOut", property: "opacity" },
-                update:  { type: "easeInEaseOut" },
-                delete:  { type: "easeInEaseOut", property: "opacity" },
-              });
-              setCodeExpanded(true);
-            }}
-            hitSlop={8}
+
+        {/* Container: height animates between toggle height and input height */}
+        <Animated.View style={[s.codeContainer, codeContainerStyle]}>
+
+          {/* Toggle row — slides left on open */}
+          <Animated.View
+            style={codeToggleStyle}
+            onLayout={(e) => setCodeToggleH(e.nativeEvent.layout.height)}
+            pointerEvents={codeExpanded ? "none" : "auto"}
           >
-            <Plus size={16} color={COLORS.text3} strokeWidth={2} />
-            <Text style={s.codeToggleTxt}>Промокод или код сертификата</Text>
-          </Pressable>
-        ) : (
-          <View style={s.codeExpandedCard}>
-            <View style={s.codeInputRow}>
-              <Tag size={15} color={COLORS.text3} strokeWidth={1.8} />
-              <TextInput
-                style={s.codeInput}
-                placeholder="Промокод или код сертификата"
-                placeholderTextColor={COLORS.text3}
-                value={codeInput}
-                onChangeText={(t) => {
-                  setCodeInput(t.toUpperCase());
-                  setPromo(null);
-                  setGift(null);
-                  setCodeError("");
-                }}
-                autoCapitalize="characters"
-                returnKeyType="done"
-                onSubmitEditing={applyCode}
-                autoFocus
-              />
-              {codeLoading ? (
-                <Spinner size={16} color={COLORS.text3} />
-              ) : (promo || gift) ? (
-                <Pressable onPress={() => { setPromo(null); setGift(null); setCodeInput(""); setCodeError(""); }} hitSlop={8}>
-                  <X size={16} color={COLORS.text3} strokeWidth={2} />
-                </Pressable>
-              ) : codeInput.trim() ? (
-                <Pressable onPress={applyCode} hitSlop={8}>
-                  <Text style={s.codeOkTxt}>OK</Text>
-                </Pressable>
-              ) : (
-                <Pressable onPress={() => {
-                  LayoutAnimation.configureNext({
-                    duration: 240,
-                    create:  { type: "easeInEaseOut", property: "opacity" },
-                    update:  { type: "easeInEaseOut" },
-                    delete:  { type: "easeInEaseOut", property: "opacity" },
-                  });
-                  setCodeExpanded(false);
-                  setCodeInput(""); setCodeError("");
-                  setPromo(null); setGift(null);
-                }} hitSlop={8}>
-                  <X size={16} color={COLORS.text3} strokeWidth={2} />
-                </Pressable>
+            <Pressable
+              style={s.codeToggleRow}
+              onPress={() => {
+                setCodeExpanded(true);
+                codeProgress.value = withTiming(1, PROMO_TIMING);
+              }}
+              hitSlop={8}
+            >
+              <Plus size={16} color={COLORS.text3} strokeWidth={2} />
+              <Text style={s.codeToggleTxt}>Промокод или код сертификата</Text>
+            </Pressable>
+          </Animated.View>
+
+          {/* Input card — slides in from right */}
+          <Animated.View
+            style={codeInputStyle}
+            onLayout={(e) => setCodeInputH(e.nativeEvent.layout.height)}
+            pointerEvents={codeExpanded ? "auto" : "none"}
+          >
+            <View style={s.codeExpandedCard}>
+              <View style={s.codeInputRow}>
+                <Tag size={15} color={COLORS.text3} strokeWidth={1.8} />
+                <TextInput
+                  style={s.codeInput}
+                  placeholder="Промокод или код сертификата"
+                  placeholderTextColor={COLORS.text3}
+                  value={codeInput}
+                  onChangeText={(t) => {
+                    setCodeInput(t.toUpperCase());
+                    setPromo(null);
+                    setGift(null);
+                    setCodeError("");
+                  }}
+                  autoCapitalize="characters"
+                  returnKeyType="done"
+                  onSubmitEditing={applyCode}
+                  autoFocus={codeExpanded}
+                />
+                {codeLoading ? (
+                  <Spinner size={16} color={COLORS.text3} />
+                ) : promo || gift ? (
+                  <Pressable
+                    onPress={() => {
+                      setPromo(null);
+                      setGift(null);
+                      setCodeInput("");
+                      setCodeError("");
+                    }}
+                    hitSlop={8}
+                  >
+                    <X size={16} color={COLORS.text3} strokeWidth={2} />
+                  </Pressable>
+                ) : codeInput.trim() ? (
+                  <Pressable onPress={applyCode} hitSlop={8}>
+                    <Text style={s.codeOkTxt}>OK</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      codeProgress.value = withTiming(0, PROMO_TIMING, () => {
+                        runOnJS(setCodeExpanded)(false);
+                        runOnJS(setCodeInput)("");
+                        runOnJS(setCodeError)("");
+                        runOnJS(setPromo)(null);
+                        runOnJS(setGift)(null);
+                      });
+                    }}
+                    hitSlop={8}
+                  >
+                    <X size={16} color={COLORS.text3} strokeWidth={2} />
+                  </Pressable>
+                )}
+              </View>
+              {codeError ? <Text style={s.codeErrTxt}>{codeError}</Text> : null}
+              {promo && (
+                <Text style={s.codeOkNote}>
+                  Скидка {promo.discount_percent}% применена ✓
+                </Text>
+              )}
+              {gift && giftUsed > 0 && (
+                <Text style={s.codeOkNote}>
+                  Сертификат: −{ruFmt(giftUsed)} ₽ ✓
+                </Text>
               )}
             </View>
-            {codeError ? <Text style={s.codeErrTxt}>{codeError}</Text> : null}
-            {promo && <Text style={s.codeOkNote}>Скидка {promo.discount_percent}% применена ✓</Text>}
-            {gift && giftUsed > 0 && <Text style={s.codeOkNote}>Сертификат: −{ruFmt(giftUsed)} ₽ ✓</Text>}
-          </View>
-        )}
+          </Animated.View>
+        </Animated.View>
 
         {/* ══ 4. White summary card ════════════════════════════════════════ */}
         <View style={s.summaryCard}>
@@ -726,7 +813,9 @@ export function BookingScreen() {
               )}
             </View>
             <View style={s.summaryBoatInfo}>
-              <Text style={s.summaryBoatName} numberOfLines={2}>{boat.name}</Text>
+              <Text style={s.summaryBoatName} numberOfLines={2}>
+                {boat.name}
+              </Text>
               {boat.type && <Text style={s.summaryBoatMeta}>{boat.type}</Text>}
             </View>
             <Pressable style={s.editBtn} onPress={handleEditCard} hitSlop={8}>
@@ -739,17 +828,27 @@ export function BookingScreen() {
           {selectedPier && (
             <View style={s.pierRow}>
               <Text style={s.pierName}>{selectedPier.name}</Text>
-              {selectedPier.address && <Text style={s.pierAddr}>{selectedPier.address}</Text>}
+              {selectedPier.address && (
+                <Text style={s.pierAddr}>{selectedPier.address}</Text>
+              )}
             </View>
           )}
 
           {/* Tags */}
           <View style={s.tagsRow}>
-            {boat.capacity ? <View style={s.tag}><Text style={s.tagTxt}>до {boat.capacity} чел.</Text></View> : null}
-            <View style={s.tag}><Text style={s.tagTxt}>{fmtDateFull(date)}</Text></View>
+            {boat.capacity ? (
+              <View style={s.tag}>
+                <Text style={s.tagTxt}>до {boat.capacity} чел.</Text>
+              </View>
+            ) : null}
+            <View style={s.tag}>
+              <Text style={s.tagTxt}>{fmtDateFull(date)}</Text>
+            </View>
             {timeConfirmed && (
               <View style={s.tag}>
-                <Text style={s.tagTxt}>{fmtHour(startHour)} – {fmtHour(startHour + duration)}</Text>
+                <Text style={s.tagTxt}>
+                  {fmtHour(startHour)} – {fmtHour(startHour + duration)}
+                </Text>
               </View>
             )}
           </View>
@@ -768,14 +867,20 @@ export function BookingScreen() {
               </View>
               {promoDiscount > 0 && (
                 <View style={s.priceRow}>
-                  <Text style={s.priceLabel}>Скидка {promo?.discount_percent}%</Text>
-                  <Text style={[s.priceVal, s.priceDiscount]}>−{ruFmt(promoDiscount)} ₽</Text>
+                  <Text style={s.priceLabel}>
+                    Скидка {promo?.discount_percent}%
+                  </Text>
+                  <Text style={[s.priceVal, s.priceDiscount]}>
+                    −{ruFmt(promoDiscount)} ₽
+                  </Text>
                 </View>
               )}
               {giftUsed > 0 && (
                 <View style={s.priceRow}>
                   <Text style={s.priceLabel}>Сертификат</Text>
-                  <Text style={[s.priceVal, s.priceDiscount]}>−{ruFmt(giftUsed)} ₽</Text>
+                  <Text style={[s.priceVal, s.priceDiscount]}>
+                    −{ruFmt(giftUsed)} ₽
+                  </Text>
                 </View>
               )}
               {isPrepayment && (
@@ -798,7 +903,9 @@ export function BookingScreen() {
           <View style={s.totalRow}>
             <Text style={s.totalLabel}>
               {timeConfirmed
-                ? isPrepayment ? "1 оплата сейчас" : "К оплате"
+                ? isPrepayment
+                  ? "1 оплата сейчас"
+                  : "К оплате"
                 : "Итого"}
             </Text>
             <Text style={s.totalVal}>
@@ -823,7 +930,9 @@ export function BookingScreen() {
             ) : !timeConfirmed ? (
               <>
                 <Clock size={18} color={COLORS.brandNavy} strokeWidth={2} />
-                <Text style={[s.payBtnTxt, { color: COLORS.brandNavy }]}>Выбрать дату и время</Text>
+                <Text style={[s.payBtnTxt, { color: COLORS.brandNavy }]}>
+                  Выбрать дату и время
+                </Text>
               </>
             ) : paymentMode === "contact" ? (
               <>
@@ -850,27 +959,59 @@ export function BookingScreen() {
           </Text>
         </View>
       </ScrollView>
+
+      {/* ── Contact sheet ─────────────────────────────────────────────── */}
+      <BottomSheetModal
+        ref={contactSheetRef}
+        enableDynamicSizing
+        enablePanDownToClose
+        backdropComponent={SheetBackdrop}
+        backgroundStyle={{ backgroundColor: "#fff", borderTopLeftRadius: 24, borderTopRightRadius: 24 }}
+        handleComponent={() => (
+          <View style={{ alignItems: "center", paddingTop: 12, paddingBottom: 4 }}>
+            <View style={{ width: 36, height: 4, borderRadius: 2, backgroundColor: "#DDD" }} />
+          </View>
+        )}
+      >
+        <BottomSheetView style={{ paddingHorizontal: 16, paddingTop: 4, paddingBottom: insets.bottom + 24 }}>
+          <Text style={s.contactSheetTitle}>Связаться с нами</Text>
+          <View style={{ gap: 10 }}>
+            {([
+              { label: "WhatsApp", Icon: MessageCircle, color: "#25D366", url: "https://wa.me/79810076500" },
+              { label: "Telegram", Icon: Send,          color: "#229ED9", url: "https://t.me/rentboat_spb" },
+              { label: "MAX",      Icon: MessageCircle, color: "#0077FF", url: "tel:+79810076500" },
+              { label: "Позвонить",Icon: Phone,         color: "#333333", url: "tel:+78124253360" },
+            ] as const).map((ch) => (
+              <Pressable
+                key={ch.label}
+                style={({ pressed }) => [s.contactBtn, pressed && { opacity: 0.6 }]}
+                onPress={() => Linking.openURL(ch.url)}
+              >
+                <ch.Icon size={20} color={ch.color} strokeWidth={1.8} />
+                <Text style={s.contactBtnLabel}>{ch.label}</Text>
+              </Pressable>
+            ))}
+          </View>
+        </BottomSheetView>
+      </BottomSheetModal>
     </KeyboardAvoidingView>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-
-const RED     = "#E8392A";
-const BG      = COLORS.greyLight;
-const DARK    = "#1C1C1E";
-const GRAY    = "#8E8E93";
-const SEP     = "#E5E5EA";
+const RED = "#E8392A";
+const BG = COLORS.greyLight;
+const DARK = "#1C1C1E";
+const GRAY = "#8E8E93";
+const SEP = "#E5E5EA";
 const SEL_BDR = "#1C1C1E";
 
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: BG },
+  root: { flex: 1, backgroundColor: BG },
   scroll: { flex: 1 },
   content: { paddingTop: 0 },
   loader: { flex: 1, alignItems: "center", justifyContent: "center" },
   errTxt: { fontSize: 15, color: COLORS.text3 },
 
-  // ── Header ────────────────────────────────────────────────────────────────
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -878,10 +1019,20 @@ const s = StyleSheet.create({
     paddingBottom: 8,
     backgroundColor: BG,
   },
-  headerBtn: { width: 44, height: 48, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, textAlign: "center", fontSize: 17, fontWeight: "700", color: DARK },
+  headerBtn: {
+    width: 44,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 17,
+    fontWeight: "700",
+    color: DARK,
+  },
 
-  // ── Section label ─────────────────────────────────────────────────────────
   secLabel: {
     fontSize: 13,
     color: GRAY,
@@ -889,7 +1040,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
   },
 
-  // ── Separate input fields ─────────────────────────────────────────────────
   inputField: {
     backgroundColor: COLORS.white,
     borderRadius: 14,
@@ -901,7 +1051,6 @@ const s = StyleSheet.create({
     color: DARK,
   },
 
-  // ── Payment cards grid ────────────────────────────────────────────────────
   payGrid: {
     flexDirection: "row",
     gap: 10,
@@ -910,43 +1059,85 @@ const s = StyleSheet.create({
   },
   payCard: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.greyLight,
     borderRadius: 14,
-    borderWidth: 1.5,
+    borderWidth: 2,
     borderColor: SEP,
     padding: 14,
     gap: 6,
     minHeight: 96,
   },
-  payCardOn: { borderColor: SEL_BDR, borderWidth: 2 },
-  payCardLabel: { fontSize: 14, fontWeight: "600", color: DARK, lineHeight: 19 },
-  payCardSub:   { fontSize: 12, color: GRAY },
+  payCardOn: { borderColor: SEL_BDR },
+  payCardLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: DARK,
+    lineHeight: 19,
+  },
+  payCardSub: { fontSize: 11, color: GRAY, lineHeight: 15 },
+  yuImg: { width: 48, height: 24 },
 
-  // ── Promo / Gift ──────────────────────────────────────────────────────────
-  codeSpacer: { height: 4 },
-  codeToggleRow: {
+  managerBtn: {
     flexDirection: "row",
     alignItems: "center",
     gap: 10,
     marginHorizontal: 16,
+    marginTop: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: SEP,
+  },
+  managerBtnTxt: { fontSize: 15, fontWeight: "500", color: DARK },
+
+  contactSheetTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: "#000",
+    textAlign: "center",
+    marginBottom: 16,
+  },
+  contactBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    backgroundColor: "#F2F2F2",
+    borderRadius: 14,
+    paddingVertical: 16,
+  },
+  contactBtnLabel: { fontSize: 16, fontWeight: "500", color: "#000" },
+
+  codeSpacer: { height: 4 },
+  codeContainer: { marginHorizontal: 16 },
+  codeToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
     paddingVertical: 14,
   },
   codeToggleTxt: { fontSize: 15, color: GRAY },
   codeExpandedCard: {
     backgroundColor: COLORS.white,
     borderRadius: 14,
-    marginHorizontal: 16,
     marginBottom: 4,
     paddingHorizontal: 16,
     paddingVertical: 14,
   },
   codeInputRow: { flexDirection: "row", alignItems: "center", gap: 10 },
-  codeInput:    { flex: 1, fontSize: 16, color: DARK, paddingVertical: 4, padding: 0 },
-  codeOkTxt:    { fontSize: 14, fontWeight: "700", color: COLORS.brandNavy },
-  codeErrTxt:   { fontSize: 12, color: RED, marginTop: 6 },
-  codeOkNote:   { fontSize: 12, color: "#2ECC71", marginTop: 6 },
+  codeInput: {
+    flex: 1,
+    fontSize: 16,
+    color: DARK,
+    paddingVertical: 4,
+    padding: 0,
+  },
+  codeOkTxt: { fontSize: 14, fontWeight: "700", color: COLORS.brandNavy },
+  codeErrTxt: { fontSize: 12, color: RED, marginTop: 6 },
+  codeOkNote: { fontSize: 12, color: "#2ECC71", marginTop: 6 },
 
-  // ── White summary card ────────────────────────────────────────────────────
   summaryCard: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: 24,
@@ -970,7 +1161,12 @@ const s = StyleSheet.create({
     flexShrink: 0,
   },
   summaryBoatInfo: { flex: 1, gap: 2 },
-  summaryBoatName: { fontSize: 16, fontWeight: "700", color: DARK, lineHeight: 22 },
+  summaryBoatName: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: DARK,
+    lineHeight: 22,
+  },
   summaryBoatMeta: { fontSize: 13, color: GRAY },
   editBtn: {
     flexDirection: "row",
@@ -986,34 +1182,58 @@ const s = StyleSheet.create({
   editBtnTxt: { fontSize: 11, fontWeight: "700", color: COLORS.brandNavy },
 
   // Pier
-  pierRow:  { marginBottom: 12, gap: 2 },
+  pierRow: { marginBottom: 12, gap: 2 },
   pierName: { fontSize: 15, color: DARK, fontWeight: "500" },
   pierAddr: { fontSize: 13, color: GRAY },
 
   // Tags
   tagsRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
-  tag:     { backgroundColor: BG, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-  tagTxt:  { fontSize: 14, color: DARK, fontWeight: "500" },
+  tag: {
+    backgroundColor: BG,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  tagTxt: { fontSize: 14, color: DARK, fontWeight: "500" },
 
-  summaryDivider: { height: StyleSheet.hairlineWidth, backgroundColor: SEP, marginVertical: 14 },
+  summaryDivider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: SEP,
+    marginVertical: 14,
+  },
 
   // Price rows
-  priceHeader: { fontSize: 16, fontWeight: "700", color: DARK, marginBottom: 10 },
-  priceRow:    { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 4 },
-  priceLabel:  { fontSize: 14, color: GRAY },
-  priceVal:    { fontSize: 14, color: DARK, fontWeight: "500" },
+  priceHeader: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: DARK,
+    marginBottom: 10,
+  },
+  priceRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 4,
+  },
+  priceLabel: { fontSize: 14, color: GRAY },
+  priceVal: { fontSize: 14, color: DARK, fontWeight: "500" },
   priceDiscount: { color: RED },
 
   // Total
-  totalRow:  { flexDirection: "row", justifyContent: "space-between", alignItems: "baseline", paddingVertical: 4 },
+  totalRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "baseline",
+    paddingVertical: 4,
+  },
   totalLabel: { fontSize: 18, fontWeight: "800", color: DARK },
-  totalVal:   { fontSize: 24, fontWeight: "800", color: DARK },
+  totalVal: { fontSize: 24, fontWeight: "800", color: DARK },
 
   // Pay button
   payBtn: {
     height: 58,
-    backgroundColor: RED,
-    borderRadius: 29,
+    backgroundColor: COLORS.brandNavy,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     marginTop: 20,
@@ -1026,8 +1246,14 @@ const s = StyleSheet.create({
     borderColor: COLORS.brandNavy,
   },
   payBtnContact: { backgroundColor: "#25D366" },
-  payBtnTxt:     { fontSize: 17, fontWeight: "700", color: COLORS.white },
+  payBtnTxt: { fontSize: 17, fontWeight: "700", color: COLORS.white },
 
-  consentTxt:  { marginTop: 16, fontSize: 11, color: GRAY, lineHeight: 16, textAlign: "center" },
+  consentTxt: {
+    marginTop: 16,
+    fontSize: 11,
+    color: GRAY,
+    lineHeight: 16,
+    textAlign: "center",
+  },
   consentLink: { color: COLORS.brandNavy, fontWeight: "600" },
 });

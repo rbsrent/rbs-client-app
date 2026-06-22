@@ -1,6 +1,6 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { memo, useCallback, useEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import {
   Dimensions,
   FlatList,
@@ -11,8 +11,17 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  createAnimatedComponent,
+  useDerivedValue,
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
+import { ReanimatedScrollDots } from '@/shared/components/ReanimatedScrollDots';
+
+const AnimatedFlatList = createAnimatedComponent(FlatList) as unknown as typeof FlatList;
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -109,11 +118,20 @@ const SlideCard = memo(function SlideCard({ slide }: { slide: Slide }) {
 // ─── HomeCarousel ─────────────────────────────────────────────────────────────
 
 export const HomeCarousel = memo(function HomeCarousel() {
-  const flatRef      = useRef<FlatList>(null);
-  const curIdxRef    = useRef(N);           // current absolute index in TRIPLED
-  const timerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef   = useRef(true);
-  const [dotIdx, setDotIdx] = useState(0); // display index 0..N-1
+  const flatRef    = useRef<FlatList<Slide>>(null);
+  const curIdxRef  = useRef(N);
+  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
+
+  const scrollXSv  = useSharedValue(N * SW);
+  const onScrollAnim = useAnimatedScrollHandler({
+    onScroll: (e) => { scrollXSv.value = e.contentOffset.x; },
+  });
+  // Map tripled-space offset → [0, N*SW) for dot interpolation
+  const normalizedX = useDerivedValue(() => {
+    const raw = scrollXSv.value - N * SW;
+    return ((raw % (N * SW)) + N * SW) % (N * SW);
+  });
 
   useEffect(() => {
     return () => {
@@ -147,7 +165,6 @@ export const HomeCarousel = memo(function HomeCarousel() {
         const next = curIdxRef.current + 1;
         flatRef.current?.scrollToOffset({ offset: next * SW, animated: true });
         curIdxRef.current = next;
-        if (mountedRef.current) setDotIdx(next % N);
         scheduleRef.current();
       }, TELEPORT_MS);
       return;
@@ -156,7 +173,6 @@ export const HomeCarousel = memo(function HomeCarousel() {
     const next = idx + 1;
     flatRef.current?.scrollToOffset({ offset: next * SW, animated: true });
     curIdxRef.current = next;
-    setDotIdx(next % N);
     scheduleRef.current();
   };
 
@@ -170,15 +186,12 @@ export const HomeCarousel = memo(function HomeCarousel() {
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
-  // On settle: update dot, handle boundaries, restart timer
+  // On settle: handle boundaries, restart timer
   const onMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!mountedRef.current) return;
       const rawIdx = Math.round(e.nativeEvent.contentOffset.x / SW);
       curIdxRef.current = rawIdx;
-
-      const display = ((rawIdx % N) + N) % N;
-      setDotIdx(display);
 
       // Teleport silently to middle copy if at a boundary copy
       if (rawIdx < N) {
@@ -210,7 +223,7 @@ export const HomeCarousel = memo(function HomeCarousel() {
 
   return (
     <View style={c.root}>
-      <FlatList
+      <AnimatedFlatList
         ref={flatRef}
         data={TRIPLED}
         keyExtractor={keyExtractor}
@@ -220,27 +233,21 @@ export const HomeCarousel = memo(function HomeCarousel() {
         showsHorizontalScrollIndicator={false}
         getItemLayout={getItemLayout}
         initialScrollIndex={N}
-        // All 12 slides are lightweight gradients — render them all upfront
-        // to avoid VirtualizedList "slow to update" false-positive from 4.2s timer
         removeClippedSubviews={false}
         maxToRenderPerBatch={12}
         windowSize={21}
         initialNumToRender={12}
-        // Scroll behaviour
         bounces={false}
         overScrollMode="never"
-        scrollEventThrottle={32}
+        scrollEventThrottle={16}
         decelerationRate="fast"
-        // Event handlers
+        onScroll={onScrollAnim}
         onScrollBeginDrag={onScrollBeginDrag}
         onMomentumScrollEnd={onMomentumScrollEnd}
       />
 
-      {/* ── Dot indicators ── */}
       <View style={c.dots}>
-        {SLIDES.map((_, i) => (
-          <View key={i} style={[c.dot, i === dotIdx && c.dotActive]} />
-        ))}
+        <ReanimatedScrollDots count={N} scrollX={normalizedX} itemInterval={SW} />
       </View>
     </View>
   );
@@ -318,22 +325,7 @@ const c = StyleSheet.create({
   },
 
   dots: {
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
     marginTop: 10,
-  },
-  dot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#CCCCCC',
-  },
-  dotActive: {
-    width: 20,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: COLORS.brandNavy,
   },
 });

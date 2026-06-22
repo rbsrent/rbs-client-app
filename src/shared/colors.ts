@@ -36,6 +36,9 @@ export const COLORS = {
   white: '#FFFFFF',
   black: '#000000',
   transparent: 'transparent',
+
+  red: '#FF6C6C',
+  yellow: '#FFDA62'
 } as const;
 
 export type Color = keyof typeof COLORS;

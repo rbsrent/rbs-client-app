@@ -1,16 +1,20 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useRef } from 'react';
 import {
-  Animated,
   Dimensions,
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Animated as RNAnimated,
   StyleSheet,
   View,
 } from 'react-native';
+import Animated, {
+  useAnimatedScrollHandler,
+  useSharedValue,
+} from 'react-native-reanimated';
 
-import { COLORS } from '@/shared/colors';
+import { ReanimatedScrollDots } from '@/shared/components/ReanimatedScrollDots';
 import { HeroSlide } from '@/store/useCatalogStore';
 
 import { BannerCard } from './BannerCard';
@@ -19,16 +23,13 @@ const { width: SW } = Dimensions.get('window');
 const CARD_W     = SW - 32;
 const CARD_H     = 172;
 const AUTO_DELAY = 4200;
-const ANIM_SETTLE = 420;
-
-// ─── Shimmer skeleton ─────────────────────────────────────────────────────────
 
 function BannerSkeleton() {
-  const translateX = useRef(new Animated.Value(-CARD_W)).current;
+  const translateX = useRef(new RNAnimated.Value(-CARD_W)).current;
 
   useEffect(() => {
-    const anim = Animated.loop(
-      Animated.timing(translateX, {
+    const anim = RNAnimated.loop(
+      RNAnimated.timing(translateX, {
         toValue: CARD_W,
         duration: 1100,
         useNativeDriver: true,
@@ -42,7 +43,7 @@ function BannerSkeleton() {
     <View style={sk.root}>
       <View style={sk.page}>
         <View style={[sk.card, { width: CARD_W, height: CARD_H }]}>
-          <Animated.View
+          <RNAnimated.View
             style={[StyleSheet.absoluteFill, { transform: [{ translateX }] }]}
           >
             <LinearGradient
@@ -51,7 +52,7 @@ function BannerSkeleton() {
               end={{ x: 1, y: 0.5 }}
               style={StyleSheet.absoluteFill}
             />
-          </Animated.View>
+          </RNAnimated.View>
         </View>
       </View>
       <View style={sk.dots}>
@@ -64,62 +65,33 @@ function BannerSkeleton() {
 const sk = StyleSheet.create({
   root: {},
   page: { paddingHorizontal: 16 },
-  card: {
-    borderRadius: 18,
-    backgroundColor: '#E8E8E8',
-    overflow: 'hidden',
-  },
-  dots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 10,
-  },
-  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#DDD' },
+  card: { borderRadius: 18, backgroundColor: '#E8E8E8', overflow: 'hidden' },
+  dots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
+  dot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#DDD' },
 });
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-
-function dotForIdx(rawIdx: number, n: number) {
-  return ((rawIdx - 1) % n + n) % n;
-}
-
-// ─── PromoBanner ─────────────────────────────────────────────────────────────
 
 interface Props { slides: HeroSlide[]; loading?: boolean }
 
 export const PromoBanner = memo(function PromoBanner({ slides, loading }: Props) {
   if (loading || !slides.length) return <BannerSkeleton />;
-
   return <PromoBannerInner slides={slides} />;
 });
 
-// Separate inner component so hooks only run once real slides arrive
 function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
-  const N = slides.length;
+  const N          = slides.length;
+  const flatRef    = useRef<FlatList<HeroSlide>>(null);
+  const curIdxRef  = useRef(0);
+  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const mountedRef = useRef(true);
 
-  const bookend = useMemo(
-    () => [slides[N - 1], ...slides, slides[0]],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [N],
-  );
-
-  const flatRef     = useRef<FlatList>(null);
-  const curIdxRef   = useRef(1);
-  const timerRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const teleportRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const mountedRef  = useRef(true);
-  const [dotIdx, setDotIdx] = useState(0);
+  const scrollXSv    = useSharedValue(0);
+  const onScrollAnim = useAnimatedScrollHandler({
+    onScroll: (e) => { scrollXSv.value = e.contentOffset.x; },
+  });
 
   useEffect(() => () => {
     mountedRef.current = false;
-    if (timerRef.current)    clearTimeout(timerRef.current);
-    if (teleportRef.current) clearTimeout(teleportRef.current);
-  }, []);
-
-  const onLayout = useCallback(() => {
-    flatRef.current?.scrollToOffset({ offset: SW, animated: false });
+    if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
   const scheduleRef = useRef<() => void>(() => {});
@@ -132,41 +104,23 @@ function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
 
   advanceRef.current = () => {
     if (!mountedRef.current) return;
-    if (teleportRef.current) clearTimeout(teleportRef.current);
-    const next = curIdxRef.current + 1;
-    flatRef.current?.scrollToOffset({ offset: next * SW, animated: true });
+    const next = (curIdxRef.current + 1) % N;
+    // wrap: jump silently to first, user won't notice during the 4.2s gap
+    flatRef.current?.scrollToOffset({ offset: next * SW, animated: next !== 0 });
     curIdxRef.current = next;
-    setDotIdx(dotForIdx(next, N));
-    if (next === N + 1) {
-      teleportRef.current = setTimeout(() => {
-        if (!mountedRef.current) return;
-        flatRef.current?.scrollToOffset({ offset: SW, animated: false });
-        curIdxRef.current = 1;
-      }, ANIM_SETTLE);
-    }
     scheduleRef.current();
   };
 
   useEffect(() => { scheduleRef.current(); }, []);
 
   const onScrollBeginDrag = useCallback(() => {
-    if (timerRef.current)    clearTimeout(timerRef.current);
-    if (teleportRef.current) clearTimeout(teleportRef.current);
+    if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
   const onMomentumScrollEnd = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
       if (!mountedRef.current) return;
-      const rawIdx = Math.round(e.nativeEvent.contentOffset.x / SW);
-      curIdxRef.current = rawIdx;
-      setDotIdx(dotForIdx(rawIdx, N));
-      if (rawIdx === 0) {
-        flatRef.current?.scrollToOffset({ offset: N * SW, animated: false });
-        curIdxRef.current = N;
-      } else if (rawIdx === N + 1) {
-        flatRef.current?.scrollToOffset({ offset: SW, animated: false });
-        curIdxRef.current = 1;
-      }
+      curIdxRef.current = Math.max(0, Math.min(N - 1, Math.round(e.nativeEvent.contentOffset.x / SW)));
       scheduleRef.current();
     },
     [N],
@@ -190,9 +144,9 @@ function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
 
   return (
     <View style={s.root}>
-      <FlatList
-        ref={flatRef}
-        data={bookend}
+      <Animated.FlatList
+        ref={flatRef as any}
+        data={slides}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         horizontal
@@ -200,20 +154,19 @@ function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
         showsHorizontalScrollIndicator={false}
         getItemLayout={getItemLayout}
         removeClippedSubviews={false}
-        initialNumToRender={N + 2}
-        maxToRenderPerBatch={N + 2}
-        windowSize={N + 2}
-        bounces={false}
-        overScrollMode="never"
-        scrollEventThrottle={32}
-        onLayout={onLayout}
+        initialNumToRender={N}
+        maxToRenderPerBatch={N}
+        windowSize={N + 1}
+        bounces
+        overScrollMode="always"
+        scrollEventThrottle={16}
+        decelerationRate="fast"
+        onScroll={onScrollAnim}
         onScrollBeginDrag={onScrollBeginDrag}
         onMomentumScrollEnd={onMomentumScrollEnd}
       />
       <View style={s.dots}>
-        {slides.map((_, i) => (
-          <View key={i} style={[s.dot, i === dotIdx && s.dotActive]} />
-        ))}
+        <ReanimatedScrollDots count={N} scrollX={scrollXSv} itemInterval={SW} />
       </View>
     </View>
   );
@@ -222,13 +175,5 @@ function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
 const s = StyleSheet.create({
   root: {},
   page: { width: SW, paddingHorizontal: 16 },
-  dots: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 10,
-  },
-  dot:       { width: 6,  height: 6, borderRadius: 3, backgroundColor: '#CCCCCC' },
-  dotActive: { width: 20, height: 6, borderRadius: 3, backgroundColor: COLORS.brandNavy },
+  dots: { alignItems: 'center', marginTop: 10 },
 });

@@ -2,14 +2,11 @@ import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { openAuthSessionAsync, WebBrowserResultType } from 'expo-web-browser';
 import {
+  ArrowLeft,
   CheckCircle,
   Copy,
   Gift,
-  Mail,
-  MessageSquare,
-  Phone,
   RotateCcw,
-  User,
 } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
@@ -27,7 +24,6 @@ import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
 
 import { COLORS } from '@/shared/colors';
 import { PhoneInput } from '@/shared/components/PhoneInput';
-import { ScreenHeader } from '@/shared/components/ScreenHeader';
 import { publicSupabase } from '@/shared/supabase/publicClient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -148,11 +144,21 @@ export default function CertificatesScreen() {
     Alert.alert('Код сертификата', certCode);
   };
 
+  const header = (title: string) => (
+    <View style={[s.header, { paddingTop: insets.top }]}>
+      <Pressable style={s.headerBtn} onPress={() => router.back()} hitSlop={8}>
+        <ArrowLeft size={22} color={COLORS.text1} strokeWidth={2} />
+      </Pressable>
+      <Text style={s.headerTitle}>{title}</Text>
+      <View style={s.headerBtn} />
+    </View>
+  );
+
   // ── Paying ──────────────────────────────────────────────────────────────────
   if (screen === 'paying') {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Оплата" />
+        {header('Оплата')}
         <View style={s.centered}>
           <Spinner />
           <Text style={s.centeredTitle}>Ожидаем подтверждение оплаты…</Text>
@@ -166,7 +172,7 @@ export default function CertificatesScreen() {
   if (screen === 'error') {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Ошибка" />
+        {header('Ошибка')}
         <View style={s.centered}>
           <View style={s.errorIcon}>
             <RotateCcw size={28} color={COLORS.error} strokeWidth={1.8} />
@@ -188,7 +194,7 @@ export default function CertificatesScreen() {
   if (screen === 'success') {
     return (
       <View style={s.root}>
-        <ScreenHeader title="Сертификат куплен" />
+        {header('Сертификат куплен')}
         <ScrollView
           contentContainerStyle={s.successContent}
           showsVerticalScrollIndicator={false}
@@ -256,7 +262,7 @@ export default function CertificatesScreen() {
       style={s.root}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScreenHeader title="Подарок впечатлений" />
+      {header('Подарок впечатлений')}
 
       <ScrollView
         style={s.scroll}
@@ -264,116 +270,75 @@ export default function CertificatesScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Intro */}
-        <View style={s.intro}>
-          <Text style={s.introTitle}>Подарочный сертификат на прогулку</Text>
-          <Text style={s.introDesc}>
-            Подарите близким незабываемую прогулку по воде. После оплаты сертификат придёт на e-mail в красивом PDF — можно распечатать и вручить.
-          </Text>
-          <View style={s.introBullets}>
-            <Text style={s.introBullet}>· Действует 1 год с даты покупки</Text>
-            <Text style={s.introBullet}>· Можно оплатить любое бронирование частично или полностью</Text>
-            <Text style={s.introBullet}>· Остаток сохраняется на коде до следующей оплаты</Text>
-          </View>
-        </View>
-
         {/* Nominal */}
-        <View style={s.section}>
-          <Text style={s.secLabel}>Номинал</Text>
-          <View style={s.nominalGrid}>
-            {NOMINALS.map((n) => {
-              const on = n === nominal;
-              return (
-                <Pressable
-                  key={n}
-                  style={[s.nominalBtn, on && s.nominalBtnOn]}
-                  onPress={() => setNominal(n)}
-                >
-                  <Text style={[s.nominalTxt, on && s.nominalTxtOn]}>{ruFmt(n)}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+        <Text style={[s.secLabel, { marginTop: 8 }]}>Номинал</Text>
+        <View style={s.nominalGrid}>
+          {NOMINALS.map((n) => {
+            const on = n === nominal;
+            return (
+              <Pressable
+                key={n}
+                style={[s.nominalBtn, on && s.nominalBtnOn]}
+                onPress={() => setNominal(n)}
+              >
+                <Text style={[s.nominalTxt, on && s.nominalTxtOn]}>{ruFmt(n)}</Text>
+              </Pressable>
+            );
+          })}
         </View>
 
         {/* Purchaser */}
-        <View style={s.section}>
-          <Text style={s.secLabel}>Данные покупателя</Text>
-          <View style={s.card}>
-            <View style={s.field}>
-              <Mail size={16} color={COLORS.text3} strokeWidth={1.8} />
-              <TextInput
-                style={s.input}
-                placeholder="E-mail *"
-                placeholderTextColor={COLORS.text3}
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                returnKeyType="next"
-              />
-            </View>
-            <View style={s.divider} />
-            <View style={s.field}>
-              <User size={16} color={COLORS.text3} strokeWidth={1.8} />
-              <TextInput
-                style={s.input}
-                placeholder="Ваше имя"
-                placeholderTextColor={COLORS.text3}
-                value={name}
-                onChangeText={setName}
-                returnKeyType="next"
-              />
-            </View>
-            <View style={s.divider} />
-            <View style={s.field}>
-              <Phone size={16} color={COLORS.text3} strokeWidth={1.8} />
-              <PhoneInput
-                style={s.input}
-                digits={phoneDigits}
-                onChangeDigits={setPhoneDigits}
-                returnKeyType="next"
-              />
-            </View>
-          </View>
-        </View>
+        <Text style={s.secLabel}>Данные покупателя</Text>
+        <TextInput
+          style={s.inputField}
+          placeholder="E-mail *"
+          placeholderTextColor={COLORS.text3}
+          value={email}
+          onChangeText={setEmail}
+          keyboardType="email-address"
+          autoCapitalize="none"
+          returnKeyType="next"
+        />
+        <TextInput
+          style={s.inputField}
+          placeholder="Ваше имя"
+          placeholderTextColor={COLORS.text3}
+          value={name}
+          onChangeText={setName}
+          returnKeyType="next"
+        />
+        <PhoneInput
+          digits={phoneDigits}
+          onChangeDigits={setPhoneDigits}
+          style={s.inputField}
+          returnKeyType="next"
+        />
 
         {/* Recipient */}
-        <View style={s.section}>
-          <View style={s.secRow}>
-            <Text style={s.secLabel}>Кому подарок</Text>
-            <Text style={s.secOptional}>необязательно</Text>
-          </View>
-          <View style={s.card}>
-            <View style={s.field}>
-              <Gift size={16} color={COLORS.text3} strokeWidth={1.8} />
-              <TextInput
-                style={s.input}
-                placeholder="Имя получателя"
-                placeholderTextColor={COLORS.text3}
-                value={recipient}
-                onChangeText={setRecipient}
-                returnKeyType="next"
-              />
-            </View>
-            <View style={s.divider} />
-            <View style={[s.field, s.fieldTop]}>
-              <MessageSquare size={16} color={COLORS.text3} strokeWidth={1.8} style={{ marginTop: 3 }} />
-              <View style={{ flex: 1 }}>
-                <TextInput
-                  style={[s.input, s.textarea]}
-                  placeholder="Поздравление"
-                  placeholderTextColor={COLORS.text3}
-                  value={greeting}
-                  onChangeText={(t) => setGreeting(t.slice(0, 180))}
-                  multiline
-                  numberOfLines={3}
-                  textAlignVertical="top"
-                />
-                <Text style={s.charCount}>{greeting.length}/180</Text>
-              </View>
-            </View>
-          </View>
+        <View style={s.secRow}>
+          <Text style={s.secLabel}>Кому подарок</Text>
+          <Text style={s.secOptional}>необязательно</Text>
+        </View>
+        <TextInput
+          style={s.inputField}
+          placeholder="Имя получателя"
+          placeholderTextColor={COLORS.text3}
+          value={recipient}
+          onChangeText={setRecipient}
+          returnKeyType="next"
+        />
+        <View style={[s.inputField, s.textareaWrap]}>
+          <TextInput
+            style={s.textarea}
+            placeholder="Поздравление"
+            placeholderTextColor={COLORS.text3}
+            value={greeting}
+            onChangeText={(t) => setGreeting(t.slice(0, 180))}
+            multiline
+            numberOfLines={3}
+            textAlignVertical="top"
+          />
+          <Text style={s.charCount}>{greeting.length}/180</Text>
         </View>
 
         {/* Legal note */}
@@ -386,7 +351,7 @@ export default function CertificatesScreen() {
       {/* Bottom CTA */}
       <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
         <Pressable
-          style={({ pressed }) => [s.cta, s.ctaFull, !isEmailValid && s.ctaDim, pressed && { opacity: 0.88 }]}
+          style={({ pressed }) => [s.cta, !isEmailValid && s.ctaDim, pressed && { opacity: 0.88 }]}
           onPress={handlePay}
           disabled={!isEmailValid}
         >
@@ -400,49 +365,65 @@ export default function CertificatesScreen() {
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
+const BG   = COLORS.greyLight;
+const DARK = '#1C1C1E';
+const GRAY = '#8E8E93';
+
 const s = StyleSheet.create({
-  root:   { flex: 1, backgroundColor: COLORS.backgroundAlt },
+  root:   { flex: 1, backgroundColor: BG },
   scroll: { flex: 1 },
   scrollContent: { paddingBottom: 140 },
 
-  intro:        { marginHorizontal: 16, marginTop: 20, gap: 10 },
-  introTitle:   { fontSize: 18, fontWeight: '800', color: COLORS.text1, lineHeight: 24 },
-  introDesc:    { fontSize: 14, color: COLORS.text2, lineHeight: 21 },
-  introBullets: { gap: 4 },
-  introBullet:  { fontSize: 13, color: COLORS.text2, lineHeight: 20 },
-
-  section: { marginHorizontal: 16, marginTop: 20 },
-
-  secRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 10 },
-  secLabel: {
-    fontSize: 11, fontWeight: '700', color: COLORS.text3,
-    textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10,
+  /* header */
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 4,
+    paddingBottom: 8,
+    backgroundColor: BG,
   },
-  secOptional: { fontSize: 11, color: COLORS.text3 },
+  headerBtn:   { width: 44, height: 48, alignItems: 'center', justifyContent: 'center' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 17, fontWeight: '700', color: DARK },
+
+  /* section label */
+  secRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginBottom: 4, paddingHorizontal: 16 },
+  secLabel: {
+    fontSize: 13,
+    color: GRAY,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+  },
+  secOptional: { fontSize: 13, color: GRAY },
 
   /* nominal picker */
-  nominalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  nominalGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, paddingHorizontal: 16, marginBottom: 16 },
   nominalBtn:  {
-    width: '30.5%', paddingVertical: 15,
-    borderRadius: 12, borderWidth: 1.5, borderColor: COLORS.border,
+    width: '30%', paddingVertical: 16,
+    borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.border,
     backgroundColor: COLORS.white,
     alignItems: 'center', justifyContent: 'center',
   },
-  nominalBtnOn:  { borderColor: COLORS.brandNavy, backgroundColor: COLORS.brandNavy },
-  nominalTxt:    { fontSize: 13, fontWeight: '700', color: COLORS.text2 },
+  nominalBtnOn:  { borderColor: DARK, backgroundColor: DARK },
+  nominalTxt:    { fontSize: 13, fontWeight: '700', color: GRAY },
   nominalTxtOn:  { color: COLORS.white },
 
-  /* form card */
-  card:     { backgroundColor: COLORS.white, borderRadius: 14, borderWidth: 1, borderColor: COLORS.border, overflow: 'hidden' },
-  field:    { flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 14, minHeight: 50 },
-  fieldTop: { alignItems: 'flex-start', paddingTop: 12 },
-  input:    { flex: 1, fontSize: 14, color: COLORS.text1, paddingVertical: 14 },
-  textarea: { paddingTop: 0, minHeight: 72, lineHeight: 20 },
-  divider:  { height: StyleSheet.hairlineWidth, backgroundColor: COLORS.border, marginLeft: 40 },
-  charCount:{ fontSize: 10, color: COLORS.text3, textAlign: 'right', marginTop: 4, marginBottom: 10 },
+  /* separate input fields (booking style) */
+  inputField: {
+    backgroundColor: COLORS.white,
+    borderRadius: 14,
+    marginHorizontal: 16,
+    marginBottom: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    fontSize: 16,
+    color: DARK,
+  },
+  textareaWrap: { paddingVertical: 12 },
+  textarea: { fontSize: 16, color: DARK, minHeight: 72, lineHeight: 22 },
+  charCount: { fontSize: 10, color: COLORS.text3, textAlign: 'right', marginTop: 4 },
 
-  /* detail lines */
-  legalTxt:  { marginHorizontal: 16, marginTop: 16, fontSize: 11, color: COLORS.text3, lineHeight: 16, textAlign: 'center' },
+  /* legal */
+  legalTxt: { marginHorizontal: 16, marginTop: 16, fontSize: 11, color: GRAY, lineHeight: 16, textAlign: 'center' },
 
   /* bottom bar */
   bottomBar: {
@@ -455,13 +436,12 @@ const s = StyleSheet.create({
 
   /* buttons */
   cta: {
-    height: 54, backgroundColor: COLORS.brandNavy,
-    borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-    flexDirection: 'row', gap: 7,
+    height: 56, backgroundColor: COLORS.brandNavy,
+    borderRadius: 28, alignItems: 'center', justifyContent: 'center',
+    flexDirection: 'row', gap: 8,
   },
-  ctaFull: { width: '100%' },
-  ctaDim:  { opacity: 0.4 },
-  ctaTxt:  { fontSize: 15, fontWeight: '700', color: '#fff' },
+  ctaDim: { opacity: 0.4 },
+  ctaTxt: { fontSize: 16, fontWeight: '700', color: '#fff' },
   ctaOutline: {
     height: 54, backgroundColor: COLORS.white,
     borderRadius: 14, borderWidth: 1.5, borderColor: COLORS.border,

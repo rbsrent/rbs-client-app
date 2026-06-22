@@ -3,12 +3,11 @@ import { useRouter } from "expo-router";
 import {
   Anchor,
   Gift,
-  Grid2x2,
   MapPin,
   MoreHorizontal,
   Route,
   Sailboat,
-  Ship,
+  Ship
 } from "lucide-react-native";
 import React, { memo, useCallback, useMemo, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
@@ -57,7 +56,7 @@ const ALL: Service[] = [
     label: "Теплоход",
     icon: <Ship size={22} color={IC} strokeWidth={2} />,
     bg: "",
-    route: "/cruises",
+    route: "/services/teplokhod",
     badge: "Скоро",
   },
   {
@@ -68,13 +67,6 @@ const ALL: Service[] = [
     route: "/routes",
   },
   {
-    key: "cert",
-    label: "Сертификат",
-    icon: <Gift size={22} color={IC} strokeWidth={2} />,
-    bg: "",
-    route: "/certificates",
-  },
-  {
     key: "piers",
     label: "Причалы",
     icon: <MapPin size={22} color={IC} strokeWidth={2} />,
@@ -82,11 +74,11 @@ const ALL: Service[] = [
     route: "/piers",
   },
   {
-    key: "catalog",
-    label: "Каталог",
-    icon: <Grid2x2 size={22} color={IC} strokeWidth={2} />,
+    key: "cert",
+    label: "Сертификат",
+    icon: <Gift size={22} color={IC} strokeWidth={2} />,
     bg: "",
-    route: "/boats",
+    route: "/certificates",
   },
 ];
 
@@ -265,10 +257,10 @@ const s = StyleSheet.create({
     position: "absolute",
     top: -4,
     right: -4,
-    backgroundColor: COLORS.warning,
-    borderRadius: 6,
+    backgroundColor: COLORS.red,
+    borderRadius: 4,
     paddingHorizontal: 5,
-    paddingVertical: 1,
+    paddingVertical: 2,
   },
   badgeTxt: { color: "#fff", fontSize: 9, fontWeight: "700" },
   label: {

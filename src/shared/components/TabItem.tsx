@@ -56,7 +56,7 @@ export function TabItem({
       <Animated.View style={[styles.tabInner, animStyle]}>
         <tab.Icon
           size={22}
-          color={active ? COLORS.brandNavy : COLORS.grey}
+          color={active ? COLORS.brandBlue : COLORS.grey}
           strokeWidth={active ? 2.2 : 1.7}
         />
         <Text style={[styles.label, active && styles.labelActive]}>
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
   labelActive: {
-    color: COLORS.brandNavy,
+    color: COLORS.brandBlue,
     fontWeight: "700",
   },
 });

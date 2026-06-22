@@ -91,8 +91,9 @@ const DateCell = React.memo(
       onSelect(sel ? null : day);
     }, [sel, day, onSelect]);
 
-    const accent = tod || wknd;
-    const abbrColor = sel ? "#fff" : accent ? RED : "#999";
+    const accent = wknd;
+
+    const abbrColor = sel ? "#fff" : accent ? RED : past ? "#bbb" : "#111";
     const numColor = sel ? "#fff" : accent ? RED : past ? "#bbb" : "#111";
 
     return (

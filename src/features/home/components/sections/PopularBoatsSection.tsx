@@ -1,7 +1,7 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { ArrowRight } from "lucide-react-native";
-import { memo, useCallback, useEffect, useMemo, useRef } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
   Pressable,
@@ -10,56 +10,48 @@ import {
   Text,
   View,
 } from "react-native";
+import ReAnimated, {
+  useSharedValue,
+  useAnimatedStyle,
+  useAnimatedScrollHandler,
+  useAnimatedReaction,
+  runOnJS,
+  interpolate,
+  Extrapolation,
+} from "react-native-reanimated";
 
 import { useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
 import { COLORS } from "@/shared/colors";
+import { STRIP_IMG_H, STRIP_W } from "@/shared/components/BoatCard";
 import { HomeBoat } from "@/store/useHomeStore";
-import { CARD_W, PopularBoatCard } from "../cards/PopularBoatCard";
+import { PopularBoatCard, CARD_W } from "../cards/PopularBoatCard";
 import { PopularSeeAllCard } from "../cards/PopularSeeAllCard";
 
-function SkeletonCard() {
-  const tx = useRef(new Animated.Value(-CARD_W)).current;
-  useEffect(() => {
-    const anim = Animated.loop(
-      Animated.timing(tx, { toValue: CARD_W, duration: 1100, useNativeDriver: true }),
-    );
-    anim.start();
-    return () => anim.stop();
-  }, []);
+const SHIMMER = ["transparent", "rgba(255,255,255,0.5)", "transparent"] as const;
+
+function SkeletonCard({ tx }: { tx: Animated.Value }) {
   return (
     <View style={sk.card}>
       <View style={sk.img}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
-          <LinearGradient
-            colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
-            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
+          <LinearGradient colors={SHIMMER} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
       </View>
       <View style={sk.line1}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
-          <LinearGradient
-            colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
-            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
+          <LinearGradient colors={SHIMMER} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
       </View>
       <View style={sk.line2}>
         <Animated.View style={[StyleSheet.absoluteFill, { transform: [{ translateX: tx }] }]}>
-          <LinearGradient
-            colors={['transparent', 'rgba(255,255,255,0.45)', 'transparent']}
-            start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }}
-            style={StyleSheet.absoluteFill}
-          />
+          <LinearGradient colors={SHIMMER} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={StyleSheet.absoluteFill} />
         </Animated.View>
       </View>
     </View>
   );
 }
 
-const SkeletonRow = memo(function SkeletonRow() {
+function SkeletonRow({ tx }: { tx: Animated.Value }) {
   return (
     <View style={s.rowRoot}>
       <View style={s.header}>
@@ -74,13 +66,12 @@ const SkeletonRow = memo(function SkeletonRow() {
         contentContainerStyle={s.scrollContent}
         scrollEnabled={false}
       >
-        {[0, 1, 2].map((i) => (
-          <SkeletonCard key={i} />
-        ))}
+        <SkeletonCard tx={tx} />
+        <SkeletonCard tx={tx} />
       </ScrollView>
     </View>
   );
-});
+}
 
 interface RowProps {
   title: string;
@@ -90,6 +81,8 @@ interface RowProps {
   badge?: string;
   discountsMap: ReturnType<typeof useDiscountsCache>;
 }
+
+const AnimatedScrollView = ReAnimated.createAnimatedComponent(ScrollView);
 
 const PopularRow = memo(function PopularRow({
   title,
@@ -107,6 +100,36 @@ const PopularRow = memo(function PopularRow({
   const handleSeeAll = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
   const handleArrow  = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
 
+  const scrollX  = useSharedValue(0);
+  const contentW = useSharedValue(0);
+  const viewW    = useSharedValue(0);
+
+  const [seeAllVisible, setSeeAllVisible] = useState(false);
+
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollX.value = event.contentOffset.x;
+  });
+
+  // fire once when SeeAll card enters viewport (within 1.5 card widths of end)
+  useAnimatedReaction(
+    () => {
+      if (contentW.value === 0 || viewW.value === 0) return false;
+      const maxScroll = contentW.value - viewW.value;
+      return scrollX.value > maxScroll - CARD_W * 1.5;
+    },
+    (visible, prev) => {
+      if (visible && !prev) runOnJS(setSeeAllVisible)(true);
+    },
+  );
+
+  const arrowAnimStyle = useAnimatedStyle(() => {
+    const maxScroll = Math.max(0, contentW.value - viewW.value);
+    const fadeStart = Math.max(0, maxScroll - CARD_W * 0.8);
+    const fadeEnd   = Math.max(0, maxScroll - CARD_W * 0.3);
+    const opacity   = interpolate(scrollX.value, [fadeStart, fadeEnd], [1, 0], Extrapolation.CLAMP);
+    return { opacity };
+  });
+
   if (boats.length === 0) return null;
 
   return (
@@ -116,20 +139,26 @@ const PopularRow = memo(function PopularRow({
           <Text style={s.title}>{title}</Text>
           <Text style={s.titleSub}>{subtitle}</Text>
         </View>
-        <Pressable
-          style={({ pressed }) => [s.arrowBtn, pressed && { opacity: 0.7 }]}
-          onPress={handleArrow}
-          hitSlop={8}
-        >
-          <ArrowRight size={15} color={COLORS.text1} strokeWidth={2.5} />
-        </Pressable>
+        <ReAnimated.View style={arrowAnimStyle}>
+          <Pressable
+            style={({ pressed }) => [s.arrowBtn, pressed && { opacity: 0.7 }]}
+            onPress={handleArrow}
+            hitSlop={8}
+          >
+            <ArrowRight size={15} color={COLORS.text1} strokeWidth={2.5} />
+          </Pressable>
+        </ReAnimated.View>
       </View>
 
-      <ScrollView
+      <AnimatedScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.scrollContent}
         removeClippedSubviews
+        onScroll={scrollHandler}
+        scrollEventThrottle={16}
+        onLayout={(e) => { viewW.value = e.nativeEvent.layout.width; }}
+        onContentSizeChange={(w) => { contentW.value = w; }}
       >
         {boats.map((b) => (
           <PopularBoatCard
@@ -142,8 +171,9 @@ const PopularRow = memo(function PopularRow({
         <PopularSeeAllCard
           previews={previews}
           onPress={handleSeeAll}
+          visible={seeAllVisible}
         />
-      </ScrollView>
+      </AnimatedScrollView>
     </View>
   );
 });
@@ -162,6 +192,16 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
   loading,
 }: Props) {
   const discountsMap = useDiscountsCache();
+  const tx = useRef(new Animated.Value(-STRIP_W)).current;
+
+  useEffect(() => {
+    if (!loading) return;
+    const anim = Animated.loop(
+      Animated.timing(tx, { toValue: STRIP_W, duration: 1200, useNativeDriver: true }),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [loading]);
 
   if (
     loading &&
@@ -171,9 +211,9 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
   ) {
     return (
       <View>
-        <SkeletonRow />
-        <SkeletonRow />
-        <SkeletonRow />
+        <SkeletonRow tx={tx} />
+        <SkeletonRow tx={tx} />
+        <SkeletonRow tx={tx} />
       </View>
     );
   }
@@ -231,10 +271,10 @@ const s = StyleSheet.create({
 
 const SKEL = "#E8E8E8";
 const sk = StyleSheet.create({
-  card: { width: 148, gap: 0 },
-  img:   { width: 148, height: 110, borderRadius: 12, backgroundColor: SKEL, overflow: 'hidden' },
-  line1: { width: 100, height: 12, borderRadius: 5, backgroundColor: SKEL, marginTop: 8, overflow: 'hidden' },
-  line2: { width: 70,  height: 10, borderRadius: 5, backgroundColor: SKEL, marginTop: 5, overflow: 'hidden' },
+  card:     { width: STRIP_W },
+  img:      { width: STRIP_W, height: STRIP_IMG_H, borderRadius: 14, backgroundColor: SKEL, overflow: 'hidden' },
+  line1:    { width: Math.round(STRIP_W * 0.55), height: 13, borderRadius: 5, backgroundColor: SKEL, marginTop: 8, overflow: 'hidden' },
+  line2:    { width: Math.round(STRIP_W * 0.38), height: 10, borderRadius: 5, backgroundColor: SKEL, marginTop: 5, overflow: 'hidden' },
   titleBar: { width: 150, height: 14, borderRadius: 5, backgroundColor: SKEL },
   subBar:   { width: 100, height: 10, borderRadius: 5, backgroundColor: SKEL },
 });

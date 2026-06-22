@@ -1,13 +1,12 @@
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
-import { useLocalSearchParams } from 'expo-router';
-import { Search, X } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { Search } from 'lucide-react-native';
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
   RefreshControl,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +31,7 @@ import { DEFAULT, Filters } from '../types';
 import { countActive, findPiersInRadius, sortBoats, toLocalDateISO } from '../utils/filterUtils';
 
 export function AllBoatsScreen() {
+  const router = useRouter();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string }>();
 
@@ -61,15 +61,13 @@ export function AllBoatsScreen() {
   const discountsMap = useDiscountsCache();
 
   // ── State ──
-  const [refreshing, setRefreshing]   = useState(false);
-  const [viewMode, setViewMode]       = useState<'list' | 'map'>('list');
-  const [draft, setDraft]             = useState<Filters>(initialFilters);
-  const [searchText, setSearch]       = useState('');
-  const [searchOpen, setSearchOpen]   = useState(false);
-  const [sortBy, setSortBy]           = useState<SortBy>('popular');
+  const [refreshing, setRefreshing] = useState(false);
+  const [viewMode, setViewMode]     = useState<'list' | 'map'>('list');
+  const [draft, setDraft]           = useState<Filters>(initialFilters);
+  const [sortBy, setSortBy]         = useState<SortBy>('popular');
 
-  const total    = allBoats.length;
-  const hasActive = countActive(filters) > 0 || searchText.trim() !== '';
+  const total     = allBoats.length;
+  const hasActive = countActive(filters) > 0;
 
   // ── Refresh ──
   const handleRefresh = useCallback(async () => {
@@ -79,7 +77,7 @@ export function AllBoatsScreen() {
   }, [refetch]);
 
   // ── Filter & sort ──
-  const applyBoatFilter = useCallback((f: Filters, q: string) => {
+  const applyBoatFilter = useCallback((f: Filters) => {
     const chip = TYPE_CHIPS.find((c) => c.id === f.typeId);
     const hasAvailData = f.dateTime.date !== null && Object.keys(availMap).length > 0;
 
@@ -91,7 +89,6 @@ export function AllBoatsScreen() {
     const pass = allBoats.filter((b) => {
       const t = (b.type ?? '').toLowerCase();
       if (chip?.boatType && t !== chip.boatType) return false;
-      if (q && !b.name.toLowerCase().includes(q)) return false;
       if (f.capacityMin !== null && (b.capacity ?? 0) < f.capacityMin) return false;
       if (f.priceMin !== null && b.price_per_hour < f.priceMin) return false;
       if (f.priceMax !== null && b.price_per_hour > f.priceMax) return false;
@@ -117,8 +114,8 @@ export function AllBoatsScreen() {
   }, [allBoats, availMap, allPiers, sortBy]);
 
   const filtered = useMemo(
-    () => applyBoatFilter(filters, searchText.trim().toLowerCase()),
-    [applyBoatFilter, filters, searchText]
+    () => applyBoatFilter(filters),
+    [applyBoatFilter, filters],
   );
 
   // ── Full sheet handlers ──
@@ -134,7 +131,6 @@ export function AllBoatsScreen() {
 
   const handleResetAll = () => {
     setFilters(DEFAULT);
-    setSearch('');
     setDraft(DEFAULT);
     filterRef.current?.dismiss();
   };
@@ -170,16 +166,14 @@ export function AllBoatsScreen() {
         selectedDate={filters.dateTime.date ? toLocalDateISO(filters.dateTime.date) : undefined}
       />
     ),
-    [availMap, discountsMap, filters.dateTime.date]
+    [availMap, discountsMap, filters.dateTime.date],
   );
 
   const listContentStyle = useMemo(
     () => [s.list, { paddingBottom: insets.bottom + 90 }],
-    [insets.bottom]
+    [insets.bottom],
   );
 
-  // useMemo element (not useCallback component) — FlatList reconciles without remounting,
-  // so DateStrip scroll position is preserved when filters change.
   const listHeader = useMemo(() => (
     <BoatsListHeader
       filters={filters}
@@ -196,7 +190,7 @@ export function AllBoatsScreen() {
     />
   ), [filters, setFilters, handleWeekDate, openFilter, viewMode, filtered.length, total, availLoading, sortBy]);
 
-  const handleResetFilters = useCallback(() => { setFilters(DEFAULT); setSearch(''); }, []);
+  const handleResetFilters = useCallback(() => setFilters(DEFAULT), []);
 
   const ListEmpty = useCallback(() => (
     <BoatEmpty
@@ -212,38 +206,13 @@ export function AllBoatsScreen() {
         right={
           <Pressable
             style={s.searchBtn}
-            onPress={() => { setSearchOpen((o) => !o); if (searchOpen) setSearch(''); }}
+            onPress={() => router.push('/boats/search')}
             hitSlop={8}
           >
-            {searchOpen
-              ? <X size={20} color={COLORS.brandNavy} strokeWidth={2} />
-              : <Search size={20} color={COLORS.brandNavy} strokeWidth={2} />
-            }
+            <Search size={20} color={COLORS.brandNavy} strokeWidth={2} />
           </Pressable>
         }
       />
-
-      {/* Inline search — fixed below header */}
-      {searchOpen && (
-        <View style={s.inlineSearch}>
-          <Search size={15} color={COLORS.text3} strokeWidth={2} />
-          <TextInput
-            autoFocus
-            style={s.inlineInput}
-            placeholder="Найти судно по названию..."
-            placeholderTextColor={COLORS.text3}
-            value={searchText}
-            onChangeText={setSearch}
-            returnKeyType="search"
-            clearButtonMode="while-editing"
-          />
-          {searchText.length > 0 && (
-            <Pressable onPress={() => setSearch('')} hitSlop={8}>
-              <X size={13} color={COLORS.text3} strokeWidth={2.5} />
-            </Pressable>
-          )}
-        </View>
-      )}
 
       {loading ? (
         <View style={s.loader}>
@@ -270,7 +239,7 @@ export function AllBoatsScreen() {
         />
       )}
 
-      {/* Full filter sheet (kept for future use) */}
+      {/* Full filter sheet */}
       <BoatFilter
         modalRef={filterRef}
         draft={draft}
@@ -326,26 +295,9 @@ export function AllBoatsScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.white },
-
+  root:      { flex: 1, backgroundColor: COLORS.white },
   searchBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-
-  inlineSearch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    marginHorizontal: 16,
-    marginBottom: 4,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    backgroundColor: COLORS.white,
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-  },
-  inlineInput: { flex: 1, fontSize: 14, color: COLORS.text1, padding: 0 },
-
-  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list:   { gap: 12, paddingHorizontal: 16 },
-  row:    { gap: 12 },
+  loader:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list:      { gap: 12, paddingHorizontal: 16 },
+  row:       { gap: 12 },
 });

@@ -167,7 +167,9 @@ export default function ReviewsScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {loading ? (
-            <Spinner style={{ marginTop: 64 }} />
+            <View style={{ marginTop: 64, alignItems: 'center' }}>
+              <Spinner />
+            </View>
           ) : (
             <>
               {/* Rating summary */}

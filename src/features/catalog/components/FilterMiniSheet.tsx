@@ -1,5 +1,3 @@
-// features/catalog/components/FilterMiniSheet.tsx
-
 import { BottomSheetModal, BottomSheetScrollView } from '@gorhom/bottom-sheet';
 import React from 'react';
 import {
@@ -240,7 +238,7 @@ export const FilterMiniSheet: React.FC<Props> = ({
           }}
         >
           <Text style={s.applyTxt}>
-            Показать суда{filteredCount > 0 ? ` (${filteredCount})` : ''}
+            Показать результаты
           </Text>
         </Pressable>
       </BottomSheetScrollView>
@@ -260,7 +258,7 @@ const s = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: 16,
   },
-  title:    { fontSize: 18, fontWeight: '800', color: COLORS.text1 },
+  title:    { fontSize: 18, fontWeight: '500', color: COLORS.text1 },
   resetTxt: { fontSize: 14, fontWeight: '600', color: COLORS.brandCyan },
 
   optRow:  { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 4 },
@@ -268,12 +266,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 9,
     borderRadius: 20,
-    backgroundColor: COLORS.backgroundAlt,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.greyLight2,
   },
   optChipOn: { backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
-  optTxt:    { fontSize: 13, fontWeight: '500', color: COLORS.text2 },
+  optTxt:    { fontSize: 13, fontWeight: '500', color: COLORS.brandNavy },
   optTxtOn:  { color: COLORS.white, fontWeight: '600' },
 
   priceRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 },

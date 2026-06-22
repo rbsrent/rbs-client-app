@@ -14,6 +14,7 @@ import {
   ReviewItem,
   ReviewRating,
 } from "@/features/catalog/hooks/useBoatDetail";
+import { COLORS } from "@/shared/colors";
 
 const { width: W } = Dimensions.get("window");
 const CARD_W = W * 0.78;
@@ -28,8 +29,8 @@ function StarDisplay({ value }: { value: number }) {
         <Star
           key={n}
           size={13}
-          color={n <= filled ? "#F5A623" : "#DDD"}
-          fill={n <= filled ? "#F5A623" : "none"}
+          color={n <= filled ? COLORS.yellow : "#DDD"}
+          fill={n <= filled ? COLORS.yellow : "none"}
           strokeWidth={1.5}
         />
       ))}
@@ -112,7 +113,10 @@ function BoatDetailReviews({ reviews, reviewRating, boatId }: Props) {
     return (
       <View style={s.section}>
         <View style={s.header}>
-          <Text style={s.title}>★ {reviewRating.avg.toFixed(2)}</Text>
+          <View style={s.ratingTag}>
+            <Star size={18} color={COLORS.yellow} fill={COLORS.yellow} strokeWidth={0} />
+            <Text style={s.title}>{reviewRating.avg.toFixed(2)}</Text>
+          </View>
           <Text style={s.sub}>
             {reviewRating.total}{" "}
             {reviewRating.total === 1
@@ -149,9 +153,9 @@ function BoatDetailReviews({ reviews, reviewRating, boatId }: Props) {
   return (
     <View style={s.noRating}>
       <View style={s.stars}>
-        <Star size={22} color="#F5A623" fill="#F5A623" strokeWidth={1} />
-        <Star size={30} color="#F5A623" fill="#F5A623" strokeWidth={1} />
-        <Star size={22} color="#F5A623" fill="#F5A623" strokeWidth={1} />
+        <Star size={22} color={COLORS.yellow} fill={COLORS.yellow} strokeWidth={1} />
+        <Star size={30} color={COLORS.yellow} fill={COLORS.yellow} strokeWidth={1} />
+        <Star size={22} color={COLORS.yellow} fill={COLORS.yellow} strokeWidth={1} />
       </View>
       <Text style={s.noRatingTitle}>Пока нет отзывов</Text>
       <Text style={s.noRatingDesc}>Поделитесь впечатлениями после поездки</Text>
@@ -177,6 +181,12 @@ const s = StyleSheet.create({
   title: { fontSize: 18, fontWeight: "500", color: "#000" },
   sub: { fontSize: 14, color: "#6A6A6A" },
   strip: { paddingHorizontal: 24, gap: 12 },
+
+  ratingTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
 
   showAllBtn: {
     marginHorizontal: 24,

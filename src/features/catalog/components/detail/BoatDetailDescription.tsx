@@ -1,5 +1,5 @@
 import { useRouter } from 'expo-router';
-import React, { memo } from 'react';
+import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { setTextModal } from '@/shared/textModalStore';
@@ -25,7 +25,7 @@ function BoatDetailDescription({ description }: Props) {
       <Text style={s.text}>{trimmed}</Text>
       {description.length > LIMIT && (
         <Pressable style={s.btn} onPress={openModal}>
-          <Text style={s.btnTxt}>Показать ещё</Text>
+          <Text style={s.btnTxt}>Читать полностью</Text>
         </Pressable>
       )}
     </View>

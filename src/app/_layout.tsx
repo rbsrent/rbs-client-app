@@ -68,13 +68,16 @@ export default function RootLayout() {
               <Stack.Screen name="wishlist/routes" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="wishlist/route/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="profile/settings" options={{ presentation: 'card' }} />
-              <Stack.Screen name="certificates" options={{ presentation: 'card' }} />
+              <Stack.Screen name="certificates" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="gift-cert" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="boats/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="boats/search" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="routes/[slug]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/boat" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/yacht" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/cruise" options={{ presentation: 'card', animation: 'slide_from_right' }} />
-              <Stack.Screen name="piers" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="services/teplokhod" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="piers" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
               <Stack.Screen name="booking/date-select" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
               <Stack.Screen name="booking/edit-trip" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
             </Stack>

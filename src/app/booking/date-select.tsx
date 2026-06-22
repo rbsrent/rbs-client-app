@@ -1,64 +1,83 @@
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { ArrowLeft, Check, Clock } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { ArrowLeft, Check, Clock } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { computeSlotSelection } from '@/features/booking/utils';
-import { CalendarPicker } from '@/shared/components/CalendarPicker';
-import { COLORS } from '@/shared/colors';
-import { Spinner } from '@/shared/components/Spinner';
-import { publicSupabase } from '@/shared/supabase/publicClient';
+import { computeSlotSelection } from "@/features/booking/utils";
+import { COLORS } from "@/shared/colors";
+import { CalendarPicker } from "@/shared/components/CalendarPicker";
+import { Spinner } from "@/shared/components/Spinner";
+import { publicSupabase } from "@/shared/supabase/publicClient";
 
-const MONTHS_S = ['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек'];
-const DAYS_S   = ['вс','пн','вт','ср','чт','пт','сб'];
+const MONTHS_S = [
+  "янв",
+  "фев",
+  "мар",
+  "апр",
+  "май",
+  "июн",
+  "июл",
+  "авг",
+  "сен",
+  "окт",
+  "ноя",
+  "дек",
+];
+const DAYS_S = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 
 function fmtDateShort(d: Date) {
   return `${d.getDate()} ${MONTHS_S[d.getMonth()]}, ${DAYS_S[d.getDay()]}`;
 }
-function fmtHour(h: number) { return `${String(h).padStart(2, '0')}:00`; }
-function durLabel(h: number) { return h === 1 ? '1 час' : h < 5 ? `${h} часа` : `${h} часов`; }
+function fmtHour(h: number) {
+  return `${String(h).padStart(2, "0")}:00`;
+}
+function durLabel(h: number) {
+  return h === 1 ? "1 час" : h < 5 ? `${h} часа` : `${h} часов`;
+}
 
-const COLS   = 4;
+const COLS = 4;
 
 export default function DateSelectScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { boatId, date: dateParam } = useLocalSearchParams<{ boatId: string; date?: string }>();
+  const { boatId, date: dateParam } = useLocalSearchParams<{
+    boatId: string;
+    date?: string;
+  }>();
 
   const [date, setDate] = useState<Date>(() => {
     if (dateParam) {
       const d = new Date(dateParam);
-      if (!isNaN(d.getTime())) { d.setHours(0, 0, 0, 0); return d; }
+      if (!isNaN(d.getTime())) {
+        d.setHours(0, 0, 0, 0);
+        return d;
+      }
     }
     const d = new Date();
     d.setHours(0, 0, 0, 0);
     return d;
   });
 
-  const [minDuration,   setMinDuration]   = useState(1);
-  const [busyHours, setBusyHours]         = useState<Set<number>>(new Set());
-  const [slotsLoading, setSlotsLoading]   = useState(false);
+  const [minDuration, setMinDuration] = useState(1);
+  const [busyHours, setBusyHours] = useState<Set<number>>(new Set());
+  const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
 
   // Fetch boat min_duration_hours once (column may not exist yet — defaults to 1)
   useEffect(() => {
     if (!boatId) return;
-    publicSupabase
-      .from('boats')
-      .select('min_duration_hours')
-      .eq('id', boatId)
-      .single()
-      .then(({ data, error }) => {
-        if (!error && data?.min_duration_hours) setMinDuration(data.min_duration_hours);
-      })
-      .catch(() => {});
+    void (async () => {
+      try {
+        const { data, error } = await publicSupabase
+          .from("boats")
+          .select("min_duration_hours")
+          .eq("id", boatId)
+          .single();
+        if (!error && data?.min_duration_hours)
+          setMinDuration(data.min_duration_hours);
+      } catch {}
+    })();
   }, [boatId]);
 
   // Fetch busy slots whenever date changes
@@ -69,50 +88,67 @@ export default function DateSelectScreen() {
     setBusyHours(new Set());
     setSelectedHours([]);
 
-    const dayStart = new Date(date); dayStart.setHours(0, 0, 0, 0);
-    const dayEnd   = new Date(date); dayEnd.setHours(23, 59, 59, 999);
+    const dayStart = new Date(date);
+    dayStart.setHours(0, 0, 0, 0);
+    const dayEnd = new Date(date);
+    dayEnd.setHours(23, 59, 59, 999);
 
-    publicSupabase
-      .rpc('get_boat_busy_slots', {
-        p_boat_id:        boatId,
-        p_start_datetime: dayStart.toISOString(),
-        p_end_datetime:   dayEnd.toISOString(),
-      })
-      .then(({ data }) => {
+    void (async () => {
+      try {
+        const { data } = await publicSupabase.rpc("get_boat_busy_slots", {
+          p_boat_id: boatId,
+          p_start_datetime: dayStart.toISOString(),
+          p_end_datetime: dayEnd.toISOString(),
+        });
         if (cancelled) return;
         const busy = new Set<number>();
-        (data ?? []).forEach((slot: { start_datetime: string; end_datetime: string }) => {
-          const s = new Date(slot.start_datetime);
-          const e = new Date(slot.end_datetime);
-          for (let h = s.getHours(); h < e.getHours(); h++) busy.add(h);
-        });
+        (data ?? []).forEach(
+          (slot: { start_datetime: string; end_datetime: string }) => {
+            const s = new Date(slot.start_datetime);
+            const e = new Date(slot.end_datetime);
+            for (let h = s.getHours(); h < e.getHours(); h++) busy.add(h);
+          },
+        );
         setBusyHours(busy);
-      })
-      .catch(() => {})
-      .finally(() => { if (!cancelled) setSlotsLoading(false); });
+      } catch {
+      } finally {
+        if (!cancelled) setSlotsLoading(false);
+      }
+    })();
 
-    return () => { cancelled = true; };
+    return () => {
+      cancelled = true;
+    };
   }, [date, boatId]);
 
-  const unavailable = useCallback((hour: number): boolean => {
-    if (busyHours.has(hour)) return true;
-    const now = new Date();
-    if (date.toDateString() === now.toDateString() && hour <= now.getHours()) return true;
-    return false;
-  }, [busyHours, date]);
+  const unavailable = useCallback(
+    (hour: number): boolean => {
+      if (busyHours.has(hour)) return true;
+      const now = new Date();
+      if (date.toDateString() === now.toDateString() && hour <= now.getHours())
+        return true;
+      return false;
+    },
+    [busyHours, date],
+  );
 
-  const handleSlot = useCallback((hour: number) => {
-    if (unavailable(hour)) return;
-    setSelectedHours((prev) => computeSlotSelection(prev, hour, minDuration, unavailable));
-  }, [unavailable, minDuration]);
+  const handleSlot = useCallback(
+    (hour: number) => {
+      if (unavailable(hour)) return;
+      setSelectedHours((prev) =>
+        computeSlotSelection(prev, hour, minDuration, unavailable),
+      );
+    },
+    [unavailable, minDuration],
+  );
 
-  const startH  = selectedHours[0];
-  const endH    = startH != null ? startH + selectedHours.length : null;
+  const startH = selectedHours[0];
+  const endH = startH != null ? startH + selectedHours.length : null;
   const canNext = selectedHours.length >= minDuration;
 
   const handleNext = useCallback(() => {
     if (!canNext) return;
-    const dateISO = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+    const dateISO = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     router.push(
       `/booking/${boatId}?date=${dateISO}&startHour=${startH}&duration=${selectedHours.length}` as any,
     );
@@ -120,7 +156,7 @@ export default function DateSelectScreen() {
 
   const slotWidth = useMemo(() => {
     // computed in render is fine — screen width doesn't change
-    const { width } = require('react-native').Dimensions.get('window');
+    const { width } = require("react-native").Dimensions.get("window");
     return Math.floor((width - 32 - (COLS - 1) * 8) / COLS);
   }, []);
 
@@ -137,7 +173,10 @@ export default function DateSelectScreen() {
 
       <ScrollView
         style={s.scroll}
-        contentContainerStyle={[s.scrollContent, { paddingBottom: 120 + insets.bottom }]}
+        contentContainerStyle={[
+          s.scrollContent,
+          { paddingBottom: 120 + insets.bottom },
+        ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
@@ -160,22 +199,31 @@ export default function DateSelectScreen() {
             <Text style={s.slotTitle}>Время</Text>
             <Text style={s.slotDate}>
               {fmtDateShort(date)}
-              {minDuration > 1 ? `  ·  мин. ${durLabel(minDuration)}` : ''}
+              {minDuration > 1 ? `  ·  мин. ${durLabel(minDuration)}` : ""}
             </Text>
           </View>
 
           {/* Legend */}
           <View style={s.legend}>
             <View style={s.legendItem}>
-              <View style={[s.legendDot, { backgroundColor: COLORS.brandNavy }]} />
+              <View
+                style={[s.legendDot, { backgroundColor: COLORS.brandNavy }]}
+              />
               <Text style={s.legendTxt}>Выбрано</Text>
             </View>
             <View style={s.legendItem}>
-              <View style={[s.legendDot, { backgroundColor: COLORS.white, borderWidth: 1, borderColor: COLORS.border }]} />
+              <View
+                style={[
+                  s.legendDot,
+                  {
+                    backgroundColor: COLORS.greyLight,
+                  },
+                ]}
+              />
               <Text style={s.legendTxt}>Свободно</Text>
             </View>
             <View style={s.legendItem}>
-              <View style={[s.legendDot, { backgroundColor: '#F3E8E8' }]} />
+              <View style={[s.legendDot, { backgroundColor: "#F3E8E8" }]} />
               <Text style={s.legendTxt}>Занято</Text>
             </View>
           </View>
@@ -188,12 +236,13 @@ export default function DateSelectScreen() {
           ) : (
             <View style={s.grid}>
               {Array.from({ length: 24 }, (_, hour) => {
-                const busy     = busyHours.has(hour);
-                const past     = unavailable(hour) && !busy;
-                const off      = busy || past;
+                const busy = busyHours.has(hour);
+                const past = unavailable(hour) && !busy;
+                const off = busy || past;
                 const selected = selectedHours.includes(hour);
-                const isFirst  = selected && hour === selectedHours[0];
-                const isLast   = selected && hour === selectedHours[selectedHours.length - 1];
+                const isFirst = selected && hour === selectedHours[0];
+                const isLast =
+                  selected && hour === selectedHours[selectedHours.length - 1];
 
                 return (
                   <Pressable
@@ -201,16 +250,22 @@ export default function DateSelectScreen() {
                     style={({ pressed }) => [
                       s.slot,
                       { width: slotWidth },
-                      off      && s.slotOff,
+                      off && s.slotOff,
                       selected && s.slotSel,
-                      isFirst  && s.slotFirst,
-                      isLast   && s.slotLast,
+                      isFirst && s.slotFirst,
+                      isLast && s.slotLast,
                       !off && !selected && pressed && s.slotPressed,
                     ]}
                     onPress={() => handleSlot(hour)}
                     disabled={off}
                   >
-                    <Text style={[s.slotTxt, off && s.slotTxtOff, selected && s.slotTxtSel]}>
+                    <Text
+                      style={[
+                        s.slotTxt,
+                        off && s.slotTxtOff,
+                        selected && s.slotTxtSel,
+                      ]}
+                    >
                       {fmtHour(hour)}
                     </Text>
                     {isFirst && !isLast && <View style={s.slotDot} />}
@@ -232,7 +287,9 @@ export default function DateSelectScreen() {
           {canNext ? (
             <>
               <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
-              <Text style={s.selTxt}>{fmtHour(startH!)} – {fmtHour(endH!)}</Text>
+              <Text style={s.selTxt}>
+                {fmtHour(startH!)} – {fmtHour(endH!)}
+              </Text>
               <View style={s.durBadge}>
                 <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
               </View>
@@ -258,80 +315,113 @@ export default function DateSelectScreen() {
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.backgroundAlt },
+  root: { flex: 1, backgroundColor: COLORS.white },
 
   header: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    height: 52, paddingHorizontal: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    height: 52,
+    paddingHorizontal: 12,
     backgroundColor: COLORS.white,
-    borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: COLORS.border,
   },
   backBtn: {
-    width: 40, height: 40, alignItems: 'center', justifyContent: 'center',
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  headerTitle: { fontSize: 17, fontWeight: '700', color: COLORS.text1 },
+  headerTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
 
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 8 },
 
-  section: { backgroundColor: COLORS.white, paddingHorizontal: 16, paddingVertical: 16 },
+  section: {
+    backgroundColor: COLORS.white,
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+  },
   divider: { height: 8 },
 
-  slotHeader: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 12 },
-  slotTitle:  { fontSize: 15, fontWeight: '700', color: COLORS.text1, flex: 1 },
-  slotDate:   { fontSize: 13, color: COLORS.text3 },
+  slotHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 12,
+  },
+  slotTitle: { fontSize: 15, fontWeight: "700", color: COLORS.text1, flex: 1 },
+  slotDate: { fontSize: 13, color: COLORS.text3 },
 
-  legend: { flexDirection: 'row', gap: 14, marginBottom: 14 },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  legendDot:  { width: 12, height: 12, borderRadius: 3 },
-  legendTxt:  { fontSize: 11, color: COLORS.text3 },
+  legend: { flexDirection: "row", gap: 14, marginBottom: 14 },
+  legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },
+  legendDot: { width: 12, height: 12, borderRadius: 3 },
+  legendTxt: { fontSize: 11, color: COLORS.text3 },
 
-  loader:    { alignItems: 'center', gap: 10, paddingVertical: 32 },
+  loader: { alignItems: "center", gap: 10, paddingVertical: 32 },
   loaderTxt: { fontSize: 13, color: COLORS.text3 },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
+  grid: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
 
   slot: {
-    height: 48, borderRadius: 10,
-    borderWidth: 1.5, borderColor: COLORS.border,
-    backgroundColor: COLORS.white,
-    alignItems: 'center', justifyContent: 'center', gap: 2,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: COLORS.greyLight,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
   },
-  slotOff:     { backgroundColor: '#F8ECEC', borderColor: '#EDD5D5', opacity: 0.7 },
-  slotSel:     { backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
-  slotFirst:   { borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
-  slotLast:    { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
-  slotPressed: { backgroundColor: COLORS.brandNavy + '12' },
+  slotOff: { backgroundColor: "#F8ECEC", borderColor: "#EDD5D5", opacity: 0.7 },
+  slotSel: { backgroundColor: COLORS.brandNavy, borderColor: COLORS.brandNavy },
+  slotFirst: { borderBottomLeftRadius: 4, borderBottomRightRadius: 4 },
+  slotLast: { borderTopLeftRadius: 4, borderTopRightRadius: 4 },
+  slotPressed: { backgroundColor: COLORS.brandNavy + "12" },
 
-  slotTxt:    { fontSize: 13, fontWeight: '600', color: COLORS.text1 },
-  slotTxtOff: { color: '#C09090', fontWeight: '400' },
-  slotTxtSel: { color: '#fff' },
-  slotBusyLbl:{ fontSize: 9, color: '#C09090' },
-  slotDot:    { width: 5, height: 5, borderRadius: 2.5, backgroundColor: 'rgba(255,255,255,0.6)' },
+  slotTxt: { fontSize: 13, fontWeight: "600", color: COLORS.text1 },
+  slotTxtOff: { color: "#C09090", fontWeight: "400" },
+  slotTxtSel: { color: "#fff" },
+  slotBusyLbl: { fontSize: 9, color: "#C09090" },
+  slotDot: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: "rgba(255,255,255,0.6)",
+  },
 
   bottomBar: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 14,
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 14,
     backgroundColor: COLORS.white,
-    borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border,
     gap: 12,
-    shadowColor: '#000', shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.06, shadowRadius: 8, elevation: 8,
   },
-  selectionInfo: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  selTxt:  { fontSize: 15, fontWeight: '700', color: COLORS.brandNavy },
+  selectionInfo: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  selTxt: { fontSize: 15, fontWeight: "700", color: COLORS.brandNavy },
   durBadge: {
-    backgroundColor: COLORS.brandNavy + '15',
-    borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3,
+    backgroundColor: COLORS.brandNavy + "15",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
   },
-  durTxt:   { fontSize: 11, color: COLORS.brandNavy, fontWeight: '600' },
-  selHint:  { flex: 1, fontSize: 12, color: COLORS.text3 },
+  durTxt: { fontSize: 11, color: COLORS.brandNavy, fontWeight: "600" },
+  selHint: { flex: 1, fontSize: 12, color: COLORS.text3 },
 
   nextBtn: {
     backgroundColor: COLORS.brandNavy,
-    borderRadius: 12, paddingHorizontal: 28, paddingVertical: 13,
+    borderRadius: 12,
+    paddingHorizontal: 28,
+    paddingVertical: 13,
   },
   nextBtnDim: { backgroundColor: COLORS.muted },
-  nextTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  nextTxt: { fontSize: 15, fontWeight: "700", color: "#fff" },
 });

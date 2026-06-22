@@ -1,5 +1,4 @@
-import { ArrowRight } from 'lucide-react-native';
-import { Animated, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
 
@@ -24,7 +23,7 @@ export function SectionHeader({ title, sub, seeAllLabel = 'Все', onSeeAll }: 
           hitSlop={8}
         >
           <Text style={styles.seeAllText}>{seeAllLabel}</Text>
-          <ArrowRight size={14} color={COLORS.brandCyan} strokeWidth={2.5} />
+          {/* <ArrowRight size={14} color={COLORS.brandCyan} strokeWidth={2.5} /> */}
         </Pressable>
       ) : null}
     </View>
@@ -57,6 +56,6 @@ const styles = StyleSheet.create({
   seeAllText: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.brandCyan,
+    color: COLORS.brandBlue,
   },
 });

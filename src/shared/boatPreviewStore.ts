@@ -1,6 +1,7 @@
 export interface BoatPreview {
   id:    string;
   name:  string;
+  type:  string | null;
   cover: string | null;
 }
 

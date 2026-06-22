@@ -1,7 +1,7 @@
 import { Image } from 'expo-image';
 import { X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { FlatList } from 'react-native-gesture-handler';
+import { FlatList, Gesture, GestureDetector } from 'react-native-gesture-handler';
 import {
   Dimensions,
   Modal,
@@ -13,10 +13,13 @@ import {
 } from 'react-native';
 import Animated, {
   Easing,
+  Extrapolation,
   SharedTransition,
+  interpolate,
   runOnJS,
   useAnimatedStyle,
   useSharedValue,
+  withSpring,
   withTiming,
 } from 'react-native-reanimated';
 
@@ -25,7 +28,7 @@ const heroTransition = SharedTransition
   .easing(Easing.bezier(0.35, 0, 0.25, 1) as any);
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const { width: W } = Dimensions.get('window');
+const { width: W, height: H } = Dimensions.get('window');
 export const SWIPER_IMG_H = 400;
 
 const viewConfig = { viewAreaCoveragePercentThreshold: 50 };
@@ -73,19 +76,56 @@ export default function BoatImageSwiper({ images, previewUri, onIndexChange, her
   const [fsVisible, setFsVisible] = useState(false);
 
   const fsOpacity = useSharedValue(0);
-  const fsStyle   = useAnimatedStyle(() => ({ opacity: fsOpacity.value }));
+  const dragY     = useSharedValue(0);
+
+  const fsStyle = useAnimatedStyle(() => ({
+    opacity:   fsOpacity.value * interpolate(dragY.value, [0, H * 0.4], [1, 0], Extrapolation.CLAMP),
+    transform: [{ translateY: dragY.value }],
+  }));
 
   const openFs = useCallback(() => {
+    dragY.value     = 0;
     fsOpacity.value = 0;
     setFsVisible(true);
-    fsOpacity.value = withTiming(1, { duration: 150 });
+    fsOpacity.value = withTiming(1, { duration: 180 });
   }, []);
 
   const closeFs = useCallback(() => {
-    fsOpacity.value = withTiming(0, { duration: 120 }, (done) => {
-      if (done) runOnJS(setFsVisible)(false);
+    fsOpacity.value = withTiming(0, { duration: 150 }, (done) => {
+      if (done) {
+        runOnJS(setFsVisible)(false);
+        dragY.value = 0;
+      }
     });
   }, []);
+
+  const hideFsModal = useCallback(() => {
+    setFsVisible(false);
+    dragY.value = 0;
+  }, []);
+
+  const panGesture = Gesture.Pan()
+    .activeOffsetY([10, Infinity])
+    .failOffsetX([-15, 15])
+    .onUpdate((e) => {
+      dragY.value = Math.max(0, e.translationY);
+    })
+    .onEnd((e) => {
+      if (e.translationY > 100 || e.velocityY > 600) {
+        // fly off with natural velocity + fade in parallel
+        dragY.value = withSpring(H * 1.2, {
+          velocity:  e.velocityY,
+          damping:   30,
+          stiffness: 180,
+          mass:      0.6,
+        });
+        fsOpacity.value = withTiming(0, { duration: 220 }, (done) => {
+          if (done) runOnJS(hideFsModal)();
+        });
+      } else {
+        dragY.value = withSpring(0, { damping: 16, stiffness: 200, mass: 0.6 });
+      }
+    });
 
   const onViewChange = useCallback(({ viewableItems }: { viewableItems: any[] }) => {
     const idx = viewableItems[0]?.index;
@@ -166,6 +206,10 @@ export default function BoatImageSwiper({ images, previewUri, onIndexChange, her
             maxToRenderPerBatch={2}
             windowSize={3}
           />
+          {/* drag zone: absolute top — does not overlap FlatList touch area */}
+          <GestureDetector gesture={panGesture}>
+            <View style={[s.fsDragZone, { height: insets.top + 64 }]} />
+          </GestureDetector>
           <Text style={[s.fsCounter, { top: insets.top + 14 }]}>
             {activeIdx + 1} / {images.length}
           </Text>
@@ -195,6 +239,7 @@ const s = StyleSheet.create({
   counterTxt: { color: '#fff', fontSize: 11, fontWeight: '500' },
 
   fsContainer: { backgroundColor: '#000', justifyContent: 'center' },
+  fsDragZone:  { position: 'absolute', top: 0, left: 0, right: 0 },
   fsCounter: {
     position: 'absolute',
     alignSelf: 'center',

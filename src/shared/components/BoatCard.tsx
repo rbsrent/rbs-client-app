@@ -47,10 +47,10 @@ interface Props {
 }
 
 const GRID_W = (W - 16 * 2 - 12) / 2;
-const STRIP_W = Math.round(W * 0.83);
+export const STRIP_W     = Math.round(W * 0.83);
+export const STRIP_IMG_H = Math.round(STRIP_W * 0.58);
 
-const GRID_IMG_H  = Math.round(GRID_W  * 1.05);
-const STRIP_IMG_H = Math.round(STRIP_W * 0.58);
+const GRID_IMG_H = Math.round(GRID_W * 1.05);
 
 const _RU_FMT = new Intl.NumberFormat("ru-RU");
 const ruNum = (n: number) => _RU_FMT.format(Math.round(n));
@@ -100,7 +100,7 @@ export const BoatCard = memo(function BoatCard({
   }), [boat.id, boat.name, boat.type, boat.cover_image_url, boat.price_per_hour, boat.capacity, boat.length_meters, boat.pier_name, boat.rating]);
 
   const handlePress = useCallback(() => {
-    setBoatPreview({ id: boat.id, name: boat.name, cover: boat.cover_image_url ?? null });
+    setBoatPreview({ id: boat.id, name: boat.name, type: boat.type ?? null, cover: boat.cover_image_url ?? null });
     router.push((route ?? `/catalog/${boat.id}`) as any);
   }, [boat.id, boat.name, boat.cover_image_url, route, router]);
 
@@ -213,8 +213,8 @@ export const BoatCard = memo(function BoatCard({
           </Text>
           {boat.pier_name ? (
             <View style={s.locationRow}>
-              <MapPin size={10} color={COLORS.text3} strokeWidth={2} />
-              <Text style={s.locationTxt} numberOfLines={1}>{boat.pier_name}</Text>
+              {/* <MapPin size={10} color={COLORS.text3} strokeWidth={2} /> */}
+              <Text style={s.locationTxt} numberOfLines={1}>Причал {boat.pier_name}</Text>
             </View>
           ) : null}
         </View>
@@ -269,7 +269,7 @@ const s = StyleSheet.create({
   },
 
   badgePill: {
-    borderRadius: 20,
+    borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
@@ -303,7 +303,7 @@ const s = StyleSheet.create({
 
   discountPill: {
     backgroundColor: "#E53935",
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
@@ -354,7 +354,7 @@ const s = StyleSheet.create({
   },
   meta: {
     fontSize: 12,
-    color: COLORS.text3,
+    color: COLORS.grey,
     lineHeight: 17,
   },
   locationRow: {
@@ -365,7 +365,7 @@ const s = StyleSheet.create({
   locationTxt: {
     flex: 1,
     fontSize: 12,
-    color: COLORS.text3,
+    color: COLORS.grey,
     lineHeight: 17,
   },
 });

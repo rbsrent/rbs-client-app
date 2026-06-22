@@ -1,8 +1,8 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useLocalSearchParams, useRouter } from 'expo-router';
-import { MapPin, Search, SlidersHorizontal, Users } from 'lucide-react-native';
-import { memo, useCallback, useMemo, useState } from 'react';
+import { Image } from "expo-image";
+import { LinearGradient } from "expo-linear-gradient";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import { MapPin, Search, SlidersHorizontal, Users } from "lucide-react-native";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -11,17 +11,24 @@ import {
   Text,
   TextInput,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { useDiscountsCache } from '@/features/catalog/hooks/useDiscountsCache';
-import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
-import { useHomeData } from '@/features/home/hooks/useHomeData';
-import { COLORS } from '@/shared/colors';
-import { getBoatPriceInfo, ruFmtPrice } from '@/shared/utils/boatPrice';
-import { Boat } from '@/store/useCatalogStore';
+import { ActiveDiscount, useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
+import { useHomeData } from "@/features/home/hooks/useHomeData";
+import { COLORS } from "@/shared/colors";
+import { getBoatPriceInfo, ruFmtPrice } from "@/shared/utils/boatPrice";
+import { Boat } from "@/store/useCatalogStore";
 
-const BoatGridCard = memo(function BoatGridCard({ boat, discount, router }: { boat: Boat; discount?: ActiveDiscount; router: any }) {
+const BoatGridCard = memo(function BoatGridCard({
+  boat,
+  discount,
+  router,
+}: {
+  boat: Boat;
+  discount?: ActiveDiscount;
+  router: any;
+}) {
   const { displayPrice, originalPrice, discountPct } = getBoatPriceInfo(
     boat.price_per_hour,
     boat.public_price_per_hour_night,
@@ -34,20 +41,32 @@ const BoatGridCard = memo(function BoatGridCard({ boat, discount, router }: { bo
     >
       <View style={styles.gridImageWrap}>
         {boat.cover_image_url ? (
-          <Image source={{ uri: boat.cover_image_url }} style={StyleSheet.absoluteFill} contentFit="cover" transition={200} />
+          <Image
+            source={{ uri: boat.cover_image_url }}
+            style={StyleSheet.absoluteFill}
+            contentFit="cover"
+            transition={200}
+          />
         ) : (
-          <LinearGradient colors={[COLORS.brandNavy, COLORS.brandCyan]} style={StyleSheet.absoluteFill} />
+          <LinearGradient
+            colors={[COLORS.brandNavy, COLORS.brandCyan]}
+            style={StyleSheet.absoluteFill}
+          />
         )}
         <View style={styles.gridTypeBadge}>
           <Text style={styles.gridTypeText}>{boat.type}</Text>
         </View>
       </View>
       <View style={styles.gridInfo}>
-        <Text style={styles.gridName} numberOfLines={1}>{boat.name}</Text>
+        <Text style={styles.gridName} numberOfLines={1}>
+          {boat.name}
+        </Text>
         {boat.pier_name ? (
           <View style={styles.gridMeta}>
             <MapPin size={10} color={COLORS.text3} strokeWidth={2} />
-            <Text style={styles.gridMetaText} numberOfLines={1}>{boat.pier_name}</Text>
+            <Text style={styles.gridMetaText} numberOfLines={1}>
+              {boat.pier_name}
+            </Text>
           </View>
         ) : null}
         <View style={styles.gridMeta}>
@@ -56,7 +75,9 @@ const BoatGridCard = memo(function BoatGridCard({ boat, discount, router }: { bo
         </View>
         <View style={styles.gridPriceRow}>
           {originalPrice ? (
-            <Text style={styles.gridPriceOld}>{ruFmtPrice(originalPrice)} ₽</Text>
+            <Text style={styles.gridPriceOld}>
+              {ruFmtPrice(originalPrice)} ₽
+            </Text>
           ) : null}
           <Text style={styles.gridPrice}>{ruFmtPrice(displayPrice)} ₽/ч</Text>
           {discountPct ? (
@@ -70,21 +91,21 @@ const BoatGridCard = memo(function BoatGridCard({ boat, discount, router }: { bo
   );
 });
 
-const _RU_FMT = new Intl.NumberFormat('ru-RU');
-const VESSEL_TYPES = ['Все', 'Катер', 'Яхта', 'Моторная яхта'];
+// const _RU_FMT = new Intl.NumberFormat("ru-RU");
+const VESSEL_TYPES = ["Все", "Катер", "Яхта", "Моторная яхта"];
 
 export const CatalogScreen = memo(function CatalogScreen() {
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{ type?: string }>();
-  const [search, setSearch] = useState('');
-  const [activeType, setActiveType] = useState(params.type ?? 'Все');
+  const [search, setSearch] = useState("");
+  const [activeType, setActiveType] = useState(params.type ?? "Все");
   const router = useRouter();
   const { boats, isLoadingBoats, refetch } = useHomeData();
   const discountsMap = useDiscountsCache();
 
   const filtered = useMemo(() => {
     let list = boats;
-    if (activeType !== 'Все') {
+    if (activeType !== "Все") {
       list = list.filter((b) => b.type === activeType);
     }
     if (search.trim()) {
@@ -93,28 +114,37 @@ export const CatalogScreen = memo(function CatalogScreen() {
         (b) =>
           b.name.toLowerCase().includes(q) ||
           b.type.toLowerCase().includes(q) ||
-          (b.pier_name ?? '').toLowerCase().includes(q),
+          (b.pier_name ?? "").toLowerCase().includes(q),
       );
     }
     return list;
   }, [boats, activeType, search]);
 
-  const renderItem = useCallback(({ item }: { item: Boat }) => (
-    <BoatGridCard boat={item} discount={discountsMap.get(item.id)} router={router} />
-  ), [router, discountsMap]);
+  const renderItem = useCallback(
+    ({ item }: { item: Boat }) => (
+      <BoatGridCard
+        boat={item}
+        discount={discountsMap.get(item.id)}
+        router={router}
+      />
+    ),
+    [router, discountsMap],
+  );
 
   const listContentStyle = useMemo(
     () => [styles.list, { paddingBottom: insets.bottom + 80 }],
-    [insets.bottom]
+    [insets.bottom],
   );
 
-  const ListEmpty = useCallback(() => (
-    !isLoadingBoats ? (
-      <View style={styles.empty}>
-        <Text style={styles.emptyText}>Суда не найдены</Text>
-      </View>
-    ) : null
-  ), [isLoadingBoats]);
+  const ListEmpty = useCallback(
+    () =>
+      !isLoadingBoats ? (
+        <View style={styles.empty}>
+          <Text style={styles.emptyText}>Суда не найдены</Text>
+        </View>
+      ) : null,
+    [isLoadingBoats],
+  );
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
@@ -133,7 +163,11 @@ export const CatalogScreen = memo(function CatalogScreen() {
             />
           </View>
           <Pressable style={styles.filterBtn}>
-            <SlidersHorizontal size={18} color={COLORS.brandNavy} strokeWidth={2} />
+            <SlidersHorizontal
+              size={18}
+              color={COLORS.brandNavy}
+              strokeWidth={2}
+            />
           </Pressable>
         </View>
         <FlatList
@@ -145,7 +179,12 @@ export const CatalogScreen = memo(function CatalogScreen() {
               style={[styles.chip, activeType === item && styles.chipActive]}
               onPress={() => setActiveType(item)}
             >
-              <Text style={[styles.chipText, activeType === item && styles.chipTextActive]}>
+              <Text
+                style={[
+                  styles.chipText,
+                  activeType === item && styles.chipTextActive,
+                ]}
+              >
                 {item}
               </Text>
             </Pressable>
@@ -169,7 +208,11 @@ export const CatalogScreen = memo(function CatalogScreen() {
         maxToRenderPerBatch={4}
         windowSize={5}
         refreshControl={
-          <RefreshControl refreshing={isLoadingBoats} onRefresh={refetch} tintColor={COLORS.brandCyan} />
+          <RefreshControl
+            refreshing={isLoadingBoats}
+            onRefresh={refetch}
+            tintColor={COLORS.brandCyan}
+          />
         }
         ListEmptyComponent={ListEmpty}
       />
@@ -192,19 +235,19 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 22,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.text1,
     paddingTop: 8,
   },
   searchRow: {
-    flexDirection: 'row',
+    flexDirection: "row",
     gap: 10,
-    alignItems: 'center',
+    alignItems: "center",
   },
   searchWrap: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 8,
     backgroundColor: COLORS.backgroundAlt,
     borderRadius: 12,
@@ -223,8 +266,8 @@ const styles = StyleSheet.create({
     height: 44,
     backgroundColor: COLORS.backgroundAlt,
     borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
     borderColor: COLORS.border,
   },
@@ -243,11 +286,11 @@ const styles = StyleSheet.create({
   chipText: {
     fontSize: 13,
     color: COLORS.text2,
-    fontWeight: '500',
+    fontWeight: "500",
   },
   chipTextActive: {
     color: COLORS.white,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   list: {
     padding: 16,
@@ -258,7 +301,7 @@ const styles = StyleSheet.create({
   },
   empty: {
     paddingVertical: 60,
-    alignItems: 'center',
+    alignItems: "center",
   },
   emptyText: {
     fontSize: 15,
@@ -268,8 +311,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.white,
     borderRadius: 14,
-    overflow: 'hidden',
-    shadowColor: '#000',
+    overflow: "hidden",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.07,
     shadowRadius: 6,
@@ -277,13 +320,13 @@ const styles = StyleSheet.create({
   },
   gridImageWrap: {
     height: 110,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   gridTypeBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: 6,
     left: 6,
-    backgroundColor: 'rgba(11,17,32,0.6)',
+    backgroundColor: "rgba(11,17,32,0.6)",
     borderRadius: 5,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -291,7 +334,7 @@ const styles = StyleSheet.create({
   gridTypeText: {
     color: COLORS.white,
     fontSize: 9,
-    fontWeight: '600',
+    fontWeight: "600",
   },
   gridInfo: {
     padding: 10,
@@ -299,12 +342,12 @@ const styles = StyleSheet.create({
   },
   gridName: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.text1,
   },
   gridMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     gap: 3,
   },
   gridMetaText: {
@@ -313,27 +356,27 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   gridPriceRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
     gap: 4,
     marginTop: 2,
   },
   gridPriceOld: {
     fontSize: 11,
     color: COLORS.text3,
-    textDecorationLine: 'line-through',
+    textDecorationLine: "line-through",
   },
   gridPrice: {
     fontSize: 13,
-    fontWeight: '700',
+    fontWeight: "700",
     color: COLORS.brandNavy,
   },
   gridDiscountPill: {
-    backgroundColor: '#E53935',
+    backgroundColor: "#E53935",
     borderRadius: 5,
     paddingHorizontal: 5,
     paddingVertical: 2,
   },
-  gridDiscountTxt: { fontSize: 10, fontWeight: '700', color: '#fff' },
+  gridDiscountTxt: { fontSize: 10, fontWeight: "700", color: "#fff" },
 });

@@ -9,13 +9,17 @@ export interface BoatImage {
 }
 
 export interface BoatPier {
-  name:    string;
-  address: string | null;
+  name:      string;
+  address:   string | null;
+  latitude:  number | null;
+  longitude: number | null;
 }
 
 export interface Boat {
   id:                          string;
   name:                        string;
+  seo_h1:                      string | null;
+  seo_name_ru:                 string | null;
   type:                        string | null;
   description:                 string | null;
   price_per_hour:              number;
@@ -29,6 +33,32 @@ export interface Boat {
   has_bluetooth:               boolean;
   piers:                       BoatPier | null;
   boat_images:                 BoatImage[];
+}
+
+const TYPE_GENITIVE: Record<string, string> = {
+  'катер':           'катера',
+  'яхта':            'яхты',
+  'моторная яхта':   'моторной яхты',
+  'парусная яхта':   'парусной яхты',
+  'моторная лодка':  'моторной лодки',
+  'лодка':           'лодки',
+  'катамаран':       'катамарана',
+  'гидроцикл':       'гидроцикла',
+  'понтон':          'понтона',
+  'тендер':          'тендера',
+};
+
+export function buildBoatH1(p: { name: string; type?: string | null; seo_h1?: string | null; seo_name_ru?: string | null }): string {
+  if (p.seo_h1?.trim()) return p.seo_h1.trim();
+  const displayName = p.seo_name_ru?.trim() || p.name;
+  const typeGen     = p.type ? (TYPE_GENITIVE[p.type.toLowerCase()] ?? p.type) : null;
+  return typeGen
+    ? `Аренда ${typeGen} «${displayName}» в Санкт-Петербурге`
+    : `Аренда «${displayName}» в Санкт-Петербурге`;
+}
+
+export function getBoatH1(boat: Boat): string {
+  return buildBoatH1(boat);
 }
 
 export interface ReviewItem {
@@ -79,7 +109,7 @@ export function useBoatDetail(id: string): BoatDetailState {
         const [boatRes, reviewsRes, ratingRes] = await Promise.all([
           publicSupabase
             .from('boats')
-            .select('*, boat_images(image_path, position), piers(name, address)')
+            .select('*, boat_images(image_path, position), piers(name, address, latitude, longitude)')
             .eq('id', id)
             .single(),
           publicSupabase

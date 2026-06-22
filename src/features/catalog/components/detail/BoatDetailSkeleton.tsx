@@ -43,26 +43,6 @@ function Divider() {
 export function BoatDetailSkeleton() {
   return (
     <View>
-      {/* Stats row — mirrors s.statsRow: paddingHorizontal:24, paddingBottom:20 */}
-      <View style={sk.statsRow}>
-        <View style={sk.statsCell}>
-          <S w={48} h={20} style={sk.r4} />
-          <S w={36} h={12} style={[sk.r3, { marginTop: 4 }]} />
-        </View>
-        <View style={sk.vSep} />
-        <View style={sk.statsCell}>
-          <S w={52} h={20} style={sk.r4} />
-          <S w={28} h={12} style={[sk.r3, { marginTop: 4 }]} />
-        </View>
-        <View style={sk.vSep} />
-        <View style={sk.statsCell}>
-          <S w={32} h={20} style={sk.r4} />
-          <S w={44} h={12} style={[sk.r3, { marginTop: 4 }]} />
-        </View>
-      </View>
-
-      <Divider />
-
       {/* Host row — mirrors s.hostRow: paddingHorizontal:24, paddingVertical:20, gap:16 */}
       <View style={sk.hostRow}>
         <S w={40} h={40} style={sk.r20} />

@@ -1,5 +1,3 @@
-// features/catalog/components/BoatFilter.tsx
-
 import { BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { Calendar, ChevronLeft, ChevronRight } from "lucide-react-native";
 import React, { useRef } from "react";
@@ -68,17 +66,15 @@ export const BoatFilter: React.FC<BoatFilterProps> = ({
       friction: 12,
     }).start();
 
-  // Helper untuk preset harga
   const setPricePreset = (min: number | null, max: number | null) => {
     onDraftChange({ ...draft, priceMin: min, priceMax: max });
   };
   const matchesPreset = (min: number | null, max: number | null) =>
     draft.priceMin === min && draft.priceMax === max;
 
-  // Fungsi untuk reset semua (draft ke default, lalu panggil onResetAll)
   const handleResetAll = () => {
-    onDraftChange(DEFAULT); // reset draft ke default
-    onResetAll(); // parent akan reset filters & search dan tutup sheet
+    onDraftChange(DEFAULT);
+    onResetAll();
   };
 
   return (
