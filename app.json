@@ -52,7 +52,6 @@
     },
     "plugins": [
       "expo-router",
-      "./plugins/withYamapFix",
       [
         "expo-location",
         {

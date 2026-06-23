@@ -10,18 +10,22 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import YaMap, { Marker } from 'react-native-yamap';
-
 
 import { COLORS } from '@/shared/colors';
-import { initYaMap } from '@/shared/yamap';
-
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import type { Pier } from '../types';
 
-const { width: W, height: H } = Dimensions.get('window');
+const { height: H } = Dimensions.get('window');
 const MAP_HEIGHT = Math.min(H * 0.45, 340);
+
+const SPB_REGION = {
+  latitude: 59.9386,
+  longitude: 30.3141,
+  latitudeDelta: 0.12,
+  longitudeDelta: 0.12,
+};
 
 type ViewMode = 'map' | 'list';
 
@@ -40,24 +44,19 @@ export function PierMapSheet({
   onSelect,
   onClose,
 }: PierMapSheetProps) {
-  const insets  = useSafeAreaInsets();
-  const ref     = useRef<BottomSheetModal>(null);
-  const mapRef  = useRef<YaMap>(null);
+  const insets = useSafeAreaInsets();
+  const ref    = useRef<BottomSheetModal>(null);
+  const mapRef = useRef<MapView>(null);
 
-  const [mode, setMode]     = useState<ViewMode>('map');
-  const [query, setQuery]   = useState('');
+  const [mode, setMode]       = useState<ViewMode>('map');
+  const [query, setQuery]     = useState('');
   const [focused, setFocused] = useState<Pier | null>(null);
 
   const snapPoints = useMemo(() => ['92%'], []);
 
-  useEffect(() => { initYaMap(); }, []);
-
   useEffect(() => {
-    if (visible) {
-      ref.current?.present();
-    } else {
-      ref.current?.dismiss();
-    }
+    if (visible) ref.current?.present();
+    else ref.current?.dismiss();
   }, [visible]);
 
   const piersWithCoords = useMemo(
@@ -75,6 +74,23 @@ export function PierMapSheet({
     );
   }, [piers, query]);
 
+  const fitAllMarkers = useCallback(() => {
+    if (!mapRef.current || piersWithCoords.length === 0) return;
+    if (piersWithCoords.length === 1) {
+      mapRef.current.animateToRegion({
+        latitude: piersWithCoords[0].latitude!,
+        longitude: piersWithCoords[0].longitude!,
+        latitudeDelta: 0.02,
+        longitudeDelta: 0.02,
+      }, 400);
+      return;
+    }
+    mapRef.current.fitToCoordinates(
+      piersWithCoords.map((p) => ({ latitude: p.latitude!, longitude: p.longitude! })),
+      { edgePadding: { top: 60, bottom: 80, left: 40, right: 40 }, animated: true },
+    );
+  }, [piersWithCoords]);
+
   const handleSelect = useCallback((pier: Pier) => {
     onSelect(pier);
     ref.current?.dismiss();
@@ -82,33 +98,42 @@ export function PierMapSheet({
 
   const handleMarkerPress = useCallback((pier: Pier) => {
     setFocused(pier);
+    if (pier.latitude && pier.longitude) {
+      mapRef.current?.animateToRegion({
+        latitude: pier.latitude,
+        longitude: pier.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      }, 350);
+    }
   }, []);
-
-  const fitAllMarkers = useCallback(() => {
-    if (!mapRef.current || piersWithCoords.length === 0) return;
-    const points = piersWithCoords.map((p) => ({
-      lat: p.latitude!,
-      lon: p.longitude!,
-    }));
-    mapRef.current.fitAllMarkers?.();
-  }, [piersWithCoords]);
 
   // Center map on selected pier when sheet opens
   useEffect(() => {
-    if (visible && selectedPier?.latitude) {
-      setTimeout(() => {
-        mapRef.current?.setCenter(
-          { lat: selectedPier.latitude!, lon: selectedPier.longitude! },
-          14,
-          0,
-          0,
-          0.5,
-        );
-      }, 400);
-    } else if (visible && piersWithCoords.length > 0) {
-      setTimeout(fitAllMarkers, 400);
-    }
+    if (!visible) return;
+    setTimeout(() => {
+      if (selectedPier?.latitude && selectedPier?.longitude) {
+        mapRef.current?.animateToRegion({
+          latitude: selectedPier.latitude,
+          longitude: selectedPier.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        }, 400);
+      } else {
+        fitAllMarkers();
+      }
+    }, 400);
   }, [visible]);
+
+  const visiblePiers = useMemo(() => {
+    if (!query.trim()) return piersWithCoords;
+    const q = query.toLowerCase();
+    return piersWithCoords.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.address ?? '').toLowerCase().includes(q),
+    );
+  }, [piersWithCoords, query]);
 
   return (
     <BottomSheetModal
@@ -129,7 +154,6 @@ export function PierMapSheet({
         <View style={s.header}>
           <Text style={s.title}>Выберите причал</Text>
           <View style={s.headerRight}>
-            {/* Map / List toggle */}
             <Pressable
               style={[s.modeBtn, mode === 'map' && s.modeBtnOn]}
               onPress={() => setMode('map')}
@@ -172,40 +196,32 @@ export function PierMapSheet({
         {/* Map view */}
         {mode === 'map' && (
           <View style={s.mapWrap}>
-            <YaMap
+            <MapView
               ref={mapRef}
               style={s.map}
-              initialRegion={{
-                lat: 59.9386,
-                lon: 30.3141,
-                zoom: 11,
-                azimuth: 0,
-                tilt: 0,
-              }}
-              showUserPosition
+              initialRegion={SPB_REGION}
+              showsUserLocation
+              showsMyLocationButton={false}
+              minZoomLevel={10}
+              maxZoomLevel={18}
             >
-              {piersWithCoords
-                .filter((p) =>
-                  !query.trim() ||
-                  p.name.toLowerCase().includes(query.toLowerCase()) ||
-                  (p.address ?? '').toLowerCase().includes(query.toLowerCase()),
-                )
-                .map((pier) => {
-                  const active = selectedPier?.id === pier.id || focused?.id === pier.id;
-                  return (
-                    <Marker
-                      key={pier.id}
-                      point={{ lat: pier.latitude!, lon: pier.longitude! }}
-                      scale={active ? 1.3 : 1}
-                      onPress={() => handleMarkerPress(pier)}
-                    >
-                      <View style={[s.pin, active && s.pinActive]}>
-                        <MapPin size={active ? 20 : 16} color="#fff" strokeWidth={2} />
-                      </View>
-                    </Marker>
-                  );
-                })}
-            </YaMap>
+              {visiblePiers.map((pier) => {
+                const active = selectedPier?.id === pier.id || focused?.id === pier.id;
+                return (
+                  <Marker
+                    key={pier.id}
+                    coordinate={{ latitude: pier.latitude!, longitude: pier.longitude! }}
+                    onPress={() => handleMarkerPress(pier)}
+                    tracksViewChanges={active}
+                    anchor={{ x: 0.5, y: 0.5 }}
+                  >
+                    <View style={[s.pin, active && s.pinActive]}>
+                      <MapPin size={active ? 20 : 16} color="#fff" strokeWidth={2} />
+                    </View>
+                  </Marker>
+                );
+              })}
+            </MapView>
 
             {/* Focused pier card */}
             {focused && (
@@ -269,8 +285,6 @@ export function PierMapSheet({
   );
 }
 
-// ─── Styles ───────────────────────────────────────────────────────────────────
-
 const s = StyleSheet.create({
   sheetBg:    { backgroundColor: COLORS.white, borderTopLeftRadius: 22, borderTopRightRadius: 22 },
   handleWrap: { alignItems: 'center', paddingTop: 10, paddingBottom: 4 },
@@ -308,7 +322,6 @@ const s = StyleSheet.create({
   },
   searchInput: { flex: 1, fontSize: 14, color: COLORS.text1 },
 
-  /* map */
   mapWrap: { flex: 1, position: 'relative' },
   map:     { flex: 1, height: MAP_HEIGHT },
 
@@ -319,7 +332,7 @@ const s = StyleSheet.create({
     shadowColor: '#000', shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.25, shadowRadius: 4, elevation: 4,
   },
-  pinActive: { backgroundColor: COLORS.brandCyan ?? COLORS.brandNavy, width: 42, height: 42, borderRadius: 21 },
+  pinActive: { backgroundColor: COLORS.brandCyan, width: 42, height: 42, borderRadius: 21 },
 
   focusedCard: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
@@ -338,14 +351,13 @@ const s = StyleSheet.create({
   },
   selectBtnTxt: { fontSize: 14, fontWeight: '700', color: '#fff' },
 
-  /* list */
   listWrap: { flex: 1 },
   pierRow: {
     flexDirection: 'row', alignItems: 'center', gap: 10,
     paddingHorizontal: 16, paddingVertical: 14,
     borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: COLORS.border,
   },
-  pierRowOn: { backgroundColor: COLORS.brandNavy + '06' },
+  pierRowOn:    { backgroundColor: COLORS.brandNavy + '06' },
   pierRadio: {
     width: 18, height: 18, borderRadius: 9,
     borderWidth: 2, borderColor: COLORS.border,
