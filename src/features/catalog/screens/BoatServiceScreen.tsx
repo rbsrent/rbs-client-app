@@ -1,5 +1,5 @@
 import { SlidersHorizontal } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -104,6 +104,11 @@ export function BoatServiceScreen({ vesselType }: Props) {
 
   useEffect(() => { fetchBoats(); }, [vesselType]);
 
+  const renderBoat = useCallback(
+    ({ item }: { item: Boat }) => <ServiceBoatCard boat={item} discount={discountsMap.get(item.id)} />,
+    [discountsMap],
+  );
+
   return (
     <View style={styles.root}>
       <ScreenHeader
@@ -127,7 +132,7 @@ export function BoatServiceScreen({ vesselType }: Props) {
         <FlatList
           data={boats}
           keyExtractor={(b) => b.id}
-          renderItem={({ item }) => <ServiceBoatCard boat={item} discount={discountsMap.get(item.id)} />}
+          renderItem={renderBoat}
           contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 90 }]}
           showsVerticalScrollIndicator={false}
           refreshControl={

@@ -26,7 +26,12 @@ export function RoutesScreen() {
   const fetchRoutes = useCallback(async (force = false) => {
     if (!force) {
       const cached = getCachedRoutes();
-      if (cached) { setRoutes(cached); setLoading(false); return; }
+      if (cached) {
+        // Skip setState if data is the same reference (cache hit on re-focus)
+        setRoutes((prev) => (prev === cached ? prev : cached));
+        setLoading(false);
+        return;
+      }
     }
     try {
       const { data } = await publicSupabase
@@ -53,6 +58,11 @@ export function RoutesScreen() {
     fetchRoutes(true);
   }, [fetchRoutes]);
 
+  const renderRoute = useCallback(
+    ({ item }: { item: WaterRoute }) => <RouteCard route={item} />,
+    [],
+  );
+
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
       <View style={s.header}>
@@ -71,7 +81,7 @@ export function RoutesScreen() {
           <FlatList
             data={routes}
             keyExtractor={(r) => r.id}
-            renderItem={({ item }) => <RouteCard route={item} />}
+            renderItem={renderRoute}
             contentContainerStyle={s.list}
             showsVerticalScrollIndicator={false}
             refreshControl={

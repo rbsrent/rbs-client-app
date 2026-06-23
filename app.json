@@ -33,12 +33,17 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
+      "navigationBar": {
+        "backgroundColor": "#00000000",
+        "barStyle": "dark-content"
+      },
       "package": "com.rbsrent.app",
+      "googleServicesFile": "./google-services.json",
       "versionCode": 2,
       "minSdkVersion": 26,
       "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ]
     },
     "web": {
@@ -51,7 +56,7 @@
       [
         "expo-location",
         {
-          "locationWhenInUsePermission": "Приложение использует геолокацию для отображения вашего положения на карте причалов."
+          "locationWhenInUsePermission": "RBS использует ваше местоположение, чтобы показать вас на карте причалов и помочь найти ближайшую точку отправления."
         }
       ],
       [
@@ -64,11 +69,27 @@
           }
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon-rbs.png",
+          "color": "#208AEF",
+          "sounds": []
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "b72fc346-7562-4433-b62a-3b370ad1ae32"
+      }
+    },
+    "owner": "rbsrent"
   }
 }

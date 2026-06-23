@@ -5,6 +5,7 @@ import { ArrowLeft, Clock, Heart, MapPin, Share2 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
@@ -16,11 +17,11 @@ import Animated, {
   FadeIn,
   FadeInLeft,
   FadeInRight,
-  ZoomIn,
   interpolate,
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useSharedValue,
+  ZoomIn,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -50,8 +51,6 @@ function durationLabel(h: number) {
   if (h < 5) return `${h} часа`;
   return `${h} часов`;
 }
-
-// ── SnakePath — animations kept exactly as-is ──────────────────────────────
 
 function SnakePath({ points }: { points: string[] }) {
   if (points.length === 0) return null;
@@ -117,8 +116,6 @@ function SnakePath({ points }: { points: string[] }) {
   );
 }
 
-// ── RouteDescription ────────────────────────────────────────────────────────
-
 function RouteDescription({ text }: { text: string }) {
   return (
     <View style={rd.wrap}>
@@ -128,8 +125,6 @@ function RouteDescription({ text }: { text: string }) {
     </View>
   );
 }
-
-// ── Main screen ─────────────────────────────────────────────────────────────
 
 export default function RouteDetailScreen() {
   const { slug } = useLocalSearchParams<{ slug: string }>();
@@ -148,9 +143,16 @@ export default function RouteDetailScreen() {
 
   const handleShare = useCallback(async () => {
     try {
-      await Share.share({ message: `${route?.name ?? "Маршрут"} — rbs.rent` });
+      const name = route?.name ?? "Маршрут";
+      const webUrl = `https://rbs.rent/routes/${slug}?from=share_${Platform.OS}`;
+      const appUrl = `rbsrent://routes/${slug}`;
+      await Share.share(
+        Platform.OS === "ios"
+          ? { title: name, message: appUrl, url: webUrl }
+          : { title: name, message: `${name}\n${webUrl}` },
+      );
     } catch {}
-  }, [route?.name]);
+  }, [route?.name, slug]);
 
   const handleHeart = useCallback(() => {
     if (!route) return;
@@ -340,8 +342,6 @@ export default function RouteDetailScreen() {
   );
 }
 
-// ── SnakePath styles (unchanged) ────────────────────────────────────────────
-
 const DOT_SIZE = 36;
 const SIDE_W = (W - 48 - DOT_SIZE) / 2;
 const CONN_H = 28;
@@ -399,8 +399,6 @@ const sp = StyleSheet.create({
   arcBotLeft: { borderRightWidth: 2, borderBottomWidth: 2, borderBottomRightRadius: CONN_W * 0.7, borderColor: NAVY },
 });
 
-// ── RouteDescription styles ──────────────────────────────────────────────────
-
 const rd = StyleSheet.create({
   wrap: { paddingHorizontal: 20, gap: 12 },
   title: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
@@ -408,7 +406,6 @@ const rd = StyleSheet.create({
   body: { fontSize: 15, color: COLORS.text2, lineHeight: 24 },
 });
 
-// ── Screen styles ────────────────────────────────────────────────────────────
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.white },

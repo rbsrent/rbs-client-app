@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 
 import { BoatCard } from '@/shared/components/BoatCard';
@@ -9,6 +9,24 @@ export interface SimilarBoatsProps {
 }
 
 export default function SimilarBoats({ boats, onPress }: SimilarBoatsProps) {
+  const renderItem = useCallback(({ item }: { item: any }) => (
+    <BoatCard
+      boat={{
+        id:              item.id,
+        name:            item.name,
+        type:            item.type        ?? null,
+        cover_image_url: item.cover_image_url ?? null,
+        price_per_hour:  item.price_per_hour,
+        capacity:        item.capacity    ?? null,
+        length_meters:   item.length_meters ?? null,
+        pier_name:       item.pier_name   ?? null,
+        rating:          item.rating > 0  ? item.rating : null,
+      }}
+      layout="strip"
+      route={`/catalog/${item.id}`}
+    />
+  ), []);
+
   if (boats.length === 0) return null;
 
   return (
@@ -25,23 +43,7 @@ export default function SimilarBoats({ boats, onPress }: SimilarBoatsProps) {
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={s.strip}
-        renderItem={({ item }) => (
-          <BoatCard
-            boat={{
-              id:              item.id,
-              name:            item.name,
-              type:            item.type        ?? null,
-              cover_image_url: item.cover_image_url ?? null,
-              price_per_hour:  item.price_per_hour,
-              capacity:        item.capacity    ?? null,
-              length_meters:   item.length_meters ?? null,
-              pier_name:       item.pier_name   ?? null,
-              rating:          item.rating > 0  ? item.rating : null,
-            }}
-            layout="strip"
-            route={`/catalog/${item.id}`}
-          />
-        )}
+        renderItem={renderItem}
         removeClippedSubviews
         initialNumToRender={3}
         maxToRenderPerBatch={3}

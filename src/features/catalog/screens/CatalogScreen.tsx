@@ -91,8 +91,8 @@ const BoatGridCard = memo(function BoatGridCard({
   );
 });
 
-// const _RU_FMT = new Intl.NumberFormat("ru-RU");
 const VESSEL_TYPES = ["Все", "Катер", "Яхта", "Моторная яхта"];
+const ChipSeparator = () => <View style={{ width: 8 }} />;
 
 export const CatalogScreen = memo(function CatalogScreen() {
   const insets = useSafeAreaInsets();
@@ -136,6 +136,20 @@ export const CatalogScreen = memo(function CatalogScreen() {
     [insets.bottom],
   );
 
+  const renderChip = useCallback(
+    ({ item }: { item: string }) => (
+      <Pressable
+        style={[styles.chip, activeType === item && styles.chipActive]}
+        onPress={() => setActiveType(item)}
+      >
+        <Text style={[styles.chipText, activeType === item && styles.chipTextActive]}>
+          {item}
+        </Text>
+      </Pressable>
+    ),
+    [activeType],
+  );
+
   const ListEmpty = useCallback(
     () =>
       !isLoadingBoats ? (
@@ -174,24 +188,10 @@ export const CatalogScreen = memo(function CatalogScreen() {
           horizontal
           data={VESSEL_TYPES}
           keyExtractor={(t) => t}
-          renderItem={({ item }) => (
-            <Pressable
-              style={[styles.chip, activeType === item && styles.chipActive]}
-              onPress={() => setActiveType(item)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  activeType === item && styles.chipTextActive,
-                ]}
-              >
-                {item}
-              </Text>
-            </Pressable>
-          )}
+          renderItem={renderChip}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}
-          ItemSeparatorComponent={() => <View style={{ width: 8 }} />}
+          ItemSeparatorComponent={ChipSeparator}
         />
       </View>
 

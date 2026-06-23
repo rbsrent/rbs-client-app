@@ -147,6 +147,11 @@ export const BoatCard = memo(function BoatCard({
           <HeartButton boat={heartData} size={18} />
         </View>
 
+        {isCatalog && discountPct ? (
+          <View style={s.catalogImgDiscountBadge}>
+            <Text style={s.catalogImgDiscountTxt}>−{discountPct}%</Text>
+          </View>
+        ) : null}
         {!isCatalog && (
           <>
             <LinearGradient
@@ -172,20 +177,6 @@ export const BoatCard = memo(function BoatCard({
       {isCatalog ? (
         <View style={s.catalogInfo}>
           <Text style={s.catalogName} numberOfLines={2}>{boat.name}</Text>
-          {(boat.type || boat.capacity) ? (
-            <Text style={s.catalogMetaTxt} numberOfLines={1}>
-              {[
-                boat.type ?? null,
-                boat.capacity ? `до ${boat.capacity} чел.` : null,
-              ].filter(Boolean).join("  ·  ")}
-            </Text>
-          ) : null}
-          {boat.pier_name ? (
-            <View style={s.locationRow}>
-              <MapPin size={10} color="#6A6A6A" strokeWidth={2} />
-              <Text style={[s.catalogMetaTxt, { flex: 1 }]} numberOfLines={1}>{boat.pier_name}</Text>
-            </View>
-          ) : null}
           <View style={s.catalogPriceRow}>
             <Text style={s.catalogMetaTxt} numberOfLines={1}>
               {ruFmtPrice(displayPrice)} ₽/ч
@@ -200,6 +191,20 @@ export const BoatCard = memo(function BoatCard({
               <Text style={s.catalogMetaTxt}>★ {boat.rating!.toFixed(1)}</Text>
             ) : null}
           </View>
+          {(boat.type || boat.capacity) ? (
+            <Text style={s.catalogMetaTxt} numberOfLines={1}>
+              {[
+                boat.type ?? null,
+                boat.capacity ? `до ${boat.capacity} чел.` : null,
+              ].filter(Boolean).join("  ·  ")}
+            </Text>
+          ) : null}
+          {boat.pier_name ? (
+            <View style={s.locationRow}>
+              <MapPin size={10} color="#6A6A6A" strokeWidth={2} />
+              <Text style={[s.catalogMetaTxt, { flex: 1 }]} numberOfLines={1}>{boat.pier_name}</Text>
+            </View>
+          ) : null}
         </View>
       ) : (
         <View style={s.info}>
@@ -235,7 +240,7 @@ const s = StyleSheet.create({
     overflow: "hidden",
   },
   imgWrapCatalog: {
-    borderRadius: 20,
+    borderRadius: 14,
   },
 
   topRow: {
@@ -251,10 +256,8 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 24,
-    borderWidth: 1,
-    borderColor: "#FFFFFF",
+    paddingVertical: 4,
+    borderRadius: 6,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.16,
@@ -301,6 +304,20 @@ const s = StyleSheet.create({
   price:    { fontSize: 14, fontWeight: "800", color: "#fff" },
   priceOld: { fontSize: 11, color: "rgba(255,255,255,0.55)", textDecorationLine: "line-through" },
 
+  catalogImgDiscountBadge: {
+    position: "absolute",
+    bottom: 10,
+    left: 10,
+    backgroundColor: COLORS.redDark,
+    borderRadius: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  catalogImgDiscountTxt: {
+    fontSize: 12,
+    fontWeight: "800",
+    color: "#fff",
+  },
   discountPill: {
     backgroundColor: "#E53935",
     borderRadius: 6,

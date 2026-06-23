@@ -231,7 +231,7 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         title="Катера"
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=boat"
-        boats={katera}
+        boats={katera.slice(0, 10)}
         badge="Катер"
         discountsMap={discountsMap}
       />
@@ -239,7 +239,7 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         title="Яхты"
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=yacht"
-        boats={yakhty}
+        boats={yakhty.slice(0, 10)}
         badge="Яхта"
         discountsMap={discountsMap}
       />

@@ -1,6 +1,6 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowLeft, Clock, Gift, Heart, Mail, Sparkles, Wallet } from "lucide-react-native";
+import { ArrowLeft, Clock, Gift, Heart, Mail, Wallet } from "lucide-react-native";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Extrapolation,
@@ -151,7 +151,6 @@ export function GiftCertDetailScreen() {
           {/* CTA closing */}
           <View style={s.closingWrap}>
             <View style={s.closingRow}>
-              <Sparkles size={18} color={COLORS.brandViolet} strokeWidth={1.8} />
               <Text style={s.closingTitle}>Оформите за 2 минуты</Text>
             </View>
             <Text style={s.closingDesc}>

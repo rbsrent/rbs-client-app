@@ -16,6 +16,16 @@ export interface ActiveDiscount {
   percentage: number;
 }
 
+export interface BoatDiscountDisplay {
+  name: string;
+  percentage: number;
+  discount_type: string;
+  start_time: string | null;
+  end_time: string | null;
+  days_of_week: number[] | null;
+  isCurrentlyActive: boolean;
+}
+
 const TTL = 5 * 60 * 1000;
 let _cache: BoatDiscount[] | null = null;
 let _ts = 0;
@@ -63,11 +73,44 @@ export function useDiscountsCache(): Map<string, ActiveDiscount> {
   return map;
 }
 
+export function useBoatAllDiscounts(boatId: string): BoatDiscountDisplay[] {
+  const [list, setList] = useState<BoatDiscountDisplay[]>(() => buildList(boatId, _cache));
+
+  useEffect(() => {
+    if (_cache && Date.now() - _ts < TTL) {
+      setList(buildList(boatId, _cache));
+      return;
+    }
+    (async () => {
+      const { data } = await publicSupabase
+        .from('boat_discounts')
+        .select('*')
+        .eq('is_active', true);
+      if (!data) return;
+      _cache = data as BoatDiscount[];
+      _ts = Date.now();
+      setList(buildList(boatId, _cache));
+    })();
+  }, [boatId]);
+
+  return list;
+}
+
+function buildList(boatId: string, discounts: BoatDiscount[] | null): BoatDiscountDisplay[] {
+  if (!discounts) return [];
+  return discounts
+    .filter(d => d.boat_id === boatId)
+    .map(d => ({ ...d, isCurrentlyActive: isDiscountActive(d) }))
+    .sort((a, b) => b.percentage - a.percentage);
+}
+
 function buildMap(discounts: BoatDiscount[] | null): Map<string, ActiveDiscount> {
   const result = new Map<string, ActiveDiscount>();
   if (!discounts) return result;
   for (const d of discounts) {
-    if (!result.has(d.boat_id) && isDiscountActive(d)) {
+    if (!isDiscountActive(d)) continue;
+    const existing = result.get(d.boat_id);
+    if (!existing || d.percentage > existing.percentage) {
       result.set(d.boat_id, { name: d.name, percentage: d.percentage });
     }
   }

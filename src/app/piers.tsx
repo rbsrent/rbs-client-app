@@ -203,8 +203,20 @@ export default function PiersScreen() {
   }, [piersWithCoords, backToSpb]);
 
   const centerOnMe = useCallback(async () => {
-    const { status } = await Location.requestForegroundPermissionsAsync();
-    if (status !== "granted") return;
+    const { status, canAskAgain } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      if (!canAskAgain) {
+        Alert.alert(
+          "Геолокация отключена",
+          "Чтобы видеть своё местоположение на карте, разрешите доступ в настройках устройства.",
+          [
+            { text: "Отмена", style: "cancel" },
+            { text: "Открыть настройки", onPress: () => Linking.openSettings() },
+          ],
+        );
+      }
+      return;
+    }
     const pos = await Location.getCurrentPositionAsync({
       accuracy: Location.Accuracy.Balanced,
     });
@@ -442,6 +454,16 @@ export default function PiersScreen() {
               </Text>
             ) : null}
 
+            <Pressable
+              style={({ pressed }) => [s.catalogBtn, pressed && { opacity: 0.75 }]}
+              onPress={() => {
+                setFocused(null);
+                router.push(`/boats?pierId=${focused.id}` as any);
+              }}
+            >
+              <Text style={s.catalogBtnTxt}>Смотреть суда с этого причала</Text>
+            </Pressable>
+
             {focused.latitude && focused.longitude ? (
               <Pressable
                 style={({ pressed }) => [
@@ -627,6 +649,14 @@ const s = StyleSheet.create({
     lineHeight: 18,
     marginBottom: 12,
   },
+  catalogBtn: {
+    backgroundColor: COLORS.brandNavy,
+    borderRadius: 14,
+    paddingVertical: 16,
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  catalogBtnTxt: { fontSize: 16, fontWeight: "600", color: COLORS.white },
   dirBtn: {
     backgroundColor: "#F2F2F7",
     borderRadius: 14,

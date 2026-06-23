@@ -1,12 +1,13 @@
 import { useRouter } from 'expo-router';
 import { Bell } from 'lucide-react-native';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { setOnboardingComplete } from '@/features/onboarding/hooks/useOnboardingComplete';
 import { COLORS } from '@/shared/colors';
 
 import { PermissionLayout } from '../components/PermissionLayout';
+import { requestNotificationPermission } from '../hooks/useNotificationPermission';
 
 function NotificationIllustration() {
   return (
@@ -18,11 +19,19 @@ function NotificationIllustration() {
 
 export function NotificationPermissionScreen() {
   const router = useRouter();
+  const [loading, setLoading] = useState(false);
 
-  const finish = useCallback(async () => {
+  const goNext = useCallback(async () => {
     await setOnboardingComplete();
-    router.replace('/(tabs)');
+    router.replace('/permissions/auth-gate' as any);
   }, [router]);
+
+  const allow = useCallback(async () => {
+    setLoading(true);
+    await requestNotificationPermission();
+    setLoading(false);
+    await goNext();
+  }, [goNext]);
 
   return (
     <PermissionLayout
@@ -31,8 +40,9 @@ export function NotificationPermissionScreen() {
       subtitle="Уведомим о скидках, подтверждении бронирования и готовности судна"
       primaryLabel="Разрешить уведомления"
       secondaryLabel="Позже"
-      onPrimary={finish}
-      onSecondary={finish}
+      onPrimary={allow}
+      onSecondary={goNext}
+      primaryLoading={loading}
     />
   );
 }

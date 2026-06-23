@@ -23,8 +23,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
-import { publicSupabase } from "@/shared/supabase/publicClient";
 import { Spinner } from '@/shared/components/Spinner';
+import { publicSupabase } from "@/shared/supabase/publicClient";
 
 type PaymentState = "loading" | "pending" | "success" | "failed" | "error";
 
@@ -83,8 +83,12 @@ function durHours(start: string, end: string) {
 const SUCCESS_STATUSES = new Set([
   "confirmed",
   "paid",
+  "fully_paid",
+  "partially_paid",
   "completed",
   "succeeded",
+  "client_confirmed",
+  "client_arrived",
 ]);
 const FAILED_STATUSES = new Set([
   "cancelled",
@@ -205,7 +209,7 @@ export default function BookingDetailScreen() {
 
   if (state === "loading") {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root]}>
         <ScreenHeader title="Бронирование" onBack={() => router.back()} />
         <View style={s.centerBox}>
           <Spinner />
@@ -217,7 +221,7 @@ export default function BookingDetailScreen() {
 
   if (state === "error") {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root]}>
         <ScreenHeader title="Бронирование" onBack={() => router.back()} />
         <View style={s.centerBox}>
           <AlertCircle size={48} color={COLORS.error} strokeWidth={1.5} />
@@ -241,7 +245,7 @@ export default function BookingDetailScreen() {
 
   if (state === "pending") {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root]}>
         <ScreenHeader title="Бронирование" onBack={() => router.back()} />
         <View style={s.centerBox}>
           <Animated.View entering={FadeIn.duration(400)}>
@@ -277,7 +281,7 @@ export default function BookingDetailScreen() {
 
   if (state === "failed") {
     return (
-      <View style={[s.root, { paddingTop: insets.top }]}>
+      <View style={[s.root]}>
         <ScreenHeader title="Бронирование" onBack={() => router.back()} />
         <View style={s.centerBox}>
           <Animated.View entering={FadeIn.duration(400)}>
@@ -315,10 +319,10 @@ export default function BookingDetailScreen() {
   }
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <View style={[s.root]}>
       <ScreenHeader
         title="Бронирование"
-        onBack={() => router.replace("/(tabs)/bookings" as any)}
+        onBack={() => router.back()}
       />
 
       <ScrollView
@@ -467,7 +471,7 @@ export default function BookingDetailScreen() {
               s.ctaPrimary,
               pressed && { opacity: 0.88 },
             ]}
-            onPress={() => router.replace("/(tabs)/bookings" as any)}
+            onPress={() => router.push("/bookings" as any)}
           >
             <Text style={s.ctaPrimaryTxt}>Мои бронирования</Text>
           </Pressable>

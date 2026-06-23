@@ -11,6 +11,7 @@ import {
 } from "lucide-react-native";
 import React, { memo, useCallback, useMemo, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -78,7 +79,7 @@ const ALL: Service[] = [
     label: "Сертификат",
     icon: <Gift size={22} color={IC} strokeWidth={2} />,
     bg: "",
-    route: "/certificates",
+    route: "/gift-cert",
   },
 ];
 
@@ -152,6 +153,7 @@ const ServiceItem = memo(function ServiceItem({
 
 export const ServiceGrid = memo(function ServiceGrid() {
   const router = useRouter();
+  const { bottom } = useSafeAreaInsets();
   const sheetRef = useRef<BottomSheetModal>(null);
   const snaps = useMemo(() => ["80%"], []);
 
@@ -203,7 +205,7 @@ export const ServiceGrid = memo(function ServiceGrid() {
         )}
       >
         <BottomSheetScrollView
-          contentContainerStyle={s.sheetContent}
+          contentContainerStyle={[s.sheetContent, { paddingBottom: bottom + 32 }]}
           showsVerticalScrollIndicator={false}
         >
           <Text style={s.sheetTitle}>Все услуги</Text>
@@ -283,7 +285,7 @@ const s = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: COLORS.border,
   },
-  sheetContent: { paddingHorizontal: 20, paddingBottom: 48 },
+  sheetContent: { paddingHorizontal: 20 },
   sheetTitle: {
     fontSize: 20,
     fontWeight: "800",

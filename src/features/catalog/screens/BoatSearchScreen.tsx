@@ -1,6 +1,6 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import { ArrowLeft, Search } from 'lucide-react-native';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { ArrowLeft, Search, SearchX } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Keyboard,
@@ -38,6 +38,12 @@ export function BoatSearchScreen() {
 
   const inputRef = useRef<TextInput>(null);
   const [query, setQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedQuery(query), 180);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const progress = useSharedValue(0);
 
@@ -85,10 +91,10 @@ export function BoatSearchScreen() {
 
   // ── Filter boats ──
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = debouncedQuery.trim().toLowerCase();
     if (!q) return allBoats;
     return allBoats.filter((b) => b.name.toLowerCase().includes(q));
-  }, [allBoats, query]);
+  }, [allBoats, debouncedQuery]);
 
   const renderBoat = useCallback(
     ({ item }: { item: Boat }) => (
@@ -152,8 +158,21 @@ export function BoatSearchScreen() {
           removeClippedSubviews
           initialNumToRender={8}
           maxToRenderPerBatch={6}
+          windowSize={5}
+          updateCellsBatchingPeriod={100}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
+          ListEmptyComponent={
+            debouncedQuery.length > 0 ? (
+              <View style={s.empty}>
+                <View style={s.emptyIconWrap}>
+                  <SearchX size={32} color={COLORS.text3} strokeWidth={1.5} />
+                </View>
+                <Text style={s.emptyTitle}>Ничего не найдено</Text>
+                <Text style={s.emptyHint}>Попробуйте изменить запрос</Text>
+              </View>
+            ) : null
+          }
         />
       )}
     </View>
@@ -217,4 +236,29 @@ const s = StyleSheet.create({
   loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   list:   { gap: 12, paddingHorizontal: 16, paddingTop: 12 },
   row:    { gap: 12 },
+  empty: {
+    alignItems: 'center',
+    paddingTop: 64,
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  emptyIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 20,
+    backgroundColor: COLORS.muted,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.text1,
+  },
+  emptyHint: {
+    fontSize: 13,
+    color: COLORS.text3,
+    textAlign: 'center',
+  },
 });

@@ -43,6 +43,7 @@ import { fmtDateFull } from "@/shared/components/CalendarPicker";
 import { PhoneInput } from "@/shared/components/PhoneInput";
 import { SheetBackdrop } from "@/shared/components/SheetBackdrop";
 import { Spinner } from "@/shared/components/Spinner";
+import { usePendingPayment } from "@/shared/context/PendingPaymentContext";
 import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
 import {
   digitsToE164,
@@ -142,6 +143,7 @@ export function BookingScreen() {
   const [clientPhoneDigits, setClientPhoneDigits] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [paying, setPaying] = useState(false);
+  const { pending: pendingPayment, save: savePendingPayment, clear: clearPendingPayment } = usePendingPayment();
 
   const bookingIdRef = useRef<string | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -228,6 +230,7 @@ export function BookingScreen() {
         if (status === "confirmed" || status === "paid") {
           clearInterval(pollRef.current!);
           setPaying(false);
+          clearPendingPayment();
           router.replace(`/bookings/${bId}` as any);
         } else if (status === "cancelled") {
           clearInterval(pollRef.current!);
@@ -565,19 +568,22 @@ export function BookingScreen() {
       if (error) throw error;
       if (!data?.success)
         throw new Error(data?.error ?? "Ошибка создания платежа");
-      bookingIdRef.current = data.public_booking_id as string;
+      const bId = data.public_booking_id as string;
+      const confirmUrl = data.confirmation_url as string;
+      bookingIdRef.current = bId;
       awaitingReturn.current = true;
       const returnUrl = Linking.createURL("booking/return");
-      const result = await openAuthSessionAsync(
-        data.confirmation_url as string,
-        returnUrl,
-        { showInRecents: true },
-      );
+      const result = await openAuthSessionAsync(confirmUrl, returnUrl, {
+        showInRecents: true,
+      });
       if (
         result.type === WebBrowserResultType.CANCEL ||
         result.type === WebBrowserResultType.DISMISS
-      )
+      ) {
+        awaitingReturn.current = false;
         setPaying(false);
+        await savePendingPayment({ bookingId: bId, confirmationUrl: confirmUrl, amount: payOnline });
+      }
     } catch (e: any) {
       setPaying(false);
       Alert.alert(
@@ -585,6 +591,36 @@ export function BookingScreen() {
         e?.message ?? "Не удалось создать платёж. Попробуйте позже.",
       );
     }
+  };
+
+  const handleRetryPayment = async () => {
+    if (!pendingPayment) return;
+    setPaying(true);
+    bookingIdRef.current = pendingPayment.bookingId;
+    awaitingReturn.current = true;
+    const returnUrl = Linking.createURL("booking/return");
+    const result = await openAuthSessionAsync(
+      pendingPayment.confirmationUrl,
+      returnUrl,
+      { showInRecents: true },
+    );
+    if (
+      result.type === WebBrowserResultType.CANCEL ||
+      result.type === WebBrowserResultType.DISMISS
+    ) {
+      awaitingReturn.current = false;
+      setPaying(false);
+    }
+  };
+
+  const handleCancelPending = async () => {
+    if (!pendingPayment) return;
+    await publicSupabase
+      .from("public_bookings")
+      .update({ booking_status: "cancelled" })
+      .eq("id", pendingPayment.bookingId);
+    await clearPendingPayment();
+    bookingIdRef.current = null;
   };
 
   // ── Header ───────────────────────────────────────────────────────────────
@@ -859,12 +895,29 @@ export function BookingScreen() {
           <Text style={s.priceHeader}>Стоимость</Text>
           {timeConfirmed ? (
             <>
+              {pricing?.appliedDiscount && (
+                <View style={s.discountInfoBanner}>
+                  <Text style={s.discountInfoTxt}>
+                    🏷 {pricing.appliedDiscount.name} · −{pricing.appliedDiscount.percentage}%
+                  </Text>
+                </View>
+              )}
               <View style={s.priceRow}>
                 <Text style={s.priceLabel}>{durLabel(duration)}</Text>
                 <Text style={s.priceVal}>
                   {pricingLoading ? "…" : `${ruFmt(baseTotal)} ₽`}
                 </Text>
               </View>
+              {pricing?.totalSavings && pricing.totalSavings > 0 ? (
+                <View style={s.priceRow}>
+                  <Text style={s.priceLabel}>
+                    Скидка {pricing.appliedDiscount?.percentage}%
+                  </Text>
+                  <Text style={[s.priceVal, s.priceDiscount]}>
+                    −{ruFmt(pricing.totalSavings)} ₽
+                  </Text>
+                </View>
+              ) : null}
               {promoDiscount > 0 && (
                 <View style={s.priceRow}>
                   <Text style={s.priceLabel}>
@@ -919,11 +972,11 @@ export function BookingScreen() {
               s.payBtn,
               !timeConfirmed && s.payBtnSecondary,
               paymentMode === "contact" && s.payBtnContact,
-              paying && { opacity: 0.7 },
+              (paying || !!pendingPayment) && { opacity: 0.4 },
               pressed && { opacity: 0.85 },
             ]}
             onPress={handleAction}
-            disabled={paying}
+            disabled={paying || !!pendingPayment}
           >
             {paying ? (
               <Spinner color="#fff" trackColor="rgba(255,255,255,0.3)" />
@@ -1218,6 +1271,21 @@ const s = StyleSheet.create({
   priceLabel: { fontSize: 14, color: GRAY },
   priceVal: { fontSize: 14, color: DARK, fontWeight: "500" },
   priceDiscount: { color: RED },
+  discountInfoBanner: {
+    backgroundColor: "#FFF0F0",
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    marginBottom: 8,
+    alignSelf: "flex-start",
+    borderWidth: 1,
+    borderColor: "#FFCDD2",
+  },
+  discountInfoTxt: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: RED,
+  },
 
   // Total
   totalRow: {
@@ -1256,4 +1324,5 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
   consentLink: { color: COLORS.brandNavy, fontWeight: "600" },
+
 });

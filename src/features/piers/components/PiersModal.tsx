@@ -1,4 +1,5 @@
-import { MapPin, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
+import { ChevronRight, MapPin, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   Modal,
@@ -19,6 +20,7 @@ interface Pier {
 }
 
 export function PiersModal({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  const router = useRouter();
   const [piers, setPiers] = useState<Pier[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -53,13 +55,20 @@ export function PiersModal({ visible, onClose }: { visible: boolean; onClose: ()
           ) : (
             piers.map((pier, idx) => (
               <View key={pier.id}>
-                <View style={styles.pierRow}>
+                <Pressable
+                  style={({ pressed }) => [styles.pierRow, pressed && { opacity: 0.7 }]}
+                  onPress={() => {
+                    onClose();
+                    router.push(`/boats?pierId=${pier.id}` as any);
+                  }}
+                >
                   <MapPin size={16} color={COLORS.brandNavy} strokeWidth={1.8} />
                   <View style={styles.pierInfo}>
                     <Text style={styles.pierName}>{pier.name}</Text>
                     {pier.address ? <Text style={styles.pierAddress}>{pier.address}</Text> : null}
                   </View>
-                </View>
+                  <ChevronRight size={16} color={COLORS.text3} strokeWidth={1.8} />
+                </Pressable>
                 {idx < piers.length - 1 && <View style={styles.divider} />}
               </View>
             ))

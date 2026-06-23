@@ -1,8 +1,6 @@
-import { Image } from 'expo-image';
-import { LinearGradient } from 'expo-linear-gradient';
-import { useRouter } from 'expo-router';
-import { Calendar, ChevronRight, Clock, MapPin } from 'lucide-react-native';
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { useRouter } from "expo-router";
+import { ArrowLeft } from "lucide-react-native";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -10,108 +8,24 @@ import {
   StyleSheet,
   Text,
   View,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+} from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { COLORS } from '@/shared/colors';
-import { authSupabase } from '@/shared/supabase/authClient';
-import { SUPABASE_URL } from '@/shared/supabase/publicClient';
-import { phoneVariants } from '@/shared/utils/phone';
-import { useAuthStore } from '@/store/useAuthStore';
-import { Spinner } from '@/shared/components/Spinner';
+import { COLORS } from "@/shared/colors";
+import { authSupabase } from "@/shared/supabase/authClient";
+import { phoneVariants } from "@/shared/utils/phone";
+import { useAuthStore } from "@/store/useAuthStore";
+import { BookingCard } from "../components/BookingCard";
+import { Booking } from "../types";
 
-interface Booking {
-  id: string;
-  start_datetime: string;
-  end_datetime: string;
-  booking_status: string;
-  total_price: number;
-  prepayment_amount: number;
-  remaining_amount: number;
-  pier_name: string | null;
-  pier_address: string | null;
-  client_name: string;
-  boats: {
-    name: string;
-    type: string;
-    boat_images: { image_path: string; position: number }[];
-  } | null;
-}
-
-const _RU_FMT = new Intl.NumberFormat('ru-RU');
-
-const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending_payment: { label: 'Ожидает оплаты', color: COLORS.warning },
-  partially_paid: { label: 'Частично оплачено', color: COLORS.brandCyan },
-  confirmed: { label: 'Подтверждено', color: COLORS.success },
-  client_confirmed: { label: 'Подтверждено', color: COLORS.success },
-  fully_paid: { label: 'Оплачено', color: COLORS.success },
-  completed: { label: 'Завершено', color: COLORS.text3 },
-  cancelled: { label: 'Отменено', color: COLORS.error },
-  client_arrived: { label: 'Клиент прибыл', color: COLORS.brandViolet },
-};
-
-const BookingCard = memo(function BookingCard({ booking }: { booking: Booking }) {
-  const router = useRouter();
-  const status = STATUS_LABELS[booking.booking_status] ?? { label: booking.booking_status, color: COLORS.text3 };
-  const startDate = new Date(booking.start_datetime);
-  const endDate = new Date(booking.end_datetime);
-  const firstImg = booking.boats?.boat_images?.slice().sort((a, b) => a.position - b.position)[0]?.image_path;
-  const imgUrl = firstImg ? `${SUPABASE_URL}/storage/v1/object/public/boat_images/${firstImg}` : null;
-
-  const duration = Math.round((endDate.getTime() - startDate.getTime()) / 3600000);
-
-  return (
-    <Pressable
-      style={styles.card}
-      onPress={() => router.push(`/bookings/${booking.id}` as any)}
-    >
-      <View style={styles.cardImageWrap}>
-        {imgUrl ? (
-          <Image source={{ uri: imgUrl }} style={styles.cardImage} contentFit="cover" />
-        ) : (
-          <LinearGradient colors={[COLORS.brandNavy, COLORS.brandCyan]} style={StyleSheet.absoluteFill} />
-        )}
-      </View>
-      <View style={styles.cardContent}>
-        <View style={styles.cardHeader}>
-          <Text style={styles.boatName} numberOfLines={1}>
-            {booking.boats?.name ?? 'Судно'}
-          </Text>
-          <View style={[styles.statusBadge, { backgroundColor: status.color + '20' }]}>
-            <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-          </View>
-        </View>
-        <View style={styles.metaRow}>
-          <Calendar size={13} color={COLORS.text3} strokeWidth={2} />
-          <Text style={styles.metaText}>
-            {startDate.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })},{' '}
-            {startDate.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}
-          </Text>
-          <Clock size={13} color={COLORS.text3} strokeWidth={2} />
-          <Text style={styles.metaText}>{duration} ч.</Text>
-        </View>
-        {booking.pier_name ? (
-          <View style={styles.metaRow}>
-            <MapPin size={13} color={COLORS.text3} strokeWidth={2} />
-            <Text style={styles.metaText} numberOfLines={1}>{booking.pier_name}</Text>
-          </View>
-        ) : null}
-        <View style={styles.cardFooter}>
-          <Text style={styles.price}>
-            {_RU_FMT.format(booking.total_price)} ₽
-          </Text>
-          {booking.remaining_amount > 0 ? (
-            <Text style={styles.remaining}>
-              Остаток: {_RU_FMT.format(booking.remaining_amount)} ₽
-            </Text>
-          ) : null}
-          <ChevronRight size={16} color={COLORS.text3} strokeWidth={2} />
-        </View>
-      </View>
-    </Pressable>
-  );
-});
+const TABS = ["upcoming", "past", "all"] as const;
+const TIMING = { duration: 240, easing: Easing.inOut(Easing.ease) };
 
 export const BookingsScreen = memo(function BookingsScreen() {
   const insets = useSafeAreaInsets();
@@ -119,25 +33,47 @@ export const BookingsScreen = memo(function BookingsScreen() {
   const { session, smsUser } = useAuthStore();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [tab, setTab] = useState<'upcoming' | 'past' | 'all'>('upcoming');
+  const [tab, setTab] = useState<"upcoming" | "past" | "all">("upcoming");
+  const tabLayouts = useRef<Record<string, { x: number; width: number }>>({});
+  const indicatorX = useSharedValue(0);
+  const indicatorW = useSharedValue(0);
+  const indicatorReady = useSharedValue(0);
+
+  const indicatorStyle = useAnimatedStyle(() => ({
+    opacity: indicatorReady.value,
+    transform: [{ translateX: indicatorX.value }],
+    width: indicatorW.value,
+  }));
+
+  const handleTabPress = useCallback((t: typeof TABS[number]) => {
+    setTab(t);
+    const layout = tabLayouts.current[t];
+    if (layout) {
+      indicatorX.value = withTiming(layout.x, TIMING);
+      indicatorW.value = withTiming(layout.width, TIMING);
+    }
+  }, [indicatorX, indicatorW]);
 
   const fetchBookings = useCallback(async () => {
     if (!session) return;
     setIsLoading(true);
     try {
-      const phone = session.user?.phone ?? session.user?.user_metadata?.phone_number ?? '';
+      const phone =
+        session.user?.phone ?? session.user?.user_metadata?.phone_number ?? "";
       if (!phone) return;
       const variants = phoneVariants(phone);
       const { data } = await authSupabase
-        .from('public_bookings')
-        .select(`
-          id, start_datetime, end_datetime, booking_status,
+        .from("public_bookings")
+        .select(
+          `
+          id, boat_id, start_datetime, end_datetime, booking_status,
           total_price, prepayment_amount, remaining_amount,
           pier_name, pier_address, client_name,
           boats(name, type, boat_images(image_path, position))
-        `)
-        .in('client_phone', variants)
-        .order('start_datetime', { ascending: false });
+        `,
+        )
+        .in("client_phone", variants)
+        .order("start_datetime", { ascending: false });
       setBookings((data ?? []) as any[]);
     } finally {
       setIsLoading(false);
@@ -152,37 +88,51 @@ export const BookingsScreen = memo(function BookingsScreen() {
     const now = new Date();
     return bookings.filter((b) => {
       const end = new Date(b.end_datetime);
-      if (tab === 'upcoming') return end >= now && b.booking_status !== 'cancelled';
-      if (tab === 'past') return end < now || b.booking_status === 'cancelled';
+      if (tab === "upcoming")
+        return end >= now && b.booking_status !== "cancelled";
+      if (tab === "past") return end < now || b.booking_status === "cancelled";
       return true;
     });
   }, [bookings, tab]);
 
-  const renderItem = useCallback(({ item }: { item: Booking }) => (
-    <BookingCard booking={item} />
-  ), []);
+  const renderItem = useCallback(
+    ({ item }: { item: Booking }) => <BookingCard booking={item} />,
+    [],
+  );
 
   const listContentStyle = useMemo(
     () => [styles.list, { paddingBottom: insets.bottom + 80 }],
-    [insets.bottom]
+    [insets.bottom],
   );
 
-  const listEmpty = useMemo(() => (
-    <View style={styles.emptyState}>
-      <Text style={styles.emptyTitle}>
-        {isLoading ? 'Загрузка...' : 'Бронирований нет'}
-      </Text>
-    </View>
-  ), [isLoading]);
+  const listEmpty = useMemo(
+    () => (
+      <View style={styles.emptyState}>
+        <Text style={styles.emptyTitle}>
+          {isLoading ? "Загрузка..." : "Бронирований нет"}
+        </Text>
+      </View>
+    ),
+    [isLoading],
+  );
 
   if (!session) {
     return (
-      <View style={[styles.container, styles.gateRoot, { paddingTop: insets.top }]}>
+      <View
+        style={[styles.container, styles.gateRoot, { paddingTop: insets.top }]}
+      >
         <Text style={styles.pageTitle}>Поездки</Text>
         <View style={styles.gateBody}>
-          <Text style={styles.gateTitle}>Войдите, чтобы посмотреть{'\n'}свои поездки</Text>
-          <Text style={styles.gateDesc}>Для просмотра ваших бронирований необходимо войти в аккаунт.</Text>
-          <Pressable style={styles.gateBtn} onPress={() => router.push('/auth' as any)}>
+          <Text style={styles.gateTitle}>
+            Войдите, чтобы посмотреть{"\n"}свои поездки
+          </Text>
+          <Text style={styles.gateDesc}>
+            Для просмотра ваших бронирований необходимо войти в аккаунт.
+          </Text>
+          <Pressable
+            style={styles.gateBtn}
+            onPress={() => router.push("/auth" as any)}
+          >
             <Text style={styles.gateBtnTxt}>Вход</Text>
           </Pressable>
         </View>
@@ -193,19 +143,37 @@ export const BookingsScreen = memo(function BookingsScreen() {
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Мои бронирования</Text>
+        <View style={styles.topBar}>
+          <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+            <ArrowLeft size={22} color="#000" strokeWidth={2} />
+          </Pressable>
+          <Text style={styles.pageTitle}>Мои бронирования</Text>
+          <View style={styles.backBtn} />
+        </View>
+
         <View style={styles.tabs}>
-          {(['upcoming', 'past', 'all'] as const).map((t) => (
+          {TABS.map((t) => (
             <Pressable
               key={t}
-              style={[styles.tabBtn, tab === t && styles.tabBtnActive]}
-              onPress={() => setTab(t)}
+              style={styles.tabBtn}
+              onPress={() => handleTabPress(t)}
+              onLayout={(e) => {
+                const { x, width } = e.nativeEvent.layout;
+                tabLayouts.current[t] = { x, width };
+                if (t === tab) {
+                  indicatorX.value = x;
+                  indicatorW.value = width;
+                  indicatorReady.value = withTiming(1, { duration: 150 });
+                }
+              }}
             >
               <Text style={[styles.tabText, tab === t && styles.tabTextActive]}>
-                {t === 'upcoming' ? 'Предстоящие' : t === 'past' ? 'Прошедшие' : 'Все'}
+                {t === "upcoming" ? "Предстоящие" : t === "past" ? "Прошедшие" : "Все"}
               </Text>
             </Pressable>
           ))}
+          {/* Single animated underline shared across all tabs */}
+          <Animated.View style={[styles.tabUnderline, indicatorStyle]} />
         </View>
       </View>
       <FlatList
@@ -219,7 +187,11 @@ export const BookingsScreen = memo(function BookingsScreen() {
         maxToRenderPerBatch={4}
         windowSize={5}
         refreshControl={
-          <RefreshControl refreshing={isLoading} onRefresh={fetchBookings} tintColor={COLORS.brandCyan} />
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={fetchBookings}
+            tintColor={COLORS.brandCyan}
+          />
         }
         ListEmptyComponent={listEmpty}
       />
@@ -228,83 +200,63 @@ export const BookingsScreen = memo(function BookingsScreen() {
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.backgroundAlt },
-  gateRoot: { backgroundColor: '#fff', paddingHorizontal: 16 },
-  pageTitle: { fontSize: 32, fontWeight: '700', color: '#000', marginTop: 8, marginBottom: 4 },
+  container: { flex: 1, backgroundColor: COLORS.white },
+  gateRoot: { backgroundColor: "#fff", paddingHorizontal: 16 },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 8,
+    paddingTop: 12,
+    paddingBottom: 4,
+  },
+  backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
+  pageTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: "#000", textAlign: "center" },
   gateBody: { paddingTop: 24, gap: 10 },
-  gateTitle: { fontSize: 24, fontWeight: '700', color: '#000', lineHeight: 32 },
-  gateDesc: { fontSize: 15, color: '#888', lineHeight: 22 },
+  gateTitle: { fontSize: 24, fontWeight: "700", color: "#000", lineHeight: 32 },
+  gateDesc: { fontSize: 15, color: "#888", lineHeight: 22 },
   gateBtn: {
-    alignSelf: 'flex-start',
+    alignSelf: "flex-start",
     marginTop: 12,
-    backgroundColor: '#000',
+    backgroundColor: "#000",
     borderRadius: 12,
     paddingHorizontal: 28,
     paddingVertical: 14,
   },
-  gateBtnTxt: { fontSize: 15, fontWeight: '700', color: '#fff' },
+  gateBtnTxt: { fontSize: 15, fontWeight: "700", color: "#fff" },
   header: {
     backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
-    gap: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: COLORS.text1,
-    paddingTop: 8,
+    paddingBottom: 0,
   },
   tabs: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.muted,
-    borderRadius: 10,
-    padding: 3,
-    gap: 3,
+    flexDirection: "row",
+    paddingHorizontal: 16,
+    marginTop: 4,
+    position: "relative",
   },
   tabBtn: {
-    flex: 1,
-    paddingVertical: 7,
-    borderRadius: 8,
-    alignItems: 'center',
+    marginRight: 24,
+    paddingVertical: 12,
+    alignItems: "center",
   },
-  tabBtnActive: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 3,
-    elevation: 2,
+  tabText: { fontSize: 15, color: COLORS.text3, fontWeight: "500" },
+  tabTextActive: { color: "#000", fontWeight: "700" },
+  tabUnderline: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    height: 2.5,
+    borderRadius: 2,
+    backgroundColor: COLORS.brandNavy,
   },
-  tabText: { fontSize: 12, color: COLORS.text3, fontWeight: '500' },
-  tabTextActive: { color: COLORS.brandNavy, fontWeight: '700' },
   list: { padding: 16, gap: 12 },
-  card: {
-    backgroundColor: COLORS.white,
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 6,
-    elevation: 2,
-    marginBottom: 12,
+
+  emptyState: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 60,
+    gap: 12,
   },
-  cardImageWrap: { height: 120, overflow: 'hidden' },
-  cardImage: { ...StyleSheet.absoluteFill },
-  cardContent: { padding: 14, gap: 8 },
-  cardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 },
-  boatName: { fontSize: 16, fontWeight: '700', color: COLORS.text1, flex: 1 },
-  statusBadge: { borderRadius: 6, paddingHorizontal: 8, paddingVertical: 3 },
-  statusText: { fontSize: 11, fontWeight: '600' },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  metaText: { fontSize: 12, color: COLORS.text2, flex: 1 },
-  cardFooter: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 4 },
-  price: { fontSize: 16, fontWeight: '700', color: COLORS.brandNavy, flex: 1 },
-  remaining: { fontSize: 11, color: COLORS.warning },
-  emptyState: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingVertical: 60, gap: 12 },
-  emptyTitle: { fontSize: 18, fontWeight: '700', color: COLORS.text1 },
+  emptyTitle: { fontSize: 18, fontWeight: "700", color: COLORS.text1 },
   emptySubtitle: { fontSize: 14, color: COLORS.text2 },
 });

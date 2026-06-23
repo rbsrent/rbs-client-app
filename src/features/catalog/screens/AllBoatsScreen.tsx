@@ -33,7 +33,7 @@ import { countActive, findPiersInRadius, sortBoats, toLocalDateISO } from '../ut
 export function AllBoatsScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ type?: string }>();
+  const params = useLocalSearchParams<{ type?: string; pierId?: string }>();
 
   // Full filter sheet ref
   const filterRef = useRef<BottomSheetModal>(null);
@@ -48,9 +48,10 @@ export function AllBoatsScreen() {
   // ── Initial filters from URL params ──
   const initialFilters = useMemo<Filters>(() => {
     const chip = TYPE_CHIPS.find((c) => c.id === params.type);
-    if (!chip || chip.id === 'all') return DEFAULT;
-    return { ...DEFAULT, typeId: chip.id };
-  }, [params.type]);
+    const base = chip && chip.id !== 'all' ? { ...DEFAULT, typeId: chip.id } : DEFAULT;
+    if (params.pierId) return { ...base, pierIds: [params.pierId] };
+    return base;
+  }, [params.type, params.pierId]);
 
   const [filters, setFilters] = useState<Filters>(initialFilters);
 
@@ -119,21 +120,21 @@ export function AllBoatsScreen() {
   );
 
   // ── Full sheet handlers ──
-  const openSheet = () => {
+  const openSheet = useCallback(() => {
     setDraft(filters);
     filterRef.current?.present();
-  };
+  }, [filters]);
 
-  const handleApply = () => {
+  const handleApply = useCallback(() => {
     setFilters(draft);
     filterRef.current?.dismiss();
-  };
+  }, [draft]);
 
-  const handleResetAll = () => {
+  const handleResetAll = useCallback(() => {
     setFilters(DEFAULT);
     setDraft(DEFAULT);
     filterRef.current?.dismiss();
-  };
+  }, []);
 
   // ── Mini sheet handlers ──
   const openFilter = useCallback((section: FilterSection) => {
@@ -181,7 +182,10 @@ export function AllBoatsScreen() {
       onDateSelect={handleWeekDate}
       onOpenFilter={openFilter}
       viewMode={viewMode}
-      setView={setViewMode}
+      setView={(m) => {
+        if (m === 'map') router.push('/piers' as any);
+        else setViewMode(m);
+      }}
       filteredCount={filtered.length}
       total={total}
       availLoading={availLoading}
@@ -191,6 +195,8 @@ export function AllBoatsScreen() {
   ), [filters, setFilters, handleWeekDate, openFilter, viewMode, filtered.length, total, availLoading, sortBy]);
 
   const handleResetFilters = useCallback(() => setFilters(DEFAULT), []);
+
+  const handleOpenSearch = useCallback(() => router.push('/boats/search'), [router]);
 
   const ListEmpty = useCallback(() => (
     <BoatEmpty
@@ -206,7 +212,7 @@ export function AllBoatsScreen() {
         right={
           <Pressable
             style={s.searchBtn}
-            onPress={() => router.push('/boats/search')}
+            onPress={handleOpenSearch}
             hitSlop={8}
           >
             <Search size={20} color={COLORS.brandNavy} strokeWidth={2} />

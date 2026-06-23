@@ -8,7 +8,7 @@ import {
   Star,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Pressable, Share, StyleSheet, Text, View } from "react-native";
+import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Extrapolation,
   FadeIn,
@@ -28,6 +28,7 @@ import BoatBookingBar from "@/features/catalog/components/BoatBookingBar";
 import BoatImageSwiper, {
   SWIPER_IMG_H,
 } from "@/features/catalog/components/BoatImageSwiper";
+import { useBoatAllDiscounts, useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
 import SimilarBoats from "@/features/catalog/components/SimilarBoats";
 import BoatDetailAmenities from "@/features/catalog/components/detail/BoatDetailAmenities";
 import BoatDetailDescription from "@/features/catalog/components/detail/BoatDetailDescription";
@@ -61,6 +62,10 @@ export default function BoatDetailScreen() {
 
   const { boat, images, similar, reviews, reviewRating, isLoading } =
     useBoatDetail(id as string);
+
+  const discountsMap = useDiscountsCache();
+  const activeDiscount = boat ? (discountsMap.get(boat.id) ?? null) : null;
+  const boatDiscounts = useBoatAllDiscounts(boat?.id ?? '');
 
   const [showPierMap, setShowPierMap] = useState(false);
 
@@ -124,11 +129,16 @@ export default function BoatDetailScreen() {
 
   const handleShare = useCallback(async () => {
     try {
-      await Share.share({
-        message: `${boat?.name ?? "Судно"} — аренда на rbs.rent`,
-      });
-    } catch { }
-  }, [boat?.name]);
+      const name = boat?.name ?? "Судно";
+      const webUrl = `https://rbs.rent/catalog/${id}?from=share_${Platform.OS}`;
+      const appUrl = `rbsrent://catalog/${id}`;
+      await Share.share(
+        Platform.OS === "ios"
+          ? { title: name, message: appUrl, url: webUrl }
+          : { title: name, message: `${name}\n${webUrl}` },
+      );
+    } catch {}
+  }, [boat?.name, id]);
 
   const handleHeart = useCallback(async () => {
     if (!boat) return;
@@ -305,6 +315,29 @@ export default function BoatDetailScreen() {
             <Text style={s.boatName}>
               {boat ? getBoatH1(boat) : preview ? buildBoatH1(preview) : ""}
             </Text>
+
+            {boatDiscounts.length > 0 && (
+              <View style={s.discountTagRow}>
+                {boatDiscounts.map((d, i) => (
+                  <View
+                    key={i}
+                    style={[
+                      s.tagFilled,
+                      { backgroundColor: d.isCurrentlyActive ? COLORS.success : COLORS.backgroundAlt },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        s.tagFilledTxt,
+                        { color: d.isCurrentlyActive ? '#fff' : COLORS.grey },
+                      ]}
+                    >
+                      {d.name} −{d.percentage}%
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* loading state — skeleton */}
@@ -391,6 +424,7 @@ export default function BoatDetailScreen() {
         <BoatBookingBar
           pricePerHour={boat.price_per_hour}
           priceNight={boat.public_price_per_hour_night}
+          discount={activeDiscount}
           onBook={() => {
             const params = selectedDate
               ? `?boatId=${boat.id}&date=${selectedDate}`
@@ -574,5 +608,11 @@ const s = StyleSheet.create({
   tagFilledTxt: {
     fontSize: 12,
     fontWeight: "700",
+  },
+  discountTagRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 8,
   },
 });

@@ -5,11 +5,8 @@ import {
   Bell,
   CalendarCheck,
   ChevronRight,
-  FileText,
   Gift,
-  Heart,
   HelpCircle,
-  Info,
   LogOut,
   MapPin,
   MessageCircle,
@@ -17,18 +14,22 @@ import {
   Phone,
   Send,
   Settings,
-  Tag,
-  Trash2,
 } from "lucide-react-native";
 import { memo, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  Linking,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { useAuth } from "@/features/auth/hooks/useAuth";
 import { COLORS } from "@/shared/colors";
 import { SheetBackdrop } from "@/shared/components/SheetBackdrop";
 import { useAuthStore } from "@/store/useAuthStore";
-import { Linking } from "react-native";
 
 interface MenuItem {
   key: string;
@@ -70,10 +71,30 @@ export const ProfileScreen = memo(function ProfileScreen() {
   const helpSheetRef = useRef<BottomSheetModal>(null);
 
   const helpContacts = [
-    { label: "WhatsApp", Icon: MessageCircle, color: "#25D366", url: "https://wa.me/79810076500" },
-    { label: "Telegram", Icon: Send,          color: "#229ED9", url: "https://t.me/rentboat_spb" },
-    { label: "MAX",      Icon: MessageCircle, color: "#0077FF", url: "tel:+79810076500" },
-    { label: "Позвонить",Icon: Phone,         color: "#333333", url: "tel:+78124253360" },
+    {
+      label: "WhatsApp",
+      Icon: MessageCircle,
+      color: "#25D366",
+      url: "https://wa.me/79810076500",
+    },
+    {
+      label: "Telegram",
+      Icon: Send,
+      color: "#229ED9",
+      url: "https://t.me/rentboat_spb",
+    },
+    {
+      label: "MAX",
+      Icon: MessageCircle,
+      color: "#0077FF",
+      url: "tel:+79810076500",
+    },
+    {
+      label: "Позвонить",
+      Icon: Phone,
+      color: "#333333",
+      url: "tel:+78124253360",
+    },
   ] as const;
 
   const renderHelpSheet = () => (
@@ -89,7 +110,9 @@ export const ProfileScreen = memo(function ProfileScreen() {
         </View>
       )}
     >
-      <BottomSheetView style={[s.helpSheetContent, { paddingBottom: insets.bottom + 24 }]}>
+      <BottomSheetView
+        style={[s.helpSheetContent, { paddingBottom: insets.bottom + 24 }]}
+      >
         <Text style={s.helpSheetTitle}>Связаться с нами</Text>
         <View style={s.helpBtnList}>
           {helpContacts.map((ch) => (
@@ -108,9 +131,18 @@ export const ProfileScreen = memo(function ProfileScreen() {
   );
 
   const guestMenu: MenuItem[] = [
-    { key: "rule", Icon: NotepadText, label: "Условия бронирования RBS", onPress: () => router.push("/booking/conditions" as any) },
-    { key: "help", Icon: HelpCircle, label: "Помощь", onPress: () => helpSheetRef.current?.present() },
-    // { key: "about", Icon: Info, label: "О приложении", onPress: () => {} },
+    {
+      key: "rule",
+      Icon: NotepadText,
+      label: "Условия бронирования RBS",
+      onPress: () => router.push("/booking/conditions" as any),
+    },
+    {
+      key: "help",
+      Icon: HelpCircle,
+      label: "Помощь",
+      onPress: () => helpSheetRef.current?.present(),
+    },
   ];
 
   if (!session) {
@@ -126,7 +158,8 @@ export const ProfileScreen = memo(function ProfileScreen() {
 
           <View style={s.guestBox}>
             <Text style={s.guestSub}>
-             Чтобы быть в курсе всех скидок и не тратить время на заполнение полей
+              Чтобы быть в курсе всех скидок и не тратить время на заполнение
+              полей
             </Text>
             <Pressable
               style={({ pressed }) => [
@@ -172,39 +205,46 @@ export const ProfileScreen = memo(function ProfileScreen() {
       label: "Личные данные",
       onPress: () => router.push("/profile/settings" as any),
     },
-    { key: "notif", Icon: Bell, label: "Уведомления", onPress: () => {} },
+    {
+      key: "notif",
+      Icon: Bell,
+      label: "Уведомления",
+      onPress: () => router.push("/profile/notifications" as any),
+    },
     {
       key: "cert",
       Icon: Gift,
       label: "Подарочные сертификаты",
-      onPress: () => router.push("/certificates" as any),
+      onPress: () => router.push("/gift-cert" as any),
     },
-    { key: "promo", Icon: Tag, label: "Промокоды", onPress: () => {} },
-  ];
-
-  const group2: MenuItem[] = [
+    // { key: "promo", Icon: Tag, label: "Промокоды", onPress: () => {} },
     {
       key: "piers",
       Icon: MapPin,
       label: "Причалы",
       onPress: () => router.push("/piers" as any),
     },
-    { key: "rule", Icon: NotepadText, label: "Условия бронирования RBS", onPress: () => router.push("/booking/conditions" as any) },
-    { key: "docs", Icon: FileText, label: "Документы", onPress: () => {} },
-    { key: "help", Icon: HelpCircle, label: "Помощь", onPress: () => helpSheetRef.current?.present() },
-    { key: "about", Icon: Info, label: "О приложении", onPress: () => {} },
+  ];
+
+  const group2: MenuItem[] = [
+    {
+      key: "rule",
+      Icon: NotepadText,
+      label: "Условия бронирования RBS",
+      onPress: () => router.push("/booking/conditions" as any),
+    },
+    {
+      key: "help",
+      Icon: HelpCircle,
+      label: "Помощь",
+      onPress: () => helpSheetRef.current?.present(),
+    },
+    // { key: "about", Icon: Info, label: "О приложении", onPress: () => {} },
     {
       key: "signout",
       Icon: LogOut,
       label: "Выйти",
       onPress: () => logoutSheetRef.current?.present(),
-      danger: true,
-    },
-    {
-      key: "delete",
-      Icon: Trash2,
-      label: "Удалить аккаунт",
-      onPress: () => {},
       danger: true,
     },
   ];
@@ -213,19 +253,10 @@ export const ProfileScreen = memo(function ProfileScreen() {
     <View style={[s.root, { paddingTop: insets.top }]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 10 }}
       >
-        {/* Top bar: title + action buttons */}
         <View style={s.topBar}>
           <Text style={s.pageTitle}>Профиль</Text>
-          {/* <View style={s.topActions}>
-            <Pressable style={({ pressed }) => [s.actionBtn, pressed && { opacity: 0.6 }]} onPress={() => router.push('/profile/settings' as any)}>
-              <Settings size={18} color="#000" strokeWidth={1.8} />
-            </Pressable>
-            <Pressable style={({ pressed }) => [s.actionBtn, pressed && { opacity: 0.6 }]} onPress={() => {}}>
-              <Send size={18} color="#000" strokeWidth={1.8} />
-            </Pressable>
-          </View> */}
         </View>
 
         <View style={[s.card, s.profileCard]}>
@@ -241,14 +272,13 @@ export const ProfileScreen = memo(function ProfileScreen() {
         </View>
 
         <View style={s.featureRow}>
-          {/* Card: Мои брони */}
           <Pressable
             style={({ pressed }) => [
               s.card,
               s.featureCard,
               pressed && { opacity: 0.88 },
             ]}
-            onPress={() => router.push("/(tabs)/bookings" as any)}
+            onPress={() => router.push("/bookings" as any)}
           >
             <View style={[s.featureImgWrap, { backgroundColor: "#EAF2FF" }]}>
               <CalendarCheck
@@ -259,24 +289,6 @@ export const ProfileScreen = memo(function ProfileScreen() {
             </View>
             <Text style={s.featureLabel}>Мои брони</Text>
           </Pressable>
-
-          {/* Card: Избранное (NEW badge — just added) */}
-          <Pressable
-            style={({ pressed }) => [
-              s.card,
-              s.featureCard,
-              pressed && { opacity: 0.88 },
-            ]}
-            onPress={() => router.push("/(tabs)/wishlist" as any)}
-          >
-            <View style={s.newBadge}>
-              <Text style={s.newBadgeTxt}>новинки</Text>
-            </View>
-            <View style={[s.featureImgWrap, { backgroundColor: "#FFEEF0" }]}>
-              <Heart size={48} color="#E63946" strokeWidth={1.4} />
-            </View>
-            <Text style={s.featureLabel}>Избранное</Text>
-          </Pressable>
         </View>
 
         <Pressable
@@ -285,7 +297,7 @@ export const ProfileScreen = memo(function ProfileScreen() {
             s.wideCard,
             pressed && { opacity: 0.88 },
           ]}
-          onPress={() => {}}
+          onPress={() => Linking.openURL("https://t.me/rentboat_spb?text=%D0%94%D0%BE%D0%B1%D1%80%D1%8B%D0%B9%20%D0%B4%D0%B5%D0%BD%D1%8C%2C%20%D0%BC%D0%B5%D0%BD%D1%8F%20%D0%B8%D0%BD%D1%82%D0%B5%D1%80%D0%B5%D1%81%D1%83%D0%B5%D1%82%20%D0%B0%D1%80%D0%B5%D0%BD%D0%B4%D0%B0%20%D0%BA%D0%B0%D1%82%D0%B5%D1%80%D0%B0%20%28%D1%8F%D1%85%D1%82%D1%8B%29%20RBS.RENT")}
         >
           <View style={s.wideIconWrap}>
             <Send size={26} color="#229ED9" strokeWidth={1.6} />
@@ -303,7 +315,6 @@ export const ProfileScreen = memo(function ProfileScreen() {
           ))}
         </View>
 
-        {/* Divider */}
         <View style={s.divider} />
 
         <View style={s.menuSection}>
@@ -317,10 +328,8 @@ export const ProfileScreen = memo(function ProfileScreen() {
         </Text>
       </ScrollView>
 
-      {/* ── Help / contacts sheet ── */}
       {renderHelpSheet()}
 
-      {/* ── Logout action sheet ── */}
       <BottomSheetModal
         ref={logoutSheetRef}
         enableDynamicSizing
@@ -337,10 +346,6 @@ export const ProfileScreen = memo(function ProfileScreen() {
           style={[s.sheetContent, { paddingBottom: insets.bottom + 16 }]}
         >
           <Text style={s.sheetTitle}>Выйти из аккаунта?</Text>
-          {/* <Text style={s.sheetSub}>
-            Вы будете перенаправлены на главный экран.
-          </Text> */}
-
           <Pressable
             style={({ pressed }) => [
               s.sheetBtn,
@@ -354,7 +359,6 @@ export const ProfileScreen = memo(function ProfileScreen() {
           >
             <Text style={s.sheetBtnDangerTxt}>Выйти</Text>
           </Pressable>
-
           <Pressable
             style={({ pressed }) => [
               s.sheetBtn,
@@ -382,7 +386,6 @@ const CARD_SHADOW = {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: "#FFFFFF" },
 
-  // Top bar
   topBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -401,14 +404,12 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Card base
   card: {
     backgroundColor: "#FFFFFF",
     borderRadius: 24,
     ...CARD_SHADOW,
   },
 
-  // Profile card
   profileCard: {
     alignItems: "center",
     marginHorizontal: 24,
@@ -440,7 +441,6 @@ const s = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Feature cards row
   featureRow: {
     flexDirection: "row",
     marginHorizontal: 24,
@@ -468,19 +468,7 @@ const s = StyleSheet.create({
     color: "#000",
     textAlign: "center",
   },
-  newBadge: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-    // navy gradient approximated as solid
-    backgroundColor: "#354668",
-  },
-  newBadgeTxt: { fontSize: 8, fontWeight: "500", color: "#FFF" },
 
-  // Wide card
   wideCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -502,7 +490,6 @@ const s = StyleSheet.create({
   wideTitle: { fontSize: 16, fontWeight: "500", color: "#000" },
   wideSub: { fontSize: 12, fontWeight: "400", color: "#666", marginTop: 2 },
 
-  // Menu
   menuSection: {
     marginHorizontal: 24,
     marginTop: 24,
@@ -530,7 +517,6 @@ const s = StyleSheet.create({
     marginTop: 24,
   },
 
-  // Guest state (not logged in)
   guestBox: {
     paddingHorizontal: 24,
     paddingTop: 8,
@@ -555,7 +541,6 @@ const s = StyleSheet.create({
     marginBottom: 8,
   },
 
-  // logout sheet
   sheetBg: {
     backgroundColor: "#fff",
     borderTopLeftRadius: 24,
@@ -587,7 +572,11 @@ const s = StyleSheet.create({
   sheetBtnDanger: { backgroundColor: COLORS.brandNavy },
   sheetBtnDangerTxt: { fontSize: 16, fontWeight: "600", color: "#fff" },
   sheetBtnCancel: { backgroundColor: "#F2F2F2" },
-  sheetBtnCancelTxt: { fontSize: 16, fontWeight: "500", color: COLORS.brandNavy },
+  sheetBtnCancelTxt: {
+    fontSize: 16,
+    fontWeight: "500",
+    color: COLORS.brandNavy,
+  },
 
   helpSheetContent: { paddingHorizontal: 16, paddingTop: 4 },
   helpSheetTitle: {

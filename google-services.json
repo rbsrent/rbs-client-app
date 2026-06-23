@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1087572715005",
+    "project_id": "rbs-client",
+    "storage_bucket": "rbs-client.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1087572715005:android:c126e520afac79f53ee594",
+        "android_client_info": {
+          "package_name": "com.rbsrent.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyABwp99NsstI0D3ls-PSpVcdmAN4hSH4TU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
