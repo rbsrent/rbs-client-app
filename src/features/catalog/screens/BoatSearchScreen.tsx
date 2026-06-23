@@ -1,4 +1,4 @@
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { ArrowLeft, Search } from 'lucide-react-native';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import {
@@ -40,6 +40,15 @@ export function BoatSearchScreen() {
   const [query, setQuery] = useState('');
 
   const progress = useSharedValue(0);
+
+  useFocusEffect(
+    useCallback(() => {
+      const t = setTimeout(() => {
+        inputRef.current?.focus();
+      }, 300);
+      return () => clearTimeout(t);
+    }, []),
+  );
 
   const { boats: allBoats, isLoadingBoats: loading } = useHomeData();
   const { availMap } = useAvailabilityCache(DEFAULT.dateTime);
@@ -106,7 +115,6 @@ export function BoatSearchScreen() {
           <Search size={16} color={COLORS.brandNavy} strokeWidth={2} />
           <TextInput
             ref={inputRef}
-            autoFocus
             style={s.input}
             placeholder="Поиск"
             placeholderTextColor={COLORS.text3}
