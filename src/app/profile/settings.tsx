@@ -100,12 +100,13 @@ export default function ProfileSettingsScreen() {
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const { data } = await authSupabase.rpc("update_sms_client_profile", {
+      const { error } = await authSupabase.rpc("update_sms_client_profile", {
         p_full_name: name.trim() || null,
         p_email: email.trim() || null,
         p_preferred_promo_code: null,
       });
-      if (data) setSmsUser(data);
+      if (error) throw error;
+      if (smsUser) setSmsUser({ ...smsUser, full_name: name.trim() || null, email: email.trim() || null });
       setEditing(false);
     } catch (e: any) {
       Alert.alert("Ошибка", e?.message ?? "Не удалось сохранить");

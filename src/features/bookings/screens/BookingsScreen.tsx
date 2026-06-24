@@ -58,27 +58,42 @@ export const BookingsScreen = memo(function BookingsScreen() {
     if (!session) return;
     setIsLoading(true);
     try {
+      const SELECT = `
+        id, boat_id, start_datetime, end_datetime, booking_status,
+        total_price, prepayment_amount, remaining_amount,
+        pier_name, pier_address, client_name,
+        boats(name, type, boat_images(image_path, position))
+      `;
       const phone =
-        session.user?.phone ?? session.user?.user_metadata?.phone_number ?? "";
-      if (!phone) return;
-      const variants = phoneVariants(phone);
-      const { data } = await authSupabase
-        .from("public_bookings")
-        .select(
-          `
-          id, boat_id, start_datetime, end_datetime, booking_status,
-          total_price, prepayment_amount, remaining_amount,
-          pier_name, pier_address, client_name,
-          boats(name, type, boat_images(image_path, position))
-        `,
-        )
-        .in("client_phone", variants)
-        .order("start_datetime", { ascending: false });
+        session.user?.phone ??
+        session.user?.user_metadata?.phone_number ??
+        smsUser?.phone_number ??
+        "";
+
+      let data: any[] | null = null;
+
+      if (phone) {
+        const variants = phoneVariants(phone);
+        const res = await authSupabase
+          .from("public_bookings")
+          .select(SELECT)
+          .in("client_phone", variants)
+          .order("start_datetime", { ascending: false });
+        data = res.data;
+      } else if (smsUser?.id) {
+        const res = await authSupabase
+          .from("public_bookings")
+          .select(SELECT)
+          .eq("sms_user_id", smsUser.id)
+          .order("start_datetime", { ascending: false });
+        data = res.data;
+      }
+
       setBookings((data ?? []) as any[]);
     } finally {
       setIsLoading(false);
     }
-  }, [session]);
+  }, [session, smsUser]);
 
   useEffect(() => {
     fetchBookings();

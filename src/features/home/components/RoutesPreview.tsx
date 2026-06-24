@@ -29,7 +29,7 @@ interface RoutePreview {
 
 function resolveImage(raw: string | null): string | null {
   if (!raw) return null;
-  if (raw.startsWith('http')) return raw;
+  if (raw.startsWith('http')) return raw.replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL);
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`;
 }
 

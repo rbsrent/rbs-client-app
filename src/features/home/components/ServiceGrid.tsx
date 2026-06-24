@@ -2,6 +2,7 @@ import { BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import {
   Anchor,
+  CalendarCheck,
   Gift,
   MapPin,
   MoreHorizontal,
@@ -81,11 +82,22 @@ const ALL: Service[] = [
     bg: "",
     route: "/gift-cert",
   },
+  {
+    key: "bookings",
+    label: "Мои брони",
+    icon: <CalendarCheck size={22} color={IC} strokeWidth={2} />,
+    bg: "",
+    route: "/bookings",
+  },
 ];
 
-const HOME_ITEMS = ALL;
+const HOME_ITEMS = ALL.slice(0, 4);
 
 const GROUPS: ServiceGroup[] = [
+  {
+    title: "Мои брони",
+    items: ALL.filter((s) => s.key === "bookings"),
+  },
   {
     title: "Аренда судов",
     items: ALL.filter((s) => ["boat", "yacht"].includes(s.key)),

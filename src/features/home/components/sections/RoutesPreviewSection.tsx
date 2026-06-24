@@ -78,7 +78,6 @@ export const RoutesPreviewSection = memo(function RoutesPreviewSection({ routes,
         snapToInterval={INTERVAL}
         snapToAlignment="start"
         scrollEventThrottle={16}
-        removeClippedSubviews
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: false },

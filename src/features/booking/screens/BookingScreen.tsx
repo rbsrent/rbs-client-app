@@ -44,6 +44,7 @@ import { PhoneInput } from "@/shared/components/PhoneInput";
 import { SheetBackdrop } from "@/shared/components/SheetBackdrop";
 import { Spinner } from "@/shared/components/Spinner";
 import { usePendingPayment } from "@/shared/context/PendingPaymentContext";
+import { authSupabase } from "@/shared/supabase/authClient";
 import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
 import {
   digitsToE164,
@@ -67,7 +68,7 @@ interface GiftCertResult {
   balance: number;
 }
 
-type PaymentMode = "prepayment" | "contact" | "full";
+type PaymentMode = "prepayment" | "contact";
 
 const CONTACT_WA = "whatsapp://send?phone=79810076500";
 const CONTACT_TEL = "tel:+79810076500";
@@ -227,7 +228,7 @@ export function BookingScreen() {
           .eq("id", bId)
           .single();
         const status = (data as any)?.booking_status;
-        if (status === "confirmed" || status === "paid") {
+        if (status === "confirmed" || status === "paid" || status === "partially_paid") {
           clearInterval(pollRef.current!);
           setPaying(false);
           clearPendingPayment();
@@ -356,8 +357,7 @@ export function BookingScreen() {
             appliedDiscount: data.appliedDiscount ?? null,
             totalSavings: data.totalSavings ?? 0,
           });
-          if ((data.prepaymentAmount ?? 0) > 0) setPaymentMode("prepayment");
-          else setPaymentMode("full");
+          setPaymentMode("prepayment");
         } else {
           const base = (boat?.price_per_hour ?? 0) * dur;
           const dp = Math.round(base * 0.2);
@@ -367,7 +367,7 @@ export function BookingScreen() {
             remainingAmount: base - dp,
             durationHours: dur,
           });
-          setPaymentMode(dp > 0 ? "prepayment" : "full");
+          setPaymentMode("prepayment");
         }
       } catch {
         const base = (boat?.price_per_hour ?? 0) * dur;
@@ -486,12 +486,6 @@ export function BookingScreen() {
     };
   }, [pricing, promo, paymentMode, gift, boat?.price_per_hour, duration]);
 
-  // Auto-switch to "full" when prepayment option is not available
-  useEffect(() => {
-    if (prepaymentAmt === 0 && paymentMode === "prepayment") {
-      setPaymentMode("full");
-    }
-  }, [prepaymentAmt]);
 
   // ── Pay / Contact ────────────────────────────────────────────────────────
   const handleAction = async () => {
@@ -540,6 +534,7 @@ export function BookingScreen() {
             description: `Аренда катера ${boat.name}`,
             payment_type: isPrepayment ? "prepayment" : "full_payment",
             idempotency_key: uuid(),
+            return_url: Linking.createURL("booking/return"),
             booking_data: {
               boat_id: boat.id,
               start_datetime: startDt.toISOString(),
@@ -547,6 +542,7 @@ export function BookingScreen() {
               client_name: clientName.trim(),
               client_phone: digitsToE164(clientPhoneDigits),
               client_email: clientEmail.trim() || null,
+              sms_user_id: smsUser?.id ?? null,
               total_public_price: totalAfterPromo,
               prepayment_amount: isPrepayment ? prepaymentAmt : 0,
               remaining_amount: isPrepayment ? remainingAmt : 0,
@@ -568,6 +564,17 @@ export function BookingScreen() {
       if (error) throw error;
       if (!data?.success)
         throw new Error(data?.error ?? "Ошибка создания платежа");
+
+      // Save phone to sms_users if Telegram user has no phone yet
+      if (smsUser?.id && !smsUser.phone_number && clientPhoneDigits) {
+        const e164 = digitsToE164(clientPhoneDigits);
+        authSupabase
+          .from("sms_users")
+          .update({ phone_number: e164 })
+          .eq("id", smsUser.id)
+          .then(() => fetchProfile());
+      }
+
       const bId = data.public_booking_id as string;
       const confirmUrl = data.confirmation_url as string;
       bookingIdRef.current = bId;
@@ -698,26 +705,14 @@ export function BookingScreen() {
         />
 
         {/* ══ 2. Payment method ════════════════════════════════════════════ */}
-        <Text style={[s.secLabel, { marginTop: 24 }]}>Способ оплаты</Text>
+        <Text style={[s.secLabel, { marginTop: 24 }]}>Оплата бронирования</Text>
         <View style={s.payGrid}>
-          {prepaymentAmt > 0 && (
-            <Pressable
-              style={[s.payCard, paymentMode === "prepayment" && s.payCardOn]}
-              onPress={() => setPaymentMode("prepayment")}
-            >
+          <View style={s.payCardWrap}>
+            <Pressable style={[s.payCard, s.payCardOn]}>
               <Image source={require("@/../assets/images/yu.png")} style={s.yuImg} contentFit="contain" />
-              <Text style={s.payCardLabel}>Предоплата</Text>
               <Text style={s.payCardSub}>Часть сейчас, остаток на месте</Text>
             </Pressable>
-          )}
-          <Pressable
-            style={[s.payCard, paymentMode === "full" && s.payCardOn]}
-            onPress={() => setPaymentMode("full")}
-          >
-            <Image source={require("@/../assets/images/yu.png")} style={s.yuImg} contentFit="contain" />
-            <Text style={s.payCardLabel}>{"Полная\nоплата"}</Text>
-            <Text style={s.payCardSub}>Всё сейчас онлайн</Text>
-          </Pressable>
+          </View>
         </View>
 
         {/* ── Менеджер button ───────────────────────────────────────────── */}
@@ -1110,17 +1105,19 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     marginBottom: 4,
   },
+  payCardWrap: {
+    width: '50%',
+  },
   payCard: {
-    flex: 1,
     backgroundColor: COLORS.greyLight,
     borderRadius: 14,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: SEP,
     padding: 14,
     gap: 6,
     minHeight: 96,
   },
-  payCardOn: { borderColor: SEL_BDR },
+  payCardOn: { borderColor: COLORS.brandNavy},
   payCardLabel: {
     fontSize: 14,
     fontWeight: "600",
