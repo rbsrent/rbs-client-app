@@ -18,10 +18,19 @@ export interface WaterRoute {
 
 const BUCKET = 'water-route-images';
 
+function toWebp(url: string): string {
+  return url.replace(/\.[^/.]+$/, '') + '_large.webp';
+}
+
 export function resolveRouteImage(raw: string | null): string | null {
   if (!raw) return null;
-  if (raw.startsWith('http')) return raw.replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL);
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`;
+  if (raw.startsWith('http')) {
+    const normalized = raw
+      .replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL)
+      .replace('https://proxy.rbs.rent', SUPABASE_URL);
+    return toWebp(normalized);
+  }
+  return toWebp(`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`);
 }
 
 export const DIFFICULTY: Record<string, { label: string; color: string }> = {

@@ -1,6 +1,5 @@
 import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
-import { ArrowRight } from "lucide-react-native";
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -11,20 +10,20 @@ import {
   View,
 } from "react-native";
 import ReAnimated, {
-  useSharedValue,
-  useAnimatedStyle,
-  useAnimatedScrollHandler,
-  useAnimatedReaction,
-  runOnJS,
-  interpolate,
   Extrapolation,
+  interpolate,
+  runOnJS,
+  useAnimatedReaction,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
 } from "react-native-reanimated";
 
 import { useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
 import { COLORS } from "@/shared/colors";
 import { STRIP_IMG_H, STRIP_W } from "@/shared/components/BoatCard";
 import { HomeBoat } from "@/store/useHomeStore";
-import { PopularBoatCard, CARD_W } from "../cards/PopularBoatCard";
+import { CARD_W, PopularBoatCard } from "../cards/PopularBoatCard";
 import { PopularSeeAllCard } from "../cards/PopularSeeAllCard";
 
 const SHIMMER = ["transparent", "rgba(255,255,255,0.5)", "transparent"] as const;
@@ -98,11 +97,11 @@ const PopularRow = memo(function PopularRow({
     [boats],
   );
   const handleSeeAll = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
-  const handleArrow  = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
+  const handleArrow = useCallback(() => router.push(typeRoute as any), [router, typeRoute]);
 
-  const scrollX  = useSharedValue(0);
+  const scrollX = useSharedValue(0);
   const contentW = useSharedValue(0);
-  const viewW    = useSharedValue(0);
+  const viewW = useSharedValue(0);
 
   const [seeAllVisible, setSeeAllVisible] = useState(false);
 
@@ -125,8 +124,8 @@ const PopularRow = memo(function PopularRow({
   const arrowAnimStyle = useAnimatedStyle(() => {
     const maxScroll = Math.max(0, contentW.value - viewW.value);
     const fadeStart = Math.max(0, maxScroll - CARD_W * 0.8);
-    const fadeEnd   = Math.max(0, maxScroll - CARD_W * 0.3);
-    const opacity   = interpolate(scrollX.value, [fadeStart, fadeEnd], [1, 0], Extrapolation.CLAMP);
+    const fadeEnd = Math.max(0, maxScroll - CARD_W * 0.3);
+    const opacity = interpolate(scrollX.value, [fadeStart, fadeEnd], [1, 0], Extrapolation.CLAMP);
     return { opacity };
   });
 
@@ -145,7 +144,7 @@ const PopularRow = memo(function PopularRow({
             onPress={handleArrow}
             hitSlop={8}
           >
-            <ArrowRight size={15} color={COLORS.text1} strokeWidth={2.5} />
+            <Text style={s.seeAllText}>Все</Text>
           </Pressable>
         </ReAnimated.View>
       </View>
@@ -224,7 +223,7 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         subtitle="На основе бронирований за 30 дней"
         typeRoute="/boats"
         boats={popular}
-        badge="Топ выбор"
+        // badge="Топ выбор"
         discountsMap={discountsMap}
       />
       <PopularRow
@@ -232,7 +231,7 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=boat"
         boats={katera.slice(0, 10)}
-        badge="Катер"
+        // badge="Катер"
         discountsMap={discountsMap}
       />
       <PopularRow
@@ -240,7 +239,7 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=yacht"
         boats={yakhty.slice(0, 10)}
-        badge="Яхта"
+        // badge="Яхта"
         discountsMap={discountsMap}
       />
     </View>
@@ -248,7 +247,11 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
 });
 
 const s = StyleSheet.create({
-  rowRoot: { marginBottom: 24 },
+  rowRoot: { 
+    paddingBottom: 24,
+    // borderBottomWidth: 1,
+    // borderBottomColor: COLORS.greyLight
+  },
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -259,22 +262,25 @@ const s = StyleSheet.create({
   title: { fontSize: 18, fontWeight: "500", color: COLORS.text1 },
   titleSub: { fontSize: 12, color: COLORS.text3, marginTop: 1 },
   arrowBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: COLORS.muted,
-    alignItems: "center",
-    justifyContent: "center",
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingTop: 2,
   },
   scrollContent: { paddingHorizontal: 16, gap: 12, paddingRight: 32 },
+  seeAllText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.brandBlue,
+  },
 });
 
 const SKEL = "#E8E8E8";
 const sk = StyleSheet.create({
-  card:     { width: STRIP_W },
-  img:      { width: STRIP_W, height: STRIP_IMG_H, borderRadius: 14, backgroundColor: SKEL, overflow: 'hidden' },
-  line1:    { width: Math.round(STRIP_W * 0.55), height: 13, borderRadius: 5, backgroundColor: SKEL, marginTop: 8, overflow: 'hidden' },
-  line2:    { width: Math.round(STRIP_W * 0.38), height: 10, borderRadius: 5, backgroundColor: SKEL, marginTop: 5, overflow: 'hidden' },
+  card: { width: STRIP_W },
+  img: { width: STRIP_W, height: STRIP_IMG_H, borderRadius: 14, backgroundColor: SKEL, overflow: 'hidden' },
+  line1: { width: Math.round(STRIP_W * 0.55), height: 13, borderRadius: 5, backgroundColor: SKEL, marginTop: 8, overflow: 'hidden' },
+  line2: { width: Math.round(STRIP_W * 0.38), height: 10, borderRadius: 5, backgroundColor: SKEL, marginTop: 5, overflow: 'hidden' },
   titleBar: { width: 150, height: 14, borderRadius: 5, backgroundColor: SKEL },
-  subBar:   { width: 100, height: 10, borderRadius: 5, backgroundColor: SKEL },
+  subBar: { width: 100, height: 10, borderRadius: 5, backgroundColor: SKEL },
 });

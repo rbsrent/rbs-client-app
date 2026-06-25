@@ -1,4 +1,3 @@
-// components/GroupCard.tsx
 import { COLORS } from "@/shared/colors";
 import {
   DEFAULT_GROUP_ID,

@@ -44,7 +44,6 @@ import { useRouteSavedStore } from "@/store/useRouteSavedStore";
 const { width: W } = Dimensions.get("window");
 const IMG_H = 280;
 const NAVY = COLORS.brandNavy;
-const TITLE_THRESHOLD = IMG_H + 60;
 
 function durationLabel(h: number) {
   if (h === 1) return "1 час";
@@ -58,7 +57,6 @@ function SnakePath({ points }: { points: string[] }) {
   return (
     <View style={sp.wrap}>
       <View style={sp.header}>
-        <MapPin size={16} color={NAVY} strokeWidth={2} />
         <Text style={sp.headerTxt}>Маршрут · {points.length} точек</Text>
       </View>
 
@@ -151,7 +149,7 @@ export default function RouteDetailScreen() {
           ? { title: name, message: appUrl, url: webUrl }
           : { title: name, message: `${name}\n${webUrl}` },
       );
-    } catch {}
+    } catch { }
   }, [route?.name, slug]);
 
   const handleHeart = useCallback(() => {
@@ -184,18 +182,26 @@ export default function RouteDetailScreen() {
     return () => { cancelled = true; };
   }, [slug]);
 
-  // scroll → header title
+  const HEADER_H = insets.top + 56;
+  const TR_END = IMG_H - HEADER_H;
+  const TR_START = TR_END - 60;
+
+  // scroll → header animations
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
-  const headerTitleStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      scrollY.value,
-      [TITLE_THRESHOLD, TITLE_THRESHOLD + 40],
-      [0, 1],
-      Extrapolation.CLAMP,
-    ),
+  const bgOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [0, 1], Extrapolation.CLAMP),
+  }));
+  const borderOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [0, 1], Extrapolation.CLAMP),
+  }));
+  const overlayBtns = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [1, 0], Extrapolation.CLAMP),
+  }));
+  const headerBtns = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [0, 1], Extrapolation.CLAMP),
   }));
 
   const imageUrl = route
@@ -209,29 +215,59 @@ export default function RouteDetailScreen() {
 
   return (
     <View style={s.root}>
-      {/* ── always-white header ── */}
-      <View style={[s.header, { paddingTop: insets.top }]}>
-        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={10}>
-          <ArrowLeft size={22} color={COLORS.text1} strokeWidth={2} />
-        </Pressable>
+      {/* ── absolute sticky header ── */}
+      <View style={[s.stickyHeader, { height: HEADER_H }]} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, s.headerWhiteBg, bgOpacity]} pointerEvents="none" />
+        <Animated.View style={[s.headerBorder, borderOpacity]} pointerEvents="none" />
 
-        <Animated.Text style={[s.headerTitle, headerTitleStyle]} numberOfLines={1}>
-          {routeName}
-        </Animated.Text>
+        {/* over-image: pill buttons */}
+        <Animated.View style={[StyleSheet.absoluteFill, overlayBtns]} pointerEvents="box-none">
+          <View style={[s.headerInner, { paddingTop: insets.top }]} pointerEvents="box-none">
+            <View style={s.headerRow} pointerEvents="box-none">
+              <Pressable style={s.pillBtn} onPress={() => router.back()} hitSlop={8}>
+                <ArrowLeft size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
+              </Pressable>
+              <View style={s.headerRight}>
+                <Pressable style={s.pillBtn} onPress={handleShare} hitSlop={8}>
+                  <Share2 size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
+                </Pressable>
+                <Pressable style={s.pillBtn} onPress={handleHeart} hitSlop={8}>
+                  <Heart
+                    size={18}
+                    color={isSaved ? "#E63946" : COLORS.brandNavy}
+                    fill={isSaved ? "#E63946" : "transparent"}
+                    strokeWidth={2.5}
+                  />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
 
-        <View style={s.headerRight}>
-          <Pressable style={s.headerIconBtn} onPress={handleShare} hitSlop={10}>
-            <Share2 size={20} color={COLORS.text1} strokeWidth={2} />
-          </Pressable>
-          <Pressable style={s.headerIconBtn} onPress={handleHeart} hitSlop={10}>
-            <Heart
-              size={20}
-              color={isSaved ? "#E63946" : COLORS.text1}
-              fill={isSaved ? "#E63946" : "transparent"}
-              strokeWidth={2}
-            />
-          </Pressable>
-        </View>
+        {/* white header: plain icons + title */}
+        <Animated.View style={[StyleSheet.absoluteFill, headerBtns]} pointerEvents="box-none">
+          <View style={[s.headerInner, { paddingTop: insets.top }]} pointerEvents="box-none">
+            <View style={s.headerRow} pointerEvents="box-none">
+              <Pressable style={s.plainBtn} onPress={() => router.back()} hitSlop={8}>
+                <ArrowLeft size={20} color={COLORS.text1} strokeWidth={2} />
+              </Pressable>
+              <Text style={s.headerTitle} numberOfLines={1}>{routeName}</Text>
+              <View style={s.headerRight}>
+                <Pressable style={s.plainBtn} onPress={handleShare} hitSlop={8}>
+                  <Share2 size={20} color={COLORS.text1} strokeWidth={2} />
+                </Pressable>
+                <Pressable style={s.plainBtn} onPress={handleHeart} hitSlop={8}>
+                  <Heart
+                    size={20}
+                    color={isSaved ? "#E63946" : COLORS.text1}
+                    fill={isSaved ? "#E63946" : "transparent"}
+                    strokeWidth={2}
+                  />
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Animated.View>
       </View>
 
       {/* ── scroll content ── */}
@@ -258,85 +294,83 @@ export default function RouteDetailScreen() {
           )}
         </View>
 
-        {/* top content block — same style as TourDetailScreen */}
-        <View style={s.content}>
-          {/* tags */}
-          <View style={s.tagsRow}>
-            {diff && (
-              <View style={[s.tagFilled, { backgroundColor: diff.color }]}>
-                <Text style={s.tagFilledTxt}>{diff.label}</Text>
-              </View>
-            )}
-            <View style={s.tagOutline}>
-              <Text style={s.tagOutlineTxt}>Маршрут</Text>
-            </View>
-          </View>
-
-          {/* title */}
-          <Text style={s.title}>{routeName}</Text>
-
-          {/* info cards */}
-          {route && (
-            <>
-              <View style={s.infoCard}>
-                <View style={s.infoIconWrap}>
-                  <Clock size={22} color={NAVY} strokeWidth={2} />
-                </View>
-                <Text style={s.infoTxt}>
-                  Продолжительность: {durationLabel(route.duration_hours)}
-                </Text>
-              </View>
-
-              {points.length > 0 && (
-                <View style={s.infoCard}>
-                  <View style={s.infoIconWrap}>
-                    <MapPin size={22} color={COLORS.brandViolet} strokeWidth={2} />
-                  </View>
-                  <Text style={s.infoTxt}>
-                    {points.length} точек маршрута — от старта до финиша
-                  </Text>
+        <View style={s.card}>
+          {/* top content block */}
+          <View style={s.content}>
+            {/* tags */}
+            <View style={s.tagsRow}>
+              {diff && (
+                <View style={[s.tagFilled, { backgroundColor: diff.color }]}>
+                  <Text style={s.tagFilledTxt}>{diff.label}</Text>
                 </View>
               )}
-            </>
+              <View style={[s.tagOutline, { backgroundColor: "#EEE9FC" }]}>
+                <Text style={[s.tagOutlineTxt, { color: COLORS.brandViolet }]}>Маршрут</Text>
+              </View>
+            </View>
+
+            {/* title */}
+            <Text style={s.title}>{routeName}</Text>
+
+            {/* info cards */}
+            {route && (
+              <>
+                <View style={s.infoCard}>
+                  <View style={s.infoIconWrap}>
+                    <Clock size={22} color={NAVY} strokeWidth={2} />
+                  </View>
+                  <Text style={s.infoTxt}>
+                    Продолжительность: {durationLabel(route.duration_hours)}
+                  </Text>
+                </View>
+
+                {points.length > 0 && (
+                  <View style={s.infoCard}>
+                    <View style={s.infoIconWrap}>
+                      <MapPin size={22} color={COLORS.brandViolet} strokeWidth={2} />
+                    </View>
+                    <Text style={s.infoTxt}>
+                      {points.length} точек маршрута — от старта до финиша
+                    </Text>
+                  </View>
+                )}
+              </>
+            )}
+          </View>
+
+          {/* loading / error */}
+          {loading ? (
+            <View style={s.loadingBlock}>
+              <Spinner size={20} />
+            </View>
+          ) : !route ? (
+            <View style={s.loadingBlock}>
+              <Text style={{ color: COLORS.text3 }}>Маршрут не найден</Text>
+            </View>
+          ) : (
+            <Animated.View entering={FadeIn.duration(260)} style={s.sections}>
+              <View style={s.spacer} />
+              {points.length > 0 && <SnakePath points={points} />}
+
+              {route.detailed_description ? (
+                <RouteDescription text={route.detailed_description} />
+              ) : null}
+
+              {route.highlights && route.highlights.length > 0 && (
+                <View style={s.highlightsSection}>
+                  <Text style={s.sectionTitle}>Что увидите</Text>
+                  <View style={s.chips}>
+                    {route.highlights.map((h, i) => (
+                      <View key={i} style={s.chip}>
+                        <Text style={s.chipTxt}>{h}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </Animated.View>
           )}
         </View>
-
-        {/* loading / error */}
-        {loading ? (
-          <View style={s.loadingBlock}>
-            <Spinner size={20} />
-          </View>
-        ) : !route ? (
-          <View style={s.loadingBlock}>
-            <Text style={{ color: COLORS.text3 }}>Маршрут не найден</Text>
-          </View>
-        ) : (
-          <Animated.View entering={FadeIn.duration(260)} style={s.sections}>
-            <View style={s.divider} />
-
-            {/* snake path */}
-            {points.length > 0 && <SnakePath points={points} />}
-
-            {/* description */}
-            {route.detailed_description ? (
-              <RouteDescription text={route.detailed_description} />
-            ) : null}
-
-            {/* highlights */}
-            {route.highlights && route.highlights.length > 0 && (
-              <View style={s.highlightsSection}>
-                <Text style={s.sectionTitle}>Что увидите</Text>
-                <View style={s.chips}>
-                  {route.highlights.map((h, i) => (
-                    <View key={i} style={s.chip}>
-                      <Text style={s.chipTxt}>{h}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            )}
-          </Animated.View>
-        )}
       </Animated.ScrollView>
     </View>
   );
@@ -363,7 +397,7 @@ const sp = StyleSheet.create({
   rowLeft: { flexDirection: "row-reverse" },
   labelCard: {
     width: SIDE_W,
-    backgroundColor: "#F8F9FB",
+    backgroundColor: COLORS.greyLight,
     borderRadius: 12,
     padding: 12,
     gap: 3,
@@ -410,46 +444,78 @@ const rd = StyleSheet.create({
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.white },
 
-  // header
-  header: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingBottom: 12,
+  // sticky header
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  headerWhiteBg: { backgroundColor: COLORS.white },
+  headerBorder: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+  },
+  headerInner: { flex: 1, justifyContent: "center" },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
   },
-  backBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
-  headerTitle: { flex: 1, fontSize: 16, fontWeight: "600", color: COLORS.text1 },
+  headerTitle: { flex: 1, fontSize: 16, fontWeight: "600", color: COLORS.text1, marginHorizontal: 8 },
   headerRight: { flexDirection: "row", alignItems: "center", gap: 4 },
-  headerIconBtn: { width: 40, height: 40, alignItems: "center", justifyContent: "center" },
+  pillBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.greyLight2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  plainBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
+  },
 
   // image
   imgWrap: {
-    marginHorizontal: 16,
-    borderRadius: 16,
     overflow: "hidden",
     height: IMG_H,
     backgroundColor: COLORS.muted,
   },
   img: { width: "100%", height: IMG_H },
 
-  // top content (same as TourDetailScreen)
+  card: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -28,
+  },
+
+  // top content
   content: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 24,
     gap: 12,
   },
   tagsRow: { flexDirection: "row", alignItems: "center", gap: 8, flexWrap: "wrap" },
   tagFilled: { borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4 },
   tagFilledTxt: { fontSize: 12, fontWeight: "700", color: "#fff" },
   tagOutline: {
-    borderWidth: 1,
-    borderColor: COLORS.border,
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
-  tagOutlineTxt: { fontSize: 12, fontWeight: "500", color: COLORS.text2 },
+  tagOutlineTxt: { fontSize: 12, fontWeight: "500" },
   title: { fontSize: 22, fontWeight: "800", color: COLORS.text1, lineHeight: 29 },
   infoCard: {
     flexDirection: "row",
@@ -472,12 +538,7 @@ const s = StyleSheet.create({
   // sections below
   loadingBlock: { paddingTop: 40, alignItems: "center" },
   sections: { paddingTop: 4, gap: 28, paddingBottom: 8 },
-  divider: {
-    height: StyleSheet.hairlineWidth,
-    backgroundColor: COLORS.border,
-    marginHorizontal: 16,
-    marginBottom: 4,
-  },
+  spacer: { height: 8 },
 
   highlightsSection: { paddingHorizontal: 20, gap: 12 },
   sectionTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
@@ -486,9 +547,7 @@ const s = StyleSheet.create({
     borderRadius: 20,
     paddingHorizontal: 12,
     paddingVertical: 6,
-    backgroundColor: COLORS.backgroundAlt,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.greyLight,
   },
   chipTxt: { fontSize: 13, color: COLORS.text2, fontWeight: "500" },
 });

@@ -7,6 +7,8 @@ export type { HeroSlide };
 export interface HomeBoat {
   boat_id: string;
   name: string;
+  seo_h1: string | null;
+  seo_name_ru: string | null;
   type: string | null;
   capacity: number | null;
   length_meters: number | null;

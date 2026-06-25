@@ -1,4 +1,4 @@
-import { ChevronLeft, ChevronRight } from "lucide-react-native";
+import { ArrowLeft, ChevronRight } from "lucide-react-native";
 import { useMemo, useState } from "react";
 import { Dimensions, Pressable, StyleSheet, Text, View } from "react-native";
 
@@ -98,7 +98,7 @@ export function CalendarPicker({ selected, onSelect }: CalendarPickerProps) {
           onPress={() => setViewMonth(new Date(year, month - 1, 1))}
           hitSlop={14}
         >
-          <ChevronLeft size={20} color={COLORS.text2} strokeWidth={2} />
+          <ArrowLeft size={20} color={COLORS.text2} strokeWidth={2} />
         </Pressable>
         <Text style={cs.monthTitle}>
           {MONTHS_RU[month]} {year}

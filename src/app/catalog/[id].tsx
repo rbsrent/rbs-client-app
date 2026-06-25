@@ -8,7 +8,14 @@ import {
   Star,
 } from "lucide-react-native";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Platform, Pressable, Share, StyleSheet, Text, View } from "react-native";
+import {
+  Platform,
+  Pressable,
+  Share,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 import Animated, {
   Extrapolation,
   FadeIn,
@@ -28,7 +35,6 @@ import BoatBookingBar from "@/features/catalog/components/BoatBookingBar";
 import BoatImageSwiper, {
   SWIPER_IMG_H,
 } from "@/features/catalog/components/BoatImageSwiper";
-import { useBoatAllDiscounts, useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
 import SimilarBoats from "@/features/catalog/components/SimilarBoats";
 import BoatDetailAmenities from "@/features/catalog/components/detail/BoatDetailAmenities";
 import BoatDetailDescription from "@/features/catalog/components/detail/BoatDetailDescription";
@@ -42,6 +48,10 @@ import {
   getBoatH1,
   useBoatDetail,
 } from "@/features/catalog/hooks/useBoatDetail";
+import {
+  useBoatAllDiscounts,
+  useDiscountsCache,
+} from "@/features/catalog/hooks/useDiscountsCache";
 
 const CARD_OVERLAP = 28;
 
@@ -65,7 +75,7 @@ export default function BoatDetailScreen() {
 
   const discountsMap = useDiscountsCache();
   const activeDiscount = boat ? (discountsMap.get(boat.id) ?? null) : null;
-  const boatDiscounts = useBoatAllDiscounts(boat?.id ?? '');
+  const boatDiscounts = useBoatAllDiscounts(boat?.id ?? "");
 
   const [showPierMap, setShowPierMap] = useState(false);
 
@@ -293,21 +303,47 @@ export default function BoatDetailScreen() {
           {/* name — shown immediately from preview or boat */}
           <View style={s.titleBlock}>
             <View style={s.typeRow}>
-              {boat?.type ? (
-                <View style={[s.tagFilled, { backgroundColor: COLORS.red }]}>
-                  <Text style={[s.tagFilledTxt, { color: "#fff" }]}>
-                    {boat.type.toLocaleUpperCase()}
-                  </Text>
-                </View>
-              ) : null}
               {reviewRating.avg > 0 ? (
                 <View style={s.ratingTag}>
-                  <Star size={12} color="#FFDA62" fill="#FFDA62" strokeWidth={0} />
+                  <Star
+                    size={12}
+                    color="#FFDA62"
+                    fill="#FFDA62"
+                    strokeWidth={0}
+                  />
                   <Text style={s.ratingTagTxt}>{ratingStr}</Text>
                 </View>
               ) : (
                 <View style={s.newBadge}>
                   <Text style={s.newBadgeTxt}>Для вас</Text>
+                </View>
+              )}
+              {/* {boat?.type ? (
+                <View style={[s.tagFilled, { backgroundColor: COLORS.red }]}>
+                  <Text style={[s.tagFilledTxt, { color: "#fff" }]}>
+                    {boat.type.toLocaleUpperCase()}
+                  </Text>
+                </View>
+              ) : null} */}
+
+              {reviewRating.avg >= 4 && (
+                <View style={s.badgeRow}>
+                  {reviewRating.avg >= 5 && (
+                    <View
+                      style={[s.tagFilled, { backgroundColor: COLORS.red }]}
+                    >
+                      <Text style={[s.tagFilledTxt, { color: "#fff" }]}>
+                        ХИТ
+                      </Text>
+                    </View>
+                  )}
+                  <View
+                    style={[s.tagFilled, { backgroundColor: COLORS.warning }]}
+                  >
+                    <Text style={[s.tagFilledTxt, { color: "#fff" }]}>
+                      ЛУЧШИЕ ОТЗЫВЫ
+                    </Text>
+                  </View>
                 </View>
               )}
             </View>
@@ -323,13 +359,17 @@ export default function BoatDetailScreen() {
                     key={i}
                     style={[
                       s.tagFilled,
-                      { backgroundColor: d.isCurrentlyActive ? COLORS.success : COLORS.backgroundAlt },
+                      {
+                        backgroundColor: d.isCurrentlyActive
+                          ? COLORS.success
+                          : COLORS.backgroundAlt,
+                      },
                     ]}
                   >
                     <Text
                       style={[
                         s.tagFilledTxt,
-                        { color: d.isCurrentlyActive ? '#fff' : COLORS.grey },
+                        { color: d.isCurrentlyActive ? "#fff" : COLORS.grey },
                       ]}
                     >
                       {d.name} −{d.percentage}%
@@ -398,7 +438,7 @@ export default function BoatDetailScreen() {
 
               {similar.length > 0 ? (
                 <>
-                  <SimilarBoats boats={similar} onPress={() => { }} />
+                  <SimilarBoats boats={similar} onPress={() => {}} />
                   <Divider />
                 </>
               ) : null}
@@ -494,7 +534,15 @@ const s = StyleSheet.create({
     gap: 8,
     marginTop: 4,
   },
-  ratingTag:    { flexDirection: "row", alignItems: "center", gap: 4, borderRadius: 8, paddingHorizontal: 10, paddingVertical: 4, backgroundColor: COLORS.backgroundAlt },
+  ratingTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    backgroundColor: COLORS.greyLight2,
+  },
   ratingTagTxt: { fontSize: 12, fontWeight: "700", color: "#000" },
   statsBig: {
     fontSize: 18,
@@ -614,5 +662,33 @@ const s = StyleSheet.create({
     flexWrap: "wrap",
     gap: 6,
     marginTop: 8,
+  },
+
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  bestBadge: {
+    backgroundColor: "rgba(37,160,119,0.12)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  hitBadge: {
+    backgroundColor: "rgba(230,126,34,0.12)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  bestBadgeTxt: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#1a7a5a",
+  },
+  hitBadgeTxt: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#c0621a",
   },
 });

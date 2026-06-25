@@ -153,7 +153,7 @@ export default function RootLayout() {
               <Stack.Screen name="booking/conditions" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="booking/oferta" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="bookings/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
-              <Stack.Screen name="bookings/[id]" options={{ presentation: 'card' }} />
+              <Stack.Screen name="bookings/[id]" options={{ presentation: 'card', gestureEnabled: false }} />
               <Stack.Screen name="wishlist/routes" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="wishlist/route/[id]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="profile/settings" options={{ presentation: 'card', animation: 'slide_from_right' }} />
@@ -170,6 +170,7 @@ export default function RootLayout() {
               <Stack.Screen name="piers" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
               <Stack.Screen name="booking/date-select" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
               <Stack.Screen name="booking/edit-trip" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
+              <Stack.Screen name="ai-chat" options={{ presentation: 'modal', animation: 'slide_from_bottom', gestureEnabled: true }} />
             </Stack>
             <WishlistToast />
             <PendingPaymentOverlay />

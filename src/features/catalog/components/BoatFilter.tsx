@@ -1,5 +1,5 @@
 import { BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { Calendar, ChevronLeft, ChevronRight } from "lucide-react-native";
+import { ArrowLeft, Calendar, ChevronRight } from "lucide-react-native";
 import React, { useRef } from "react";
 import {
   Animated,
@@ -256,7 +256,7 @@ export const BoatFilter: React.FC<BoatFilterProps> = ({
             <View style={[s.panel, { paddingBottom: insets.bottom + 16 }]}>
               <View style={s.dtPageHeader}>
                 <Pressable onPress={goToMain} style={s.dtBackBtn} hitSlop={10}>
-                  <ChevronLeft
+                  <ArrowLeft
                     size={20}
                     color={COLORS.brandNavy}
                     strokeWidth={2}

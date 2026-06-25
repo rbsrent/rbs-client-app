@@ -1,10 +1,9 @@
 import { useRouter } from "expo-router";
-import { Search } from "lucide-react-native";
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { Bot, Search } from "lucide-react-native";
+import { memo, useCallback, useRef } from "react";
 import {
   Animated,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -16,7 +15,6 @@ import { COLORS } from "@/shared/colors";
 import { useHomeStore } from "@/store/useHomeStore";
 
 import { GiftCertCard } from "../components/GiftCertCard";
-import { PromoBanner } from "../components/PromoBanner";
 import { ServiceGrid } from "../components/ServiceGrid";
 import { TourCard } from "../components/TourCrad";
 import { PopularBoatsSection } from "../components/sections/PopularBoatsSection";
@@ -26,14 +24,9 @@ import { useHomePageData } from "../hooks/useHomePageData";
 export const HomeScreen = memo(function HomeScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { popular, katera, yakhty, routes, slides, loading } =
-    useHomePageData();
-  const setLoading = useHomeStore((s) => s.setLoading);
-  const lastFetch  = useHomeStore((s) => s.lastFetch);
+  const { popular, katera, yakhty, routes, loading } = useHomePageData();
+  const lastFetch = useHomeStore((s) => s.lastFetch);
   const isFirstLoad = loading && lastFetch === null;
-
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  useEffect(() => { if (!loading) setIsRefreshing(false); }, [loading]);
 
   const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -64,12 +57,6 @@ export const HomeScreen = memo(function HomeScreen() {
     [],
   );
 
-  const refetch = useCallback(() => {
-    setIsRefreshing(true);
-    useHomeStore.setState({ lastFetch: null });
-    setLoading(true);
-  }, []);
-
   return (
     <View style={s.root}>
       <Animated.View
@@ -87,8 +74,15 @@ export const HomeScreen = memo(function HomeScreen() {
           style={s.searchBar}
           onPress={() => router.push("/boats" as any)}
         >
-          <Search size={18} color="#8E8E8E" strokeWidth={2} />
+          <Search size={18} color={COLORS.greyIntents} strokeWidth={2} />
           <Text style={s.searchText}>Найти катер, яхту, маршрут...</Text>
+        </Pressable>
+        <Pressable
+          style={s.chatBtn}
+          onPress={() => router.push("/ai-chat" as any)}
+          hitSlop={4}
+        >
+          <Bot size={20} color={COLORS.brandNavy} strokeWidth={2} />
         </Pressable>
       </Animated.View>
 
@@ -102,29 +96,19 @@ export const HomeScreen = memo(function HomeScreen() {
         scrollEventThrottle={16}
         removeClippedSubviews
         onScroll={onScroll}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing}
-            onRefresh={refetch}
-            tintColor={COLORS.brandCyan}
-          />
-        }
       >
         {/* Service Grid */}
         <View style={[s.sectionBg, { paddingTop: insets.top + 72 }]}>
           <ServiceGrid />
         </View>
 
-        {/* Hero banner */}
-        <PromoBanner slides={slides} loading={isFirstLoad} />
+        {/* Куда отправиться — hero carousel */}
+        <RoutesPreviewSection routes={routes} loading={isFirstLoad} />
 
         {/* Подарочный сертификат */}
         <View style={s.giftSection}>
           <GiftCertCard />
         </View>
-
-        {/* Куда отправиться */}
-        <RoutesPreviewSection routes={routes} loading={isFirstLoad} />
 
         {/* Популярные суда */}
         <View style={s.popularSection}>
@@ -175,6 +159,15 @@ const s = StyleSheet.create({
     paddingVertical: 11,
   },
   searchText: { flex: 1, fontSize: 14, color: "#8E8E8E" },
+  chatBtn: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: "#F0F0F0",
+    alignItems: "center",
+    justifyContent: "center",
+    marginLeft: 8,
+  },
 
   scroll: { flex: 1 },
   scrollContent: { gap: 0 },
@@ -184,7 +177,7 @@ const s = StyleSheet.create({
     paddingVertical: 16,
     overflow: "visible",
   },
-  giftSection: { marginTop: 24 },
-  popularSection: { marginTop: 24 },
-  tepSection: { marginTop: 8, paddingHorizontal: 16, paddingBottom: 8 },
+  giftSection: { marginTop: 32 },
+  popularSection: { marginTop: 32 },
+  tepSection: { paddingHorizontal: 16, paddingBottom: 8 },
 });

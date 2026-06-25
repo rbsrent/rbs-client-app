@@ -10,6 +10,13 @@ import {
   Text,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
@@ -23,6 +30,9 @@ import { OtpScreen } from './OtpScreen';
 import { PhoneScreen } from './PhoneScreen';
 
 type ScreenView = 'main' | 'phone' | 'otp' | 'tg-waiting' | 'tg-verifying';
+
+const TIMING = { duration: 280, easing: Easing.inOut(Easing.ease) };
+const W = 400; // slide distance in px
 
 export function LoginScreen() {
   const insets = useSafeAreaInsets();
@@ -43,6 +53,35 @@ export function LoginScreen() {
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const verifiedRef = useRef(false);
 
+  // ── Transition ──────────────────────────────────────────────────────────────
+  // progress: 0 = previous view, 1 = current view
+  const progress = useSharedValue(1);
+  const dirRef = useRef<1 | -1>(1); // 1 = forward, -1 = back
+
+  const [displayView, setDisplayView] = useState<ScreenView>('main');
+
+  const navigate = (next: ScreenView, dir: 1 | -1 = 1) => {
+    dirRef.current = dir;
+    progress.value = 0;
+    setDisplayView(next);
+    setView(next);
+    progress.value = withTiming(1, TIMING);
+  };
+
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.4, 1], [0, 0.6, 1]),
+    transform: [
+      {
+        translateX: interpolate(
+          progress.value,
+          [0, 1],
+          [dirRef.current * W * 0.18, 0],
+        ),
+      },
+    ],
+  }));
+
+  // ── Cleanup ─────────────────────────────────────────────────────────────────
   const cleanupTg = useCallback(() => {
     if (channelRef.current) {
       authSupabase.removeChannel(channelRef.current);
@@ -56,7 +95,7 @@ export function LoginScreen() {
 
   useEffect(() => () => cleanupTg(), [cleanupTg]);
 
-  // Countdown timer
+  // ── Countdown ───────────────────────────────────────────────────────────────
   useEffect(() => {
     if (view !== 'tg-waiting' || !tgExpiresAt) return;
     const tick = () => {
@@ -64,7 +103,7 @@ export function LoginScreen() {
       setTgSecondsLeft(left);
       if (left === 0) {
         cleanupTg();
-        setView('main');
+        navigate('main', -1);
         setError('Срок ссылки истёк. Попробуйте ещё раз.');
       }
     };
@@ -73,6 +112,7 @@ export function LoginScreen() {
     return () => clearInterval(id);
   }, [view, tgExpiresAt]);
 
+  // ── Telegram ─────────────────────────────────────────────────────────────────
   const checkAndVerify = useCallback(async (token: string) => {
     if (verifiedRef.current) return;
     const { data: row } = await authSupabase
@@ -89,13 +129,12 @@ export function LoginScreen() {
     if (verifiedRef.current) return;
     verifiedRef.current = true;
     cleanupTg();
-    setView('tg-verifying');
+    navigate('tg-verifying', 1);
     const res = await verifyTelegramToken(token);
     if (!res.success) {
       verifiedRef.current = false;
-      setView('tg-waiting');
+      navigate('tg-waiting', -1);
     }
-    // on success AuthRedirect handles navigation
   };
 
   const startTelegram = async () => {
@@ -107,12 +146,10 @@ export function LoginScreen() {
     setTgDeepLink(res.deepLink);
     setTgWebLink(res.webLink);
     setTgExpiresAt(res.expiresAt);
-    setView('tg-waiting');
+    navigate('tg-waiting', 1);
 
-    // Open Telegram
     Linking.openURL(res.deepLink).catch(() => Linking.openURL(res.webLink));
 
-    // Realtime subscription
     const channel = authSupabase
       .channel(`tg-login-${res.token}`)
       .on(
@@ -131,83 +168,84 @@ export function LoginScreen() {
       .subscribe();
     channelRef.current = channel;
 
-    // Polling fallback every 3s
     pollRef.current = setInterval(() => checkAndVerify(res.token), 3000);
   };
 
   const formatTime = (s: number) =>
     `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 
-  // ── OTP screen ──
+  // ── OTP screen ──────────────────────────────────────────────────────────────
   if (view === 'otp') {
     return (
       <OtpScreen
         phone={phone}
-        onBack={() => setView('phone')}
+        onBack={() => navigate('phone', -1)}
       />
     );
   }
 
-  // ── Phone input screen ──
+  // ── Phone screen ─────────────────────────────────────────────────────────────
   if (view === 'phone') {
     return (
       <PhoneScreen
-        onBack={() => setView('main')}
+        onBack={() => navigate('main', -1)}
         onCodeSent={(normalizedPhone) => {
           setPhone(normalizedPhone);
-          setView('otp');
+          navigate('otp', 1);
         }}
       />
     );
   }
 
+  // ── Main / Telegram views ────────────────────────────────────────────────────
   return (
     <KeyboardAvoidingView
-      style={styles.flex}
+      style={s.flex}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={[styles.root, { paddingTop: insets.top }]}>
-        {/* Close — top right, floating */}
+      <View style={[s.root, { paddingTop: insets.top }]}>
         <Pressable
           onPress={() => router.back()}
           hitSlop={10}
-          style={styles.closeBtn}
+          style={s.closeBtn}
         >
-          <X size={22} color={COLORS.brandNavy} strokeWidth={2} />
+          <X size={18} color={COLORS.text2} strokeWidth={2} />
         </Pressable>
 
-        {view === 'tg-verifying' ? (
-          <View style={styles.centerBox}>
-            <Spinner />
-            <Text style={styles.verifyingText}>Завершаем вход...</Text>
-          </View>
-        ) : view === 'tg-waiting' ? (
-          <TgWaitingView
-            secondsLeft={tgSecondsLeft}
-            formatTime={formatTime}
-            deepLink={tgDeepLink}
-            webLink={tgWebLink}
-            onCheckManually={() => checkAndVerify(tgToken)}
-            onCancel={() => {
-              cleanupTg();
-              verifiedRef.current = false;
-              setView('main');
-            }}
-          />
-        ) : (
-          <MainView
-            isLoading={isLoading}
-            error={error}
-            onTelegram={startTelegram}
-            onPhone={() => { setError(null); setView('phone'); }}
-          />
-        )}
+        <Animated.View style={[s.flex, animStyle]}>
+          {displayView === 'tg-verifying' ? (
+            <View style={s.centerBox}>
+              <Spinner />
+              <Text style={s.verifyingText}>Завершаем вход…</Text>
+            </View>
+          ) : displayView === 'tg-waiting' ? (
+            <TgWaitingView
+              secondsLeft={tgSecondsLeft}
+              formatTime={formatTime}
+              deepLink={tgDeepLink}
+              webLink={tgWebLink}
+              onCheckManually={() => checkAndVerify(tgToken)}
+              onCancel={() => {
+                cleanupTg();
+                verifiedRef.current = false;
+                navigate('main', -1);
+              }}
+            />
+          ) : (
+            <MainView
+              isLoading={isLoading}
+              error={error}
+              onTelegram={startTelegram}
+              onPhone={() => { setError(null); navigate('phone', 1); }}
+            />
+          )}
+        </Animated.View>
       </View>
     </KeyboardAvoidingView>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
   flex: { flex: 1 },
   root: {
     flex: 1,
@@ -215,11 +253,13 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     position: 'absolute',
-    top: 14,
+    top: 12,
     right: 16,
     zIndex: 10,
     width: 36,
     height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.muted,
     alignItems: 'center',
     justifyContent: 'center',
   },

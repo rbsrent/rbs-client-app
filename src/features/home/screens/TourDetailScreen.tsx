@@ -15,49 +15,71 @@ import RecentlyViewedSection from "@/features/catalog/components/detail/Recently
 import { COLORS } from "@/shared/colors";
 
 const IMG_H = 280;
-// title appears in header after scrolling past image + tags (~60px)
-const TITLE_THRESHOLD = IMG_H + 60;
+const TITLE = "Прогулки на теплоходе по рекам и каналам Санкт-Петербурга";
 
 export function TourDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+
+  const HEADER_H = insets.top + 56;
+  const TR_END = IMG_H - HEADER_H;
+  const TR_START = TR_END - 60;
 
   const scrollY = useSharedValue(0);
   const scrollHandler = useAnimatedScrollHandler((e) => {
     scrollY.value = e.contentOffset.y;
   });
 
-  const headerTitleStyle = useAnimatedStyle(() => ({
-    opacity: interpolate(
-      scrollY.value,
-      [TITLE_THRESHOLD, TITLE_THRESHOLD + 40],
-      [0, 1],
-      Extrapolation.CLAMP,
-    ),
+  const bgOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [0, 1], Extrapolation.CLAMP),
+  }));
+  const borderOpacity = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [0, 1], Extrapolation.CLAMP),
+  }));
+  const overlayBtns = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [1, 0], Extrapolation.CLAMP),
+  }));
+  const headerBtns = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [TR_START, TR_END], [0, 1], Extrapolation.CLAMP),
   }));
 
   return (
     <View style={s.root}>
-      <View style={[s.header, { paddingTop: insets.top }]}>
-        <Pressable style={s.backBtn} onPress={() => router.back()} hitSlop={10}>
-          <ArrowLeft size={22} color={COLORS.text1} strokeWidth={2} />
-        </Pressable>
-        <Animated.Text
-          style={[s.headerTitle, headerTitleStyle]}
-          numberOfLines={1}
-        >
-          Прогулки на теплоходе по рекам и каналам Санкт-Петербурга
-        </Animated.Text>
+      {/* ── absolute sticky header ── */}
+      <View style={[s.stickyHeader, { height: HEADER_H }]} pointerEvents="box-none">
+        <Animated.View style={[StyleSheet.absoluteFill, s.headerWhiteBg, bgOpacity]} pointerEvents="none" />
+        <Animated.View style={[s.headerBorder, borderOpacity]} pointerEvents="none" />
+
+        {/* over-image: pill back button */}
+        <Animated.View style={[StyleSheet.absoluteFill, overlayBtns]} pointerEvents="box-none">
+          <View style={[s.headerInner, { paddingTop: insets.top }]} pointerEvents="box-none">
+            <View style={s.headerRow} pointerEvents="box-none">
+              <Pressable style={s.pillBtn} onPress={() => router.back()} hitSlop={8}>
+                <ArrowLeft size={18} color={COLORS.brandNavy} strokeWidth={2.5} />
+              </Pressable>
+            </View>
+          </View>
+        </Animated.View>
+
+        {/* white header: plain back + title */}
+        <Animated.View style={[StyleSheet.absoluteFill, headerBtns]} pointerEvents="box-none">
+          <View style={[s.headerInner, { paddingTop: insets.top }]} pointerEvents="box-none">
+            <View style={s.headerRow} pointerEvents="box-none">
+              <Pressable style={s.plainBtn} onPress={() => router.back()} hitSlop={8}>
+                <ArrowLeft size={20} color={COLORS.text1} strokeWidth={2} />
+              </Pressable>
+              <Text style={s.headerTitle} numberOfLines={1}>{TITLE}</Text>
+              <View style={s.plainBtn} />
+            </View>
+          </View>
+        </Animated.View>
       </View>
 
       <Animated.ScrollView
         onScroll={scrollHandler}
         scrollEventThrottle={16}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={[
-          s.scroll,
-          { paddingBottom: insets.bottom + 32 },
-        ]}
+        contentContainerStyle={{ paddingBottom: insets.bottom + 32 }}
       >
         <View style={s.imgWrap}>
           <Image
@@ -68,83 +90,76 @@ export function TourDetailScreen() {
           />
         </View>
 
-        <View style={s.content}>
-          {/* tags row */}
-          <View style={s.tagsRow}>
-            {/* <View style={s.tagOutline}>
-              <Text style={s.tagOutlineTxt}>0+</Text>
-            </View> */}
-            <View style={[s.tagFilled, { backgroundColor: COLORS.red }]}>
-              <Text style={[s.tagFilledTxt, { color: "#fff" }]}>НОВИНКА</Text>
+        <View style={s.card}>
+          <View style={s.content}>
+            {/* tags row */}
+            <View style={s.tagsRow}>
+              <View style={[s.tagFilled, { backgroundColor: COLORS.red }]}>
+                <Text style={[s.tagFilledTxt, { color: "#fff" }]}>НОВИНКА</Text>
+              </View>
+              <View style={[s.tagFilled, { backgroundColor: "#EEE9FC" }]}>
+                <Text style={[s.tagFilledTxt, { color: COLORS.brandViolet }]}>
+                  СКОРО
+                </Text>
+              </View>
             </View>
-            <View style={[s.tagFilled, { backgroundColor: "#EEE9FC" }]}>
-              <Text style={[s.tagFilledTxt, { color: COLORS.brandViolet }]}>
-                СКОРО
+
+            {/* title */}
+            <Text style={s.title}>{TITLE}</Text>
+
+            {/* coming soon note */}
+            <View style={s.comingSoonRow}>
+              <Text style={s.comingSoonTxt}>
+                ⏳ Готовится к запуску · совсем скоро
+              </Text>
+            </View>
+
+            {/* info card 1 */}
+            <View style={s.infoCard}>
+              <View style={s.infoIconWrap}>
+                <Ship size={22} color={COLORS.red} strokeWidth={2} />
+              </View>
+              <Text style={s.infoTxt}>
+                Мы готовим для вас удобный способ бронировать билеты на теплоход.
+                Совсем скоро вы сможете купить их прямо в приложении — без
+                очередей и звонков.
+              </Text>
+            </View>
+
+            {/* info card 2 */}
+            <View style={s.infoCard}>
+              <View style={s.infoIconWrap}>
+                <Calendar size={22} color={COLORS.brandNavy} strokeWidth={2} />
+              </View>
+              <Text style={s.infoTxt}>
+                Скоро: ежедневно, каждый час, с 11:00 до 21:00
+              </Text>
+            </View>
+
+            {/* discount preview */}
+            <View style={s.discountCard}>
+              <View style={s.discountLeft}>
+                <Text style={s.discountFrom}>Скидки до</Text>
+                <View style={s.discountRow}>
+                  <Text style={s.discountPct}>20%</Text>
+                </View>
+                <Text style={s.discountSub}>эксклюзивно в приложении</Text>
+              </View>
+            </View>
+
+            {/* coming soon closing */}
+            <View style={s.closingWrap}>
+              <Text style={s.closingTitle}>
+                Северная столица — ближе, чем кажется
+              </Text>
+              <Text style={s.closingDesc}>
+                Следите за обновлениями. Мы запустим теплоходы в приложении совсем
+                скоро — чтобы ваш отдых стал ещё удобнее и ярче.
               </Text>
             </View>
           </View>
-
-          {/* title */}
-          <Text style={s.title}>
-            Прогулки на теплоходе по рекам и каналам Санкт-Петербурга
-          </Text>
-
-          {/* coming soon note */}
-          <View style={s.comingSoonRow}>
-            <Text style={s.comingSoonTxt}>
-              ⏳ Готовится к запуску · совсем скоро
-            </Text>
-          </View>
-
-          {/* info card 1 */}
-          <View style={s.infoCard}>
-            <View style={s.infoIconWrap}>
-              <Ship size={22} color={COLORS.red} strokeWidth={2} />
-            </View>
-            <Text style={s.infoTxt}>
-              Мы готовим для вас удобный способ бронировать билеты на теплоход.
-              Совсем скоро вы сможете купить их прямо в приложении — без
-              очередей и звонков.
-            </Text>
-          </View>
-
-          {/* info card 2 */}
-          <View style={s.infoCard}>
-            <View style={s.infoIconWrap}>
-              <Calendar size={22} color={COLORS.brandNavy} strokeWidth={2} />
-            </View>
-            <Text style={s.infoTxt}>
-              Скоро: ежедневно, каждый час, с 11:00 до 21:00
-            </Text>
-          </View>
-
-          {/* discount preview */}
-          <View style={s.discountCard}>
-            <View style={s.discountLeft}>
-              <Text style={s.discountFrom}>Скидки до</Text>
-              <View style={s.discountRow}>
-                <Text style={s.discountPct}>20%</Text>
-                {/* <View style={s.discountBadge}>
-                  <Text style={s.discountBadgeTxt}>−20%</Text>
-                </View> */}
-              </View>
-              <Text style={s.discountSub}>эксклюзивно в приложении</Text>
-            </View>
-          </View>
-
-          {/* coming soon closing */}
-          <View style={s.closingWrap}>
-            {/* <Text style={s.closingEmoji}>🚢</Text> */}
-            <Text style={s.closingTitle}>
-              Северная столица — ближе, чем кажется
-            </Text>
-            <Text style={s.closingDesc}>
-              Следите за обновлениями. Мы запустим теплоходы в приложении совсем
-              скоро — чтобы ваш отдых стал ещё удобнее и ярче.
-            </Text>
-          </View>
+          <RecentlyViewedSection title="Рекомендуем" />
         </View>
-        <RecentlyViewedSection title="Рекомендуем" />
       </Animated.ScrollView>
     </View>
   );
@@ -153,31 +168,53 @@ export function TourDetailScreen() {
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.white },
 
-  header: {
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 100,
+  },
+  headerWhiteBg: { backgroundColor: COLORS.white },
+  headerBorder: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: COLORS.border,
+  },
+  headerInner: { flex: 1, justifyContent: "center" },
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  backBtn: {
-    width: 40,
-    height: 40,
-    alignItems: "center",
-    justifyContent: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 18,
   },
   headerTitle: {
     flex: 1,
     fontSize: 16,
     fontWeight: "600",
     color: COLORS.text1,
-    marginRight: 16,
+    marginHorizontal: 8,
+  },
+  pillBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: COLORS.greyLight2,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  plainBtn: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    alignItems: "center",
+    justifyContent: "center",
   },
 
-  scroll: { gap: 0 },
-
   imgWrap: {
-    marginHorizontal: 16,
-    borderRadius: 16,
     overflow: "hidden",
     height: IMG_H,
     backgroundColor: COLORS.muted,
@@ -187,9 +224,16 @@ const s = StyleSheet.create({
     height: IMG_H,
   },
 
+  card: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    marginTop: -28,
+  },
+
   content: {
     paddingHorizontal: 16,
-    paddingTop: 16,
+    paddingTop: 24,
     gap: 12,
   },
 
@@ -269,13 +313,6 @@ const s = StyleSheet.create({
   discountFrom: { fontSize: 13, color: COLORS.text2 },
   discountRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   discountPct: { fontSize: 28, fontWeight: "800", color: COLORS.red },
-  // discountBadge: {
-  //   backgroundColor: COLORS.red,
-  //   borderRadius: 10,
-  //   paddingHorizontal: 8,
-  //   paddingVertical: 3,
-  // },
-  // discountBadgeTxt: { color: "#fff", fontSize: 13, fontWeight: "700" },
   discountSub: { fontSize: 12, color: COLORS.text2 },
 
   closingWrap: {

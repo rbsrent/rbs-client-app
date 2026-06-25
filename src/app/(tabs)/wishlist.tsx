@@ -8,6 +8,11 @@ import {
   Text,
   View,
 } from "react-native";
+import Animated, {
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { GroupCard } from "@/features/wishlist/components/GroupCard";
@@ -28,8 +33,6 @@ import { useWishlistStore } from "@/store/useWishlistStore";
 
 const W = Dimensions.get("window").width;
 const CARD_W = (W - 32 - 12) / 2;
-const CELL_GAP = 3;
-const CELL_RADIUS = 9;
 
 
 export default function WishlistScreen() {
@@ -39,11 +42,20 @@ export default function WishlistScreen() {
   const [groups, setGroups] = useState<WishlistGroupMeta[]>([]);
   const [editing, setEditing] = useState(false);
 
+  const opacity = useSharedValue(0);
+  const fadeStyle = useAnimatedStyle(() => ({ opacity: opacity.value }));
+
   const load = useCallback(() => {
     getAllGroups().then(setGroups);
   }, []);
 
-  useFocusEffect(load);
+  useFocusEffect(
+    useCallback(() => {
+      opacity.value = withTiming(1, { duration: 180 });
+      load();
+      return () => { opacity.value = 0; };
+    }, [load]),
+  );
 
   const recentGroup = groups.find((g) => g.id === RECENT_GROUP_ID) ?? null;
   const defaultGroup = groups.find((g) => g.id === DEFAULT_GROUP_ID) ?? null;
@@ -91,7 +103,7 @@ export default function WishlistScreen() {
     router.push(`/wishlist/route/${id}` as any);
 
   return (
-    <View style={[s.root, { paddingTop: insets.top }]}>
+    <Animated.View style={[s.root, { paddingTop: insets.top }, fadeStyle]}>
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingBottom: insets.bottom + 90 }}
@@ -160,7 +172,7 @@ export default function WishlistScreen() {
           ))}
         </View>
       </ScrollView>
-    </View>
+    </Animated.View>
   );
 }
 

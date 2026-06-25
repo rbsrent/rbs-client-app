@@ -6,6 +6,7 @@ export const COLORS = {
   brandBlue: "#2086D9",
 
   grey: "#8E8E8E",
+  greyIntents: "#8E8E8E",
   greyDark: "#D9D9D9",
   greyLight: "#F7F7F7",
   greyLight2: "#F2F2F2",
@@ -39,6 +40,8 @@ export const COLORS = {
   red: "#FF6C6C",
   redDark: "#E53935",
   yellow: "#FFDA62",
+  
+  carcoal: "#282F37"
 } as const;
 
 export type Color = keyof typeof COLORS;

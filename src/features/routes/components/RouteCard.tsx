@@ -1,9 +1,9 @@
+import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
 import { Clock, Heart, MapPin } from 'lucide-react-native';
-import { memo, useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -190,7 +190,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     gap: 5,
     backgroundColor: 'rgba(255,255,255,0.92)',
-    borderRadius: 20,
+    borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },

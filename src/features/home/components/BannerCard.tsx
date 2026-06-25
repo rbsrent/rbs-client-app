@@ -30,7 +30,7 @@ export function BannerCard({ slide, width, height }: Props) {
   return (
     <Pressable
       style={[styles.card, { width, height }]}
-      onPress={() => ctaUrl && router.push(ctaUrl as any)}
+      onPress={() => router.push((ctaUrl ?? "/boats") as any)}
       android_ripple={null}
     >
       {imageUrl ? (
@@ -65,17 +65,6 @@ export function BannerCard({ slide, width, height }: Props) {
               {slide.description}
             </Text>
           ) : null}
-          {slide.cta_primary_label ? (
-            <Pressable
-              style={({ pressed }) => [
-                styles.ctaTag,
-                pressed && { opacity: 0.9 },
-              ]}
-              onPress={() => router.push("/boats" as any)}
-            >
-              <Text style={styles.ctaTagText}>{slide.cta_primary_label}</Text>
-            </Pressable>
-          ) : null}
         </LinearGradient>
       )}
     </Pressable>
@@ -84,7 +73,7 @@ export function BannerCard({ slide, width, height }: Props) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 18,
+    borderRadius: 14,
     overflow: "hidden",
     backgroundColor: COLORS.muted,
     justifyContent: "flex-end",
@@ -100,26 +89,13 @@ const styles = StyleSheet.create({
   },
   cardTitle: {
     color: COLORS.white,
-    fontSize: 20,
-    fontWeight: "800",
-    lineHeight: 25,
+    fontSize: 16,
+    fontWeight: "700",
+    lineHeight: 21,
   },
   cardDesc: {
     color: "rgba(255,255,255,0.72)",
     fontSize: 13,
     lineHeight: 18,
-  },
-  ctaTag: {
-    alignSelf: "flex-start",
-    backgroundColor: COLORS.white,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    marginTop: 6,
-  },
-  ctaTagText: {
-    color: COLORS.brandNavy,
-    fontSize: 11,
-    fontWeight: "700",
   },
 });

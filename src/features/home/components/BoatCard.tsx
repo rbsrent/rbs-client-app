@@ -57,9 +57,22 @@ export const BoatCard = memo(function BoatCard({ boat, width }: Props) {
           colors={['transparent', 'rgba(11,17,32,0.5)']}
           style={styles.imageOverlay}
         />
-        <View style={styles.typeBadge}>
-          <Text style={styles.typeBadgeText}>{boat.type}</Text>
-        </View>
+        {boat.rating != null && boat.rating >= 4 ? (
+          <View style={styles.topBadgeRow}>
+            <View style={styles.ratingBadge}>
+              <Text style={styles.typeBadgeText}>лучшие отзывы</Text>
+            </View>
+            {boat.rating >= 5 && (
+              <View style={styles.hitBadge}>
+                <Text style={styles.typeBadgeText}>хит</Text>
+              </View>
+            )}
+          </View>
+        ) : boat.type ? (
+          <View style={styles.typeBadge}>
+            <Text style={styles.typeBadgeText}>{boat.type}</Text>
+          </View>
+        ) : null}
       </View>
 
       <View style={styles.info}>
@@ -119,10 +132,17 @@ const styles = StyleSheet.create({
   imageOverlay: {
     ...StyleSheet.absoluteFill,
   },
+  topBadgeRow: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    flexDirection: 'row',
+    gap: 4,
+  },
   typeBadge: {
     position: 'absolute',
     top: 8,
-    left: 8,
+    right: 8,
     backgroundColor: 'rgba(11,17,32,0.6)',
     borderRadius: 6,
     paddingHorizontal: 7,
@@ -132,6 +152,18 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 10,
     fontWeight: '600',
+  },
+  ratingBadge: {
+    backgroundColor: 'rgba(37,160,119,0.85)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+  },
+  hitBadge: {
+    backgroundColor: 'rgba(230,126,34,0.9)',
+    borderRadius: 6,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
   },
   info: {
     padding: 12,

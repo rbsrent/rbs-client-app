@@ -1,5 +1,5 @@
 import { ArrowLeft } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -9,6 +9,13 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import Animated, {
+  Easing,
+  interpolate,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { PhoneInput } from '@/shared/components/PhoneInput';
@@ -17,6 +24,9 @@ import { digitsToE164, isValidDigits, normalizePhone } from '@/shared/utils/phon
 
 import { useAuth } from '../hooks/useAuth';
 import { Spinner } from '@/shared/components/Spinner';
+
+const TIMING = { duration: 280, easing: Easing.inOut(Easing.ease) };
+const W = 400;
 
 interface Props {
   onBack: () => void;
@@ -30,6 +40,16 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
   const [channel, setChannel] = useState<'sms' | 'max'>('sms');
   const inputRef = useRef<TextInput>(null);
 
+  const progress = useSharedValue(0);
+  const animStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.4, 1], [0, 0.6, 1]),
+    transform: [{ translateX: interpolate(progress.value, [0, 1], [W * 0.18, 0]) }],
+  }));
+
+  useEffect(() => {
+    progress.value = withTiming(1, TIMING);
+  }, []);
+
   const handleSend = async () => {
     if (!isValidDigits(digits)) return;
     const e164 = digitsToE164(digits);
@@ -38,53 +58,56 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
   };
 
   return (
+    <Animated.View style={[s.flex, animStyle]}>
     <KeyboardAvoidingView
-      style={[styles.root, { paddingTop: insets.top }]}
+      style={[s.root, { paddingTop: insets.top }]}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <View style={styles.header}>
-        <Pressable onPress={onBack} hitSlop={10} style={styles.backBtn}>
+      <View style={s.header}>
+        <Pressable onPress={onBack} hitSlop={10} style={s.backBtn}>
           <ArrowLeft size={22} color={COLORS.brandNavy} strokeWidth={2} />
         </Pressable>
       </View>
 
-      <View style={styles.body}>
-        <Text style={styles.title}>Войти по номеру</Text>
-        <Text style={styles.subtitle}>
-          Введите номер телефона — отправим код подтверждения
-        </Text>
+      <View style={s.body}>
+        <View style={s.hero}>
+          <Text style={s.title}>Войти по номеру</Text>
+          <Text style={s.subtitle}>
+            Введите номер телефона — отправим код подтверждения
+          </Text>
+        </View>
 
-        <View style={styles.channelRow}>
+        <View style={s.segmentedControl}>
           {(['sms', 'max'] as const).map((ch) => (
             <Pressable
               key={ch}
-              style={[styles.channelBtn, channel === ch && styles.channelBtnActive]}
+              style={[s.segmentBtn, channel === ch && s.segmentBtnActive]}
               onPress={() => setChannel(ch)}
             >
-              <Text style={[styles.channelText, channel === ch && styles.channelTextActive]}>
+              <Text style={[s.segmentText, channel === ch && s.segmentTextActive]}>
                 {ch === 'sms' ? 'SMS' : 'MAX'}
               </Text>
             </Pressable>
           ))}
         </View>
 
-        <Pressable style={styles.inputWrap} onPress={() => inputRef.current?.focus()}>
+        <Pressable style={s.inputWrap} onPress={() => inputRef.current?.focus()}>
           <PhoneInput
             ref={inputRef}
             digits={digits}
             onChangeDigits={setDigits}
-            style={styles.input}
+            style={s.input}
             returnKeyType="done"
             onSubmitEditing={handleSend}
           />
         </Pressable>
 
-        {error ? <Text style={styles.errorText}>{error}</Text> : null}
+        {error ? <Text style={s.errorText}>{error}</Text> : null}
 
         <Pressable
           style={[
-            styles.sendBtn,
-            (!isValidDigits(digits) || isLoading) && styles.sendBtnDisabled,
+            s.sendBtn,
+            (!isValidDigits(digits) || isLoading) && s.sendBtnDisabled,
           ]}
           onPress={handleSend}
           disabled={!isValidDigits(digits) || isLoading}
@@ -92,20 +115,22 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
           {isLoading ? (
             <Spinner color="#fff" trackColor="rgba(255,255,255,0.25)" />
           ) : (
-            <Text style={styles.sendBtnText}>Получить код</Text>
+            <Text style={s.sendBtnText}>Получить код</Text>
           )}
         </Pressable>
 
-        <Text style={styles.terms}>
+        <Text style={s.terms}>
           Продолжая, вы соглашаетесь с{' '}
-          <Text style={styles.termsLink}>условиями использования</Text>
+          <Text style={s.termsLink}>условиями использования</Text>
         </Text>
       </View>
     </KeyboardAvoidingView>
+    </Animated.View>
   );
 }
 
-const styles = StyleSheet.create({
+const s = StyleSheet.create({
+  flex: { flex: 1 },
   root: {
     flex: 1,
     backgroundColor: COLORS.white,
@@ -124,11 +149,15 @@ const styles = StyleSheet.create({
   body: {
     flex: 1,
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 8,
     gap: 16,
   },
+  hero: {
+    gap: 8,
+    marginBottom: 4,
+  },
   title: {
-    fontSize: 28,
+    fontSize: 30,
     fontWeight: '800',
     color: COLORS.text1,
     letterSpacing: 0.2,
@@ -136,22 +165,22 @@ const styles = StyleSheet.create({
   subtitle: {
     fontSize: 14,
     color: COLORS.text2,
-    lineHeight: 20,
-    marginTop: -8,
+    lineHeight: 21,
   },
-  channelRow: {
+  segmentedControl: {
     flexDirection: 'row',
+    backgroundColor: COLORS.muted,
     borderRadius: 12,
     padding: 3,
     gap: 3,
   },
-  channelBtn: {
+  segmentBtn: {
     flex: 1,
     paddingVertical: 9,
     borderRadius: 10,
     alignItems: 'center',
   },
-  channelBtnActive: {
+  segmentBtnActive: {
     backgroundColor: COLORS.white,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -159,12 +188,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
   },
-  channelText: {
+  segmentText: {
     fontSize: 13,
     fontWeight: '600',
     color: COLORS.text3,
   },
-  channelTextActive: {
+  segmentTextActive: {
     color: COLORS.brandNavy,
     fontWeight: '700',
   },
@@ -177,6 +206,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderWidth: 1.5,
     borderColor: COLORS.border,
+    backgroundColor: COLORS.white,
   },
   input: {
     flex: 1,
@@ -185,17 +215,19 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   errorText: {
-    fontSize: 12,
+    fontSize: 13,
     color: COLORS.error,
-    marginTop: -8,
+    backgroundColor: COLORS.errorLight,
+    borderRadius: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
   },
   sendBtn: {
-    height: 52,
+    height: 54,
     borderRadius: 16,
     backgroundColor: COLORS.brandNavy,
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: 4,
   },
   sendBtnDisabled: {
     opacity: 0.4,
@@ -210,7 +242,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: COLORS.text3,
     textAlign: 'center',
-    lineHeight: 15,
+    lineHeight: 16,
   },
   termsLink: {
     color: COLORS.brandNavy,

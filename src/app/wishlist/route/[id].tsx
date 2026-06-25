@@ -1,15 +1,15 @@
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { Bookmark, ChevronLeft, X } from "lucide-react-native";
-import { memo, useCallback, useEffect, useMemo, useState } from "react";
+import { ArrowLeft, Bookmark, X } from "lucide-react-native";
+import { memo, useCallback, useMemo, useState } from "react";
 import {
-  Dimensions,
-  FlatList,
-  ListRenderItem,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
+    Dimensions,
+    FlatList,
+    ListRenderItem,
+    Pressable,
+    StyleSheet,
+    Text,
+    View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
@@ -18,12 +18,12 @@ import { resolveRouteImage, WaterRoute } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
 import { publicSupabase } from "@/shared/supabase/publicClient";
 import {
-  getGroup,
-  getRouteGroupItems,
-  removeRouteFromGroup,
-  RouteGroupItem,
-  ROUTES_GROUP_ID,
-  WishlistGroup,
+    getGroup,
+    getRouteGroupItems,
+    removeRouteFromGroup,
+    RouteGroupItem,
+    ROUTES_GROUP_ID,
+    WishlistGroup,
 } from "@/shared/wishlist";
 import { useRouteSavedStore } from "@/store/useRouteSavedStore";
 
@@ -227,7 +227,7 @@ export default function RouteGroupScreen() {
           style={({ pressed }) => [s.backBtn, pressed && { opacity: 0.6 }]}
           onPress={() => router.back()}
         >
-          <ChevronLeft size={20} color="#000" strokeWidth={2.5} />
+          <ArrowLeft size={20} color="#000" strokeWidth={2.5} />
         </Pressable>
         {items.length > 0 && (
           <Pressable

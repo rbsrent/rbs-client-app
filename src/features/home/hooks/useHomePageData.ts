@@ -23,6 +23,8 @@ function mapDirectBoat(b: any): HomeBoat {
   return {
     boat_id:        b.id,
     name:           b.name,
+    seo_h1:         b.seo_h1 ?? null,
+    seo_name_ru:    b.seo_name_ru ?? null,
     type:           b.type ?? null,
     capacity:       b.capacity ?? null,
     length_meters:  b.length_meters ?? null,
@@ -41,6 +43,8 @@ function mapRpcBoat(b: any): HomeBoat {
   return {
     boat_id:         b.boat_id,
     name:            b.name,
+    seo_h1:          b.seo_h1 ?? null,
+    seo_name_ru:     b.seo_name_ru ?? null,
     type:            b.type ?? null,
     capacity:        b.capacity ?? null,
     length_meters:   b.length_meters ?? null,
@@ -70,14 +74,14 @@ export function useHomePageData() {
       publicSupabase.rpc('get_popular_boats', { limit_count: 8 }),
       publicSupabase
         .from('boats')
-        .select('id,name,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
+        .select('id,name,seo_h1,seo_name_ru,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
         .eq('is_hidden', false)
         .eq('moderation_status', 'approved')
         .eq('type', 'катер')
         .order('display_order', { ascending: true }),
       publicSupabase
         .from('boats')
-        .select('id,name,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
+        .select('id,name,seo_h1,seo_name_ru,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
         .eq('is_hidden', false)
         .eq('moderation_status', 'approved')
         .eq('type', 'яхта')

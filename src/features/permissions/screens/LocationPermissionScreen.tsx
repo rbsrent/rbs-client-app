@@ -1,18 +1,18 @@
 import { useRouter } from 'expo-router';
-import { MapPin } from 'lucide-react-native';
+import LottieView from 'lottie-react-native';
 import { useCallback, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
-
-import { COLORS } from '@/shared/colors';
 
 import { PermissionLayout } from '../components/PermissionLayout';
 import { requestLocationPermission } from '../hooks/useLocationPermission';
 
 function LocationIllustration() {
   return (
-    <View style={s.circle}>
-      <MapPin size={68} color={COLORS.brandCyan} strokeWidth={1.4} />
-    </View>
+    <LottieView
+      source={require('@/assets/animation/location.json')}
+      autoPlay
+      loop
+      style={{ width: 200, height: 200 }}
+    />
   );
 }
 
@@ -45,13 +45,3 @@ export function LocationPermissionScreen() {
   );
 }
 
-const s = StyleSheet.create({
-  circle: {
-    width: 148,
-    height: 148,
-    borderRadius: 74,
-    backgroundColor: 'rgba(43,196,229,0.1)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

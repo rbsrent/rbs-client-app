@@ -10,6 +10,8 @@ function toHomeBoat(item: WishlistItem): HomeBoat {
   return {
     boat_id: item.boat_id,
     name: item.name,
+    seo_h1: null,
+    seo_name_ru: null,
     type: item.type,
     capacity: item.capacity,
     length_meters: item.length_meters,

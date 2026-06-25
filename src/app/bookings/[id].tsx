@@ -30,6 +30,7 @@ type PaymentState = "loading" | "pending" | "success" | "failed" | "error";
 
 interface BookingData {
   id: string;
+  boat_id: string | null;
   booking_status: string;
   start_datetime: string;
   end_datetime: string;
@@ -42,7 +43,6 @@ interface BookingData {
   boats: {
     name: string;
     type: string | null;
-    boat_images: { image_path: string; position: number }[];
   } | null;
 }
 
@@ -115,6 +115,7 @@ export default function BookingDetailScreen() {
 
   const [state, setState] = useState<PaymentState>("loading");
   const [booking, setBooking] = useState<BookingData | null>(null);
+  const [coverUri, setCoverUri] = useState<string | null>(null);
   const [rechecking, setRechecking] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -133,10 +134,10 @@ export default function BookingDetailScreen() {
       .from("public_bookings")
       .select(
         `
-        id, booking_status, start_datetime, end_datetime,
+        id, boat_id, booking_status, start_datetime, end_datetime,
         total_price, prepayment_amount, remaining_amount,
         pier_name, pier_address, client_name,
-        boats(name, type, boat_images(image_path, position))
+        boats(name, type)
       `,
       )
       .eq("id", id)
@@ -155,6 +156,23 @@ export default function BookingDetailScreen() {
         setBooking(data);
         const next = classifyStatus(data.booking_status);
         setState(next);
+
+        if (data.boat_id && !coverUri) {
+          publicSupabase
+            .from("boats")
+            .select("boat_images(image_path, position)")
+            .eq("id", data.boat_id)
+            .single()
+            .then(({ data: boatData }) => {
+              const images = (boatData as any)?.boat_images ?? [];
+              if (!images.length) return;
+              const sorted = [...images].sort((a: any, b: any) => a.position - b.position);
+              const { data: urlData } = publicSupabase.storage
+                .from("boat_images")
+                .getPublicUrl(sorted[0].image_path);
+              setCoverUri(urlData.publicUrl);
+            });
+        }
 
         if (next === "pending") {
           pollCount.current += 1;
@@ -194,18 +212,6 @@ export default function BookingDetailScreen() {
     pollCount.current = 0;
     await refresh({ manual: true });
   };
-
-  const coverUri = (() => {
-    if (!booking?.boats?.boat_images?.length) return null;
-    const sorted = [...booking.boats.boat_images].sort(
-      (a, b) => a.position - b.position,
-    );
-    const path = sorted[0].image_path;
-    const { data } = publicSupabase.storage
-      .from("boat-images")
-      .getPublicUrl(path);
-    return data.publicUrl;
-  })();
 
   if (state === "loading") {
     return (
@@ -322,7 +328,7 @@ export default function BookingDetailScreen() {
     <View style={[s.root]}>
       <ScreenHeader
         title="Бронирование"
-        onBack={() => router.back()}
+        onBack={() => router.replace('/(tabs)/' as any)}
       />
 
       <ScrollView
@@ -468,7 +474,7 @@ export default function BookingDetailScreen() {
               s.ctaPrimary,
               pressed && { opacity: 0.88 },
             ]}
-            onPress={() => router.push("/bookings" as any)}
+            onPress={() => router.replace("/(tabs)/bookings" as any)}
           >
             <Text style={s.ctaPrimaryTxt}>Мои бронирования</Text>
           </Pressable>

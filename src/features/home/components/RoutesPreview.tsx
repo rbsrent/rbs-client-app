@@ -27,10 +27,19 @@ interface RoutePreview {
   seo_slug: string | null;
 }
 
+function toWebp(url: string): string {
+  return url.replace(/\.[^/.]+$/, '') + '_large.webp';
+}
+
 function resolveImage(raw: string | null): string | null {
   if (!raw) return null;
-  if (raw.startsWith('http')) return raw.replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL);
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`;
+  if (raw.startsWith('http')) {
+    const normalized = raw
+      .replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL)
+      .replace('https://proxy.rbs.rent', SUPABASE_URL);
+    return toWebp(normalized);
+  }
+  return toWebp(`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`);
 }
 
 const CARD_W = 220;

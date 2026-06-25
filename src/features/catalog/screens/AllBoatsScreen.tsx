@@ -189,21 +189,31 @@ export function AllBoatsScreen() {
       filteredCount={filtered.length}
       total={total}
       availLoading={availLoading}
+      isLoading={loading}
       sortBy={sortBy}
       onSortChange={setSortBy}
     />
-  ), [filters, setFilters, handleWeekDate, openFilter, viewMode, filtered.length, total, availLoading, sortBy]);
+  ), [filters, setFilters, handleWeekDate, openFilter, viewMode, filtered.length, total, availLoading, loading, sortBy]);
 
   const handleResetFilters = useCallback(() => setFilters(DEFAULT), []);
 
   const handleOpenSearch = useCallback(() => router.push('/boats/search'), [router]);
 
-  const ListEmpty = useCallback(() => (
-    <BoatEmpty
-      hasActive={hasActive}
-      onReset={handleResetFilters}
-    />
-  ), [hasActive, handleResetFilters]);
+  const ListEmpty = useCallback(() => {
+    if (loading) {
+      return (
+        <View style={s.loader}>
+          <Spinner />
+        </View>
+      );
+    }
+    return (
+      <BoatEmpty
+        hasActive={hasActive}
+        onReset={handleResetFilters}
+      />
+    );
+  }, [loading, hasActive, handleResetFilters]);
 
   return (
     <View style={s.root}>
@@ -220,30 +230,25 @@ export function AllBoatsScreen() {
         }
       />
 
-      {loading ? (
-        <View style={s.loader}>
-          <Spinner />
-        </View>
-      ) : (
-        <FlatList
-          data={filtered}
-          keyExtractor={(b) => b.id}
-          numColumns={2}
-          renderItem={renderBoat}
-          columnWrapperStyle={s.row}
-          contentContainerStyle={listContentStyle}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews
-          initialNumToRender={6}
-          maxToRenderPerBatch={4}
-          windowSize={5}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandNavy} />
-          }
-          ListHeaderComponent={listHeader as any}
-          ListEmptyComponent={ListEmpty}
-        />
-      )}
+      <FlatList
+        data={loading ? [] : filtered}
+        keyExtractor={(b) => b.id}
+        numColumns={2}
+        renderItem={renderBoat}
+        columnWrapperStyle={s.row}
+        contentContainerStyle={listContentStyle}
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews
+        initialNumToRender={6}
+        maxToRenderPerBatch={4}
+        windowSize={5}
+        scrollEnabled={!loading}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandNavy} />
+        }
+        ListHeaderComponent={listHeader as any}
+        ListEmptyComponent={ListEmpty}
+      />
 
       {/* Full filter sheet */}
       <BoatFilter

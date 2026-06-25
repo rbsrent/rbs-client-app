@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
-import { ChevronLeft, Clock, Heart, Star, X } from "lucide-react-native";
+import { ArrowLeft, Clock, Heart, Star, X } from "lucide-react-native";
 import { memo, useCallback, useMemo, useState } from "react";
 import {
   Dimensions,
@@ -210,7 +210,7 @@ export default function WishlistDetailScreen() {
           style={({ pressed }) => [s.backBtn, pressed && { opacity: 0.6 }]}
           onPress={() => router.back()}
         >
-          <ChevronLeft size={20} color="#000" strokeWidth={2.5} />
+          <ArrowLeft size={20} color="#000" strokeWidth={2.5} />
         </Pressable>
         {items.length > 0 && (
           <Pressable

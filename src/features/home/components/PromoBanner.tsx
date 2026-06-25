@@ -20,8 +20,8 @@ import { HeroSlide } from '@/store/useCatalogStore';
 import { BannerCard } from './BannerCard';
 
 const { width: SW } = Dimensions.get('window');
-const CARD_W     = SW - 32;
-const CARD_H     = 172;
+const CARD_W = SW - 32;
+const CARD_H = 230;
 const AUTO_DELAY = 4200;
 
 function BannerSkeleton() {
@@ -67,7 +67,7 @@ const sk = StyleSheet.create({
   page: { paddingHorizontal: 16 },
   card: { borderRadius: 18, backgroundColor: '#E8E8E8', overflow: 'hidden' },
   dots: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 10 },
-  dot:  { width: 6, height: 6, borderRadius: 3, backgroundColor: '#DDD' },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#DDD' },
 });
 
 interface Props { slides: HeroSlide[]; loading?: boolean }
@@ -78,13 +78,13 @@ export const PromoBanner = memo(function PromoBanner({ slides, loading }: Props)
 });
 
 function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
-  const N          = slides.length;
-  const flatRef    = useRef<FlatList<HeroSlide>>(null);
-  const curIdxRef  = useRef(0);
-  const timerRef   = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const N = slides.length;
+  const flatRef = useRef<FlatList<HeroSlide>>(null);
+  const curIdxRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const mountedRef = useRef(true);
 
-  const scrollXSv    = useSharedValue(0);
+  const scrollXSv = useSharedValue(0);
   const onScrollAnim = useAnimatedScrollHandler({
     onScroll: (e) => { scrollXSv.value = e.contentOffset.x; },
   });
@@ -94,8 +94,8 @@ function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
     if (timerRef.current) clearTimeout(timerRef.current);
   }, []);
 
-  const scheduleRef = useRef<() => void>(() => {});
-  const advanceRef  = useRef<() => void>(() => {});
+  const scheduleRef = useRef<() => void>(() => { });
+  const advanceRef = useRef<() => void>(() => { });
 
   scheduleRef.current = () => {
     if (timerRef.current) clearTimeout(timerRef.current);
@@ -166,7 +166,7 @@ function PromoBannerInner({ slides }: { slides: HeroSlide[] }) {
         onMomentumScrollEnd={onMomentumScrollEnd}
       />
       <View style={s.dots}>
-        <ReanimatedScrollDots count={N} scrollX={scrollXSv} itemInterval={SW} />
+        <ReanimatedScrollDots count={N} scrollX={scrollXSv} itemInterval={SW} size="small" />
       </View>
     </View>
   );

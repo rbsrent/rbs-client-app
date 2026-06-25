@@ -113,18 +113,20 @@ function BoatDetailReviews({ reviews, reviewRating, boatId }: Props) {
     return (
       <View style={s.section}>
         <View style={s.header}>
-          <View style={s.ratingTag}>
-            <Star size={18} color={COLORS.yellow} fill={COLORS.yellow} strokeWidth={0} />
-            <Text style={s.title}>{reviewRating.avg.toFixed(2)}</Text>
+          <View style={s.headerTop}>
+            <View style={s.ratingTag}>
+              <Star size={18} color={COLORS.yellow} fill={COLORS.yellow} strokeWidth={0} />
+              <Text style={s.title}>{reviewRating.avg.toFixed(2)}</Text>
+            </View>
+            <Text style={s.sub}>
+              {reviewRating.total}{" "}
+              {reviewRating.total === 1
+                ? "отзыв"
+                : reviewRating.total < 5
+                  ? "отзыва"
+                  : "отзывов"}
+            </Text>
           </View>
-          <Text style={s.sub}>
-            {reviewRating.total}{" "}
-            {reviewRating.total === 1
-              ? "отзыв"
-              : reviewRating.total < 5
-                ? "отзыва"
-                : "отзывов"}
-          </Text>
         </View>
 
         {/* ScrollView avoids nested VirtualizedList on Android */}
@@ -174,6 +176,9 @@ const s = StyleSheet.create({
   header: {
     paddingHorizontal: 24,
     marginBottom: 14,
+    gap: 8,
+  },
+  headerTop: {
     flexDirection: "row",
     alignItems: "baseline",
     gap: 8,

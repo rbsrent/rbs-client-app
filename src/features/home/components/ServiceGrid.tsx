@@ -12,12 +12,12 @@ import {
 } from "lucide-react-native";
 import React, { memo, useCallback, useMemo, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
   withSpring,
 } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
 import { SheetBackdrop } from "@/shared/components/SheetBackdrop";
@@ -263,9 +263,7 @@ const s = StyleSheet.create({
   iconBox: {
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: COLORS.muted,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.greyLight,
   },
   badge: {
     position: "absolute",

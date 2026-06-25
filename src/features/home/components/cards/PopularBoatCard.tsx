@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { Dimensions } from 'react-native';
 
 import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
+import { buildBoatH1 } from '@/features/catalog/hooks/useBoatDetail';
 import { BoatCard } from '@/shared/components/BoatCard';
 import { HomeBoat } from '@/store/useHomeStore';
 
@@ -20,7 +21,7 @@ export const PopularBoatCard = memo(function PopularBoatCard({ boat, badge, disc
     <BoatCard
       boat={{
         id:              boat.boat_id,
-        name:            boat.name,
+        name:            buildBoatH1({ name: boat.name, type: boat.type, seo_h1: boat.seo_h1, seo_name_ru: boat.seo_name_ru }),
         type:            boat.type,
         cover_image_url: boat.cover_image_url,
         price_per_hour:  boat.price_per_hour,

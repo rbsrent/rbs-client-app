@@ -55,6 +55,7 @@ interface Props {
   filteredCount: number;
   total: number;
   availLoading: boolean;
+  isLoading?: boolean;
   sortBy: SortBy;
   onSortChange: (s: SortBy) => void;
 }
@@ -69,6 +70,7 @@ export const BoatsListHeader: React.FC<Props> = ({
   filteredCount,
   total,
   availLoading,
+  isLoading = false,
   sortBy,
   onSortChange,
 }) => {
@@ -258,7 +260,7 @@ export const BoatsListHeader: React.FC<Props> = ({
 
   return (
     <View>
-      <DateStrip selected={filters.dateTime.date} onSelect={onDateSelect} />
+      <DateStrip selected={filters.dateTime.date} onSelect={onDateSelect} disabled={isLoading} />
 
       {/* ── Gorbilet-style filter chips ── */}
       <ScrollView

@@ -10,9 +10,9 @@ import Animated, {
 
 import * as Haptics from 'expo-haptics';
 
+import { useWishlistToast } from "@/shared/context/WishlistToastContext";
 import { BoatData, getGroup, getGroupsContaining, RECENT_GROUP_ID } from "@/shared/wishlist";
 import { useWishlistStore } from "@/store/useWishlistStore";
-import { useWishlistToast } from "@/shared/context/WishlistToastContext";
 import { useWishlistPicker } from "./WishlistPickerContext";
 
 const AnimPressable = Animated.createAnimatedComponent(Pressable);

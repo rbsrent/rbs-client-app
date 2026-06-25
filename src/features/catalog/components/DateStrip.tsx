@@ -129,11 +129,13 @@ const DateCell = React.memo(
 export interface DateStripProps {
   selected: Date | null;
   onSelect: (date: Date | null) => void;
+  disabled?: boolean;
 }
 
 export const DateStrip = React.memo(function DateStrip({
   selected,
   onSelect,
+  disabled = false,
 }: DateStripProps) {
   const today = useMemo(() => {
     const d = new Date();
@@ -298,7 +300,7 @@ export const DateStrip = React.memo(function DateStrip({
   );
 
   return (
-    <View style={s.wrap}>
+    <View style={[s.wrap, disabled && s.wrapDisabled]}>
       <View style={s.monthRow} pointerEvents="none">
         <Animated.Text style={[s.monthLabel, { opacity: primOpacity }]}>
           {primMonth}
@@ -319,6 +321,8 @@ export const DateStrip = React.memo(function DateStrip({
         scrollEventThrottle={16}
         bounces={false}
         overScrollMode="never"
+        scrollEnabled={!disabled}
+        pointerEvents={disabled ? 'none' : 'auto'}
       >
         {days.map((day, i) => {
           const jsDay = day.getDay();
@@ -348,6 +352,9 @@ const s = StyleSheet.create({
   wrap: {
     paddingTop: 6,
     paddingBottom: 8,
+  },
+  wrapDisabled: {
+    opacity: 0.4,
   },
 
   monthRow: {

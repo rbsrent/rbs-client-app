@@ -54,7 +54,7 @@ const styles = StyleSheet.create({
     paddingTop: 2,
   },
   seeAllText: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '600',
     color: COLORS.brandBlue,
   },

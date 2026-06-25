@@ -1,22 +1,31 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
-import { Clock } from 'lucide-react-native';
 import { memo, useState } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
 import { SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { HomeRoute } from '@/store/useHomeStore';
 
 const BUCKET  = 'water-route-images';
-const CARD_W  = 220;
-const CARD_H  = 160;
+const SCREEN  = Dimensions.get('window').width;
+const CARD_W  = SCREEN - 80;
+const CARD_H  = 300;
+
+function toWebp(url: string): string {
+  return url.replace(/\.[^/.]+$/, '') + '_large.webp';
+}
 
 function resolveImage(raw: string | null): string | null {
   if (!raw) return null;
-  if (raw.startsWith('http')) return raw.replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL);
-  return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`;
+  if (raw.startsWith('http')) {
+    const normalized = raw
+      .replace('https://ntempzyiunijdoskroxs.supabase.co', SUPABASE_URL)
+      .replace('https://proxy.rbs.rent', SUPABASE_URL);
+    return toWebp(normalized);
+  }
+  return toWebp(`${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${raw}`);
 }
 
 function durationLabel(h: number): string {
@@ -32,7 +41,7 @@ export const HomeRouteCard = memo(function HomeRouteCard({ route }: { route: Hom
 
   return (
     <Pressable
-      style={({ pressed }) => [s.card, pressed && { opacity: 0.9 }]}
+      style={({ pressed }) => [s.card, pressed && { opacity: 0.92 }]}
       onPress={() => router.push(`/routes/${route.seo_slug ?? route.id}` as any)}
     >
       {imageUrl && !imgErr ? (
@@ -46,51 +55,53 @@ export const HomeRouteCard = memo(function HomeRouteCard({ route }: { route: Hom
       ) : (
         <View style={[StyleSheet.absoluteFill, s.placeholder]} />
       )}
-      <View style={[StyleSheet.absoluteFill, s.dim]} />
+
       <LinearGradient
-        colors={['transparent', 'rgba(0,0,0,0.82)']}
-        start={{ x: 0, y: 0.35 }}
+        colors={['transparent', 'rgba(0,0,0,0.72)']}
+        start={{ x: 0, y: 0.45 }}
         end={{ x: 0, y: 1 }}
         style={StyleSheet.absoluteFill}
         pointerEvents="none"
       />
+
       <View style={s.bottom}>
         <Text style={s.name} numberOfLines={2}>{route.name}</Text>
-        {route.duration_hours ? (
+        {/* {route.duration_hours ? (
           <View style={s.durationRow}>
-            <Clock size={11} color="rgba(255,255,255,0.8)" strokeWidth={2} />
+            <Clock size={12} color="rgba(255,255,255,0.85)" strokeWidth={2} />
             <Text style={s.durationTxt}>{durationLabel(route.duration_hours)}</Text>
           </View>
-        ) : null}
+        ) : null} */}
       </View>
     </Pressable>
   );
 });
 
-export { CARD_W as ROUTE_CARD_W, CARD_H as ROUTE_CARD_H };
+export { CARD_H as ROUTE_CARD_H, CARD_W as ROUTE_CARD_W };
 
 const s = StyleSheet.create({
   card: {
-    width: CARD_W, height: CARD_H,
-    borderRadius: 16, overflow: 'hidden',
+    width: CARD_W,
+    height: CARD_H,
+    borderRadius: 14,
+    overflow: 'hidden',
     backgroundColor: COLORS.brandNavy,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18, shadowRadius: 10,
-    elevation: 4,
   },
   placeholder: { backgroundColor: '#0B1120' },
-  dim:         { backgroundColor: 'rgba(0,0,0,0.18)', zIndex: 1 },
   bottom: {
-    position: 'absolute', bottom: 0, left: 0, right: 0,
-    paddingHorizontal: 12, paddingBottom: 12, paddingTop: 28, gap: 4,
+    position: 'absolute',
+    bottom: 0, left: 0, right: 0,
+    paddingHorizontal: 14,
+    paddingBottom: 14,
+    paddingTop: 40,
+    gap: 5,
   },
   name: {
-    color: '#fff', fontSize: 13, fontWeight: '700', lineHeight: 17,
-    textShadowColor: 'rgba(0,0,0,0.4)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '700',
+    lineHeight: 21,
   },
-  durationRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 3 },
-  durationTxt: { color: 'rgba(255,255,255,0.8)', fontSize: 11 },
+  durationRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  durationTxt: { color: 'rgba(255,255,255,0.85)', fontSize: 12, fontWeight: '500' },
 });

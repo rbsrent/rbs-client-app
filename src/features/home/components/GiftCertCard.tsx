@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, Text, View } from "react-native";
 
 import { COLORS } from "@/shared/colors";
 
-const CARD_H = 260;
+const CARD_H = 200;
 
 export const GiftCertCard = memo(function GiftCertCard() {
   const router = useRouter();
