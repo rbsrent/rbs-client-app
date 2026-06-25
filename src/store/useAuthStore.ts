@@ -46,7 +46,7 @@ export const useAuthStore = create<AuthState>((set) => ({
   fetchProfile: async () => {
     try {
       const { data, error } = await authSupabase.rpc('get_sms_client_profile');
-      if (!error && data) set({ smsUser: data });
+      if (!error && data) set({ smsUser: (Array.isArray(data) ? data[0] : data) ?? null });
     } catch {}
   },
 
@@ -56,7 +56,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     if (data.session) {
       try {
         const { data: profile, error } = await authSupabase.rpc('get_sms_client_profile');
-        if (!error && profile) set({ smsUser: profile });
+        if (!error && profile) set({ smsUser: (Array.isArray(profile) ? profile[0] : profile) ?? null });
       } catch {}
     }
   },

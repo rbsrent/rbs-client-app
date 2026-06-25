@@ -1,6 +1,6 @@
 import * as Linking from "expo-linking";
 import { useRouter, useSegments } from "expo-router";
-import { openAuthSessionAsync, WebBrowserResultType } from "expo-web-browser";
+import { openAuthSessionAsync } from "expo-web-browser";
 import { Clock } from "lucide-react-native";
 import { useEffect, useState } from "react";
 import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
@@ -52,37 +52,30 @@ export function PendingPaymentOverlay() {
   const handleResume = async () => {
     setPaying(true);
     const returnUrl = Linking.createURL("booking/return");
-    const result = await openAuthSessionAsync(pending.confirmationUrl, returnUrl, {
+    await openAuthSessionAsync(pending.confirmationUrl, returnUrl, {
       showInRecents: true,
     });
-    if (
-      result.type !== WebBrowserResultType.CANCEL &&
-      result.type !== WebBrowserResultType.DISMISS
-    ) {
-      // Poll for status after browser closes successfully
-      let attempts = 0;
-      const poll = setInterval(async () => {
-        attempts++;
-        const { data } = await publicSupabase
-          .from("public_bookings")
-          .select("booking_status")
-          .eq("id", pending.bookingId)
-          .single();
-        const status = (data as any)?.booking_status;
-        if (status === "confirmed" || status === "paid") {
-          clearInterval(poll);
-          setPaying(false);
-          await clear();
-          router.push(`/bookings/${pending.bookingId}` as any);
-        } else if (status === "cancelled" || attempts >= 20) {
-          clearInterval(poll);
-          setPaying(false);
-          if (status === "cancelled") await clear();
-        }
-      }, 2000);
-    } else {
-      setPaying(false);
-    }
+    // Always poll after browser closes — user may have paid before dismissing
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      const { data } = await publicSupabase
+        .from("public_bookings")
+        .select("booking_status")
+        .eq("id", pending.bookingId)
+        .single();
+      const status = (data as any)?.booking_status;
+      if (status === "confirmed" || status === "paid" || status === "partially_paid") {
+        clearInterval(poll);
+        setPaying(false);
+        await clear();
+        router.push(`/bookings/${pending.bookingId}` as any);
+      } else if (status === "cancelled" || attempts >= 20) {
+        clearInterval(poll);
+        setPaying(false);
+        if (status === "cancelled") await clear();
+      }
+    }, 2000);
   };
 
   const handleCancel = () => {

@@ -136,7 +136,7 @@ export default function RouteDetailScreen() {
   const [loading, setLoading] = useState(!cached);
 
   const { openRoutePicker } = useRouteWishlistPicker();
-  const isSaved = useRouteSavedStore((s) => (route ? s.isSaved(route.id) : false));
+  const isSaved = useRouteSavedStore((s) => (route ? s.savedIds.has(route.id) : false));
   const hydrate = useRouteSavedStore((s) => s.hydrate);
 
   useEffect(() => { hydrate(); }, []);

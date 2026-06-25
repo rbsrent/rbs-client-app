@@ -1,8 +1,9 @@
 import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
+import * as Haptics from 'expo-haptics';
 import { Clock, Heart, MapPin } from 'lucide-react-native';
-import { memo, useEffect, useRef } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -13,6 +14,8 @@ import Animated, {
 
 import { COLORS } from '@/shared/colors';
 import { useRouteWishlistPicker } from '@/shared/components/RouteWishlistPickerContext';
+import { useWishlistToast } from '@/shared/context/WishlistToastContext';
+import { removeRouteFromAllGroups } from '@/shared/wishlist';
 import { useRouteSavedStore } from '@/store/useRouteSavedStore';
 
 import { setRoutePreview } from '../store';
@@ -30,26 +33,37 @@ function durationLabel(h: number) {
 }
 
 function HeartBtn({ route }: { route: WaterRoute }) {
-  const hydrate          = useRouteSavedStore((s) => s.hydrate);
-  const isSaved          = useRouteSavedStore((s) => s.isSaved(route.id));
+  const hydrate             = useRouteSavedStore((s) => s.hydrate);
+  const isSaved             = useRouteSavedStore((s) => s.savedIds.has(route.id));
+  const refresh             = useRouteSavedStore((s) => s.refresh);
   const { openRoutePicker } = useRouteWishlistPicker();
-  const scale            = useSharedValue(1);
+  const { show: showToast, dismiss: dismissToast } = useWishlistToast();
+  const scale               = useSharedValue(1);
 
   useEffect(() => { hydrate(); }, []);
 
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
 
-  const handlePress = () => {
+  const handlePress = async () => {
+    dismissToast();
     scale.value = withSequence(
       withTiming(0.82, { duration: 90 }),
       withTiming(1,    { duration: 90 }),
     );
-    openRoutePicker({
-      route_id:      route.id,
-      name:          route.name,
-      map_image_url: route.map_image_url,
-      duration_hours: route.duration_hours,
-    });
+    if (isSaved) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await removeRouteFromAllGroups(route.id);
+      await refresh(route.id);
+      showToast({ type: 'deleted', listName: 'Маршруты', imageUrl: route.map_image_url });
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      openRoutePicker({
+        route_id:       route.id,
+        name:           route.name,
+        map_image_url:  route.map_image_url,
+        duration_hours: route.duration_hours,
+      });
+    }
   };
 
   return (
@@ -65,10 +79,11 @@ function HeartBtn({ route }: { route: WaterRoute }) {
 }
 
 export const RouteCard = memo(function RouteCard({ route }: { route: WaterRoute }) {
-  const router   = useRouter();
-  const imageUrl = resolveRouteImage(route.map_image_url);
-  const points   = (route.route_points ?? []).map((p) => p.name).filter(Boolean);
-  const slug     = route.seo_slug ?? route.id;
+  const router    = useRouter();
+  const imageUrl  = resolveRouteImage(route.map_image_url);
+  const [imgErr, setImgErr] = useState(false);
+  const points    = (route.route_points ?? []).map((p) => p.name).filter(Boolean);
+  const slug      = route.seo_slug ?? route.id;
 
   const handlePress = () => {
     setRoutePreview({ slug, name: route.name, imageUrl });
@@ -81,13 +96,14 @@ export const RouteCard = memo(function RouteCard({ route }: { route: WaterRoute 
       onPress={handlePress}
     >
       <View style={s.imgWrap}>
-        {imageUrl ? (
+        {imageUrl && !imgErr ? (
           <Image
             source={{ uri: imageUrl }}
             style={StyleSheet.absoluteFill}
             contentFit="cover"
             cachePolicy="memory-disk"
             transition={{ duration: 180, effect: 'cross-dissolve' }}
+            onError={() => setImgErr(true)}
           />
         ) : (
           <LinearGradient

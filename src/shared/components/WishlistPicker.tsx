@@ -4,8 +4,11 @@ import { Check, Plus } from 'lucide-react-native';
 import { forwardRef, useImperativeHandle, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import * as Haptics from 'expo-haptics';
+
 import { COLORS } from '@/shared/colors';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
+import { useWishlistToast } from '@/shared/context/WishlistToastContext';
 import { useWishlistStore } from '@/store/useWishlistStore';
 import {
   BoatData,
@@ -35,6 +38,7 @@ export const WishlistPicker = forwardRef<WishlistPickerHandle>((_, ref) => {
 
   const addBoatToGroup     = useWishlistStore((s) => s.addBoatToGroup);
   const removeBoatFromGroup = useWishlistStore((s) => s.removeBoatFromGroup);
+  const { show: showToast } = useWishlistToast();
 
   useImperativeHandle(ref, () => ({
     open: (b: BoatData, onClose?: () => void) => {
@@ -55,22 +59,45 @@ export const WishlistPicker = forwardRef<WishlistPickerHandle>((_, ref) => {
 
   const toggle = async (groupId: string) => {
     if (!boat) return;
-    const next = new Set(inGroups);
-    if (next.has(groupId)) {
-      await removeBoatFromGroup(groupId, boat.boat_id);
-    } else {
+    const group = groups.find((g) => g.id === groupId);
+    const groupName = group?.name ?? '';
+    const isAdding = !inGroups.has(groupId);
+    if (isAdding) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await addBoatToGroup(groupId, boat);
+      const capturedBoat = boat;
+      showToast({
+        type: 'saved',
+        listName: groupName,
+        imageUrl: capturedBoat.cover_image_url,
+        onEdit: () => {
+          loadGroups(capturedBoat.boat_id);
+          sheetRef.current?.present();
+        },
+      });
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await removeBoatFromGroup(groupId, boat.boat_id);
+      showToast({
+        type: 'deleted',
+        listName: groupName,
+        imageUrl: boat.cover_image_url,
+      });
     }
     sheetRef.current?.dismiss();
   };
 
   const handleCreate = async () => {
     if (!newName.trim() || !boat) return;
-    const id = await createGroup(newName);
+    const groupName = newName.trim();
+    const id = await createGroup(groupName);
     await addBoatToGroup(id, boat);
-    setNewName('');
-    setPage('list');
-    loadGroups(boat.boat_id);
+    showToast({
+      type: 'saved',
+      listName: groupName,
+      imageUrl: boat.cover_image_url,
+    });
+    sheetRef.current?.dismiss();
   };
 
   const visibleGroups = groups;

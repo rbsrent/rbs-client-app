@@ -40,6 +40,8 @@ export function PendingPaymentProvider({ children }: { children: ReactNode }) {
     setPending(null);
   }, []);
 
+  const PAID_STATUSES = ["confirmed", "paid", "partially_paid", "cancelled"];
+
   // Verify booking status from Supabase, clear if no longer pending
   const verify = useCallback(
     async (data: PendingPaymentData) => {
@@ -49,7 +51,7 @@ export function PendingPaymentProvider({ children }: { children: ReactNode }) {
         .eq("id", data.bookingId)
         .single();
       const status = (row as any)?.booking_status;
-      if (status === "confirmed" || status === "paid" || status === "cancelled") {
+      if (PAID_STATUSES.includes(status)) {
         await clear();
       }
     },
@@ -76,6 +78,13 @@ export function PendingPaymentProvider({ children }: { children: ReactNode }) {
       }
     })();
   }, [verify]);
+
+  // Auto-poll when pending exists so overlay clears after webhook updates status
+  useEffect(() => {
+    if (!pending) return;
+    const interval = setInterval(() => verify(pending), 5000);
+    return () => clearInterval(interval);
+  }, [pending, verify]);
 
   const save = useCallback(
     async (data: Omit<PendingPaymentData, "savedAt">) => {

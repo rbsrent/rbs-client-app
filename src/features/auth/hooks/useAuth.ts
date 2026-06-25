@@ -13,7 +13,7 @@ export function useAuth() {
   const fetchProfile = async () => {
     try {
       const { data } = await authSupabase.rpc('get_sms_client_profile');
-      if (data) setSmsUser(data);
+      if (data) setSmsUser((Array.isArray(data) ? data[0] : data) ?? null);
     } catch {}
   };
 

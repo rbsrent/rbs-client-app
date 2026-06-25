@@ -80,10 +80,19 @@ export default function ProfileSettingsScreen() {
   }));
 
   const rawPhone =
-    session?.user?.phone ?? session?.user?.user_metadata?.phone_number ?? "";
-  const displayPhone = rawPhone
-    ? `+7 ${rawPhone.slice(1, 4)} ${rawPhone.slice(4, 7)}-${rawPhone.slice(7, 9)}-${rawPhone.slice(9)}`
-    : "—";
+    smsUser?.phone_number ??
+    session?.user?.phone ??
+    session?.user?.user_metadata?.phone_number ??
+    "";
+  const phoneDigits = rawPhone.replace(/\D/g, "");
+  const phoneLocal =
+    phoneDigits.startsWith("7") || phoneDigits.startsWith("8")
+      ? phoneDigits.slice(1)
+      : phoneDigits;
+  const displayPhone =
+    phoneLocal.length === 10
+      ? `+7 (${phoneLocal.slice(0, 3)}) ${phoneLocal.slice(3, 6)}-${phoneLocal.slice(6, 8)}-${phoneLocal.slice(8)}`
+      : "—";
 
   const startEdit = () => {
     setName(smsUser?.full_name ?? "");

@@ -9,7 +9,9 @@ import { PersistGate } from 'redux-persist/integration/react';
 
 import { authSupabase } from '@/shared/supabase/authClient';
 import { PendingPaymentProvider } from '@/shared/context/PendingPaymentContext';
+import { WishlistToastProvider } from '@/shared/context/WishlistToastContext';
 import { PendingPaymentOverlay } from '@/shared/components/PendingPaymentOverlay';
+import { WishlistToast } from '@/shared/components/WishlistToast';
 import { WishlistPickerProvider } from '@/shared/components/WishlistPickerContext';
 import { RouteWishlistPickerProvider } from '@/shared/components/RouteWishlistPickerContext';
 import { registerPushToken } from '@/shared/registerPushToken';
@@ -129,7 +131,8 @@ export default function RootLayout() {
       <Provider store={offlineReduxStore}>
         <PersistGate loading={null} persistor={persistor}>
           <BottomSheetModalProvider>
-            <PendingPaymentProvider>
+            <WishlistToastProvider>
+          <PendingPaymentProvider>
             <WishlistPickerProvider>
             <RouteWishlistPickerProvider>
             <AuthListener />
@@ -168,10 +171,12 @@ export default function RootLayout() {
               <Stack.Screen name="booking/date-select" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
               <Stack.Screen name="booking/edit-trip" options={{ presentation: 'card', animation: 'slide_from_right', headerShown: false }} />
             </Stack>
+            <WishlistToast />
             <PendingPaymentOverlay />
             </RouteWishlistPickerProvider>
             </WishlistPickerProvider>
             </PendingPaymentProvider>
+          </WishlistToastProvider>
           </BottomSheetModalProvider>
         </PersistGate>
       </Provider>

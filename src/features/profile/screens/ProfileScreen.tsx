@@ -191,10 +191,19 @@ export const ProfileScreen = memo(function ProfileScreen() {
   }
 
   const rawPhone =
-    session.user?.phone ?? session.user?.user_metadata?.phone_number ?? "";
-  const displayPhone = rawPhone
-    ? `+7 ${rawPhone.slice(1, 4)} ${rawPhone.slice(4, 7)}-${rawPhone.slice(7, 9)}-${rawPhone.slice(9)}`
-    : "";
+    smsUser?.phone_number ??
+    session.user?.phone ??
+    session.user?.user_metadata?.phone_number ??
+    "";
+  const phoneDigits = rawPhone.replace(/\D/g, "");
+  const local =
+    phoneDigits.startsWith("7") || phoneDigits.startsWith("8")
+      ? phoneDigits.slice(1)
+      : phoneDigits;
+  const displayPhone =
+    local.length === 10
+      ? `+7 (${local.slice(0, 3)}) ${local.slice(3, 6)}-${local.slice(6, 8)}-${local.slice(8)}`
+      : "";
   const name = smsUser?.full_name ?? "Пользователь";
   const initial = name.charAt(0).toUpperCase();
 

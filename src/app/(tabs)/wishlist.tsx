@@ -17,10 +17,14 @@ import {
   DEFAULT_GROUP_ID,
   deleteGroup,
   getAllGroups,
+  getGroupItems,
+  getRouteGroupItems,
   RECENT_GROUP_ID,
   ROUTES_GROUP_ID,
   WishlistGroupMeta,
 } from "@/shared/wishlist";
+import { useRouteSavedStore } from "@/store/useRouteSavedStore";
+import { useWishlistStore } from "@/store/useWishlistStore";
 
 const W = Dimensions.get("window").width;
 const CARD_W = (W - 32 - 12) / 2;
@@ -59,8 +63,26 @@ export default function WishlistScreen() {
     customRoute.length > 0 ||
     (defaultGroup?.item_count ?? 0) > 0;
 
-  const handleDelete = async (id: string) => {
-    await deleteGroup(id);
+  const refreshBoat  = useWishlistStore((s) => s.refreshBoat);
+  const markUnsaved  = useRouteSavedStore((s) => s.markUnsaved);
+  const routeRefresh = useRouteSavedStore((s) => s.refresh);
+
+  const handleDelete = async (groupId: string) => {
+    const group = groups.find((g) => g.id === groupId);
+    if (group?.type === 'route') {
+      const items = await getRouteGroupItems(groupId);
+      await deleteGroup(groupId);
+      for (const item of items) {
+        markUnsaved(item.route_id);
+        routeRefresh(item.route_id);
+      }
+    } else {
+      const items = await getGroupItems(groupId);
+      await deleteGroup(groupId);
+      for (const item of items) {
+        refreshBoat(item.boat_id);
+      }
+    }
     load();
   };
 

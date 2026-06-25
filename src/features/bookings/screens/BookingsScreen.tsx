@@ -18,6 +18,7 @@ import Animated, {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
+import { Spinner } from "@/shared/components/Spinner";
 import { authSupabase } from "@/shared/supabase/authClient";
 import { phoneVariants } from "@/shared/utils/phone";
 import { useAuthStore } from "@/store/useAuthStore";
@@ -26,6 +27,7 @@ import { Booking } from "../types";
 
 const TABS = ["upcoming", "past", "all"] as const;
 const TIMING = { duration: 240, easing: Easing.inOut(Easing.ease) };
+
 
 export const BookingsScreen = memo(function BookingsScreen() {
   const insets = useSafeAreaInsets();
@@ -121,13 +123,12 @@ export const BookingsScreen = memo(function BookingsScreen() {
   );
 
   const listEmpty = useMemo(
-    () => (
-      <View style={styles.emptyState}>
-        <Text style={styles.emptyTitle}>
-          {isLoading ? "Загрузка..." : "Бронирований нет"}
-        </Text>
-      </View>
-    ),
+    () =>
+      isLoading ? null : (
+        <View style={styles.emptyState}>
+          <Text style={styles.emptyTitle}>Бронирований нет</Text>
+        </View>
+      ),
     [isLoading],
   );
 
@@ -191,25 +192,31 @@ export const BookingsScreen = memo(function BookingsScreen() {
           <Animated.View style={[styles.tabUnderline, indicatorStyle]} />
         </View>
       </View>
-      <FlatList
-        data={filtered}
-        keyExtractor={(b) => b.id}
-        renderItem={renderItem}
-        contentContainerStyle={listContentStyle}
-        showsVerticalScrollIndicator={false}
-        removeClippedSubviews
-        initialNumToRender={6}
-        maxToRenderPerBatch={4}
-        windowSize={5}
-        refreshControl={
-          <RefreshControl
-            refreshing={isLoading}
-            onRefresh={fetchBookings}
-            tintColor={COLORS.brandCyan}
-          />
-        }
-        ListEmptyComponent={listEmpty}
-      />
+      {isLoading && bookings.length === 0 ? (
+        <View style={styles.spinnerBox}>
+          <Spinner size={28} />
+        </View>
+      ) : (
+        <FlatList
+          data={filtered}
+          keyExtractor={(b) => b.id}
+          renderItem={renderItem}
+          contentContainerStyle={listContentStyle}
+          showsVerticalScrollIndicator={false}
+          removeClippedSubviews
+          initialNumToRender={6}
+          maxToRenderPerBatch={4}
+          windowSize={5}
+          refreshControl={
+            <RefreshControl
+              refreshing={isLoading}
+              onRefresh={fetchBookings}
+              tintColor={COLORS.brandCyan}
+            />
+          }
+          ListEmptyComponent={listEmpty}
+        />
+      )}
     </View>
   );
 });
@@ -265,6 +272,7 @@ const styles = StyleSheet.create({
   },
   list: { padding: 16, gap: 12 },
 
+  spinnerBox: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyState: {
     flex: 1,
     alignItems: "center",

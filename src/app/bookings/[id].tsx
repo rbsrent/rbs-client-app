@@ -359,12 +359,12 @@ export default function BookingDetailScreen() {
 
         {/* Booking details card */}
         {booking && (
+          <>
+          <Text style={[s.cardTitle, { marginHorizontal: 16, marginBottom: 4 }]}>Детали бронирования</Text>
           <Animated.View
             entering={FadeIn.duration(400).delay(150)}
             style={s.card}
           >
-            <Text style={s.cardTitle}>Детали бронирования</Text>
-
             <DetailRow
               icon={
                 <Calendar
@@ -393,16 +393,7 @@ export default function BookingDetailScreen() {
                   />
                 }
                 label="Причал"
-                value={booking.pier_name}
-              />
-            )}
-            {booking.pier_address && (
-              <DetailRow
-                icon={
-                  <MapPin size={15} color={COLORS.text3} strokeWidth={1.8} />
-                }
-                label="Адрес"
-                value={booking.pier_address}
+                value={[booking.pier_name, booking.pier_address].filter(Boolean).join(", ")}
               />
             )}
             {booking.client_name && (
@@ -412,36 +403,42 @@ export default function BookingDetailScreen() {
                 value={booking.client_name}
               />
             )}
+          </Animated.View>
 
-            {/* Amount breakdown */}
-            <View style={s.amtBox}>
-              <View style={s.amtRow}>
-                <Text style={s.amtKey}>Оплачено онлайн</Text>
-                <Text style={s.amtVal}>
-                  {ruFmt(
-                    booking.prepayment_amount > 0
-                      ? booking.prepayment_amount
-                      : booking.total_price,
-                  )}{" "}
-                  ₽
-                </Text>
+          {/* Payment card */}
+          <Text style={[s.cardTitle, { marginHorizontal: 16, marginTop: 16, marginBottom: 4 }]}>Оплата</Text>
+          <Animated.View entering={FadeIn.duration(400).delay(180)} style={s.card}>
+            {booking.remaining_amount > 0 && (
+              <View style={s.payBadgeRow}>
+                <View style={s.payBadge}>
+                  <Text style={s.payBadgeTxt}>Доплата</Text>
+                </View>
               </View>
+            )}
+            <View style={s.payGrid}>
               {booking.remaining_amount > 0 && (
-                <View style={s.amtRow}>
-                  <Text style={s.amtKey}>К оплате исполнителю</Text>
-                  <Text style={[s.amtVal, { color: COLORS.text2 }]}>
-                    {ruFmt(booking.remaining_amount)} ₽
-                  </Text>
+                <View style={s.payItem}>
+                  <Text style={s.payItemLabel}>К доплате</Text>
+                  <Text style={[s.payItemVal, { color: COLORS.warning }]}>{ruFmt(booking.remaining_amount)} ₽</Text>
                 </View>
               )}
-              <View style={[s.amtRow, s.amtTotalRow]}>
-                <Text style={s.amtTotalKey}>Общая стоимость</Text>
-                <Text style={s.amtTotalVal}>
-                  {ruFmt(booking.total_price)} ₽
-                </Text>
+              <View style={s.payItem}>
+                <Text style={s.payItemLabel}>Оплачено</Text>
+                <Text style={s.payItemVal}>{ruFmt(booking.prepayment_amount > 0 ? booking.prepayment_amount : booking.total_price)} ₽</Text>
+              </View>
+              {booking.prepayment_amount > 0 && (
+                <View style={s.payItem}>
+                  <Text style={s.payItemLabel}>Предоплата</Text>
+                  <Text style={s.payItemVal}>{ruFmt(booking.prepayment_amount)} ₽</Text>
+                </View>
+              )}
+              <View style={[s.payItem, s.payItemTotal]}>
+                <Text style={s.payItemLabelTotal}>Общая стоимость</Text>
+                <Text style={s.payItemValTotal}>{ruFmt(booking.total_price)} ₽</Text>
               </View>
             </View>
           </Animated.View>
+          </>
         )}
 
         {/* Info box */}
@@ -511,7 +508,7 @@ function DetailRow({
 }
 
 const s = StyleSheet.create({
-  root: { flex: 1, backgroundColor: COLORS.background ?? COLORS.backgroundAlt },
+  root: { flex: 1, backgroundColor: COLORS.white },
   scroll: { flex: 1 },
 
   /* center states */
@@ -557,8 +554,6 @@ const s = StyleSheet.create({
   pendingHintBox: {
     backgroundColor: COLORS.warningLight,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.warning + "40",
     padding: 14,
   },
   pendingHintTxt: {
@@ -571,8 +566,7 @@ const s = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderWidth: 1.5,
-    borderColor: COLORS.brandNavy,
+    backgroundColor: COLORS.greyLight,
     borderRadius: 12,
     paddingHorizontal: 20,
     paddingVertical: 11,
@@ -634,10 +628,8 @@ const s = StyleSheet.create({
   /* card */
   card: {
     margin: 16,
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.greyLight,
     borderRadius: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     overflow: "hidden",
   },
   cardTitle: {
@@ -656,8 +648,6 @@ const s = StyleSheet.create({
     gap: 10,
     paddingHorizontal: 16,
     paddingVertical: 11,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
   },
   detailIcon: { width: 20, alignItems: "center", marginTop: 1 },
   detailLabel: { fontSize: 13, color: COLORS.text3, width: 76 },
@@ -676,34 +666,39 @@ const s = StyleSheet.create({
     marginTop: 4,
   },
 
-  /* amount */
-  amtBox: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginTop: 4,
+  /* payment card */
+  payBadgeRow: { paddingHorizontal: 16, paddingTop: 14, paddingBottom: 8 },
+  payBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: COLORS.warningLight,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
   },
-  amtRow: {
+  payBadgeTxt: { fontSize: 12, fontWeight: "700", color: "#7a5800" },
+  payGrid: { paddingHorizontal: 16, paddingBottom: 4 },
+  payItem: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 16,
-    paddingVertical: 11,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: COLORS.border,
+    paddingVertical: 10,
   },
-  amtKey: { fontSize: 13, color: COLORS.text2 },
-  amtVal: { fontSize: 13, fontWeight: "600", color: COLORS.brandNavy },
-  amtTotalRow: { backgroundColor: COLORS.successLight },
-  amtTotalKey: { fontSize: 14, fontWeight: "700", color: COLORS.text1 },
-  amtTotalVal: { fontSize: 18, fontWeight: "800", color: COLORS.success },
+  payItemTotal: {
+    marginTop: 4,
+    paddingTop: 12,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: COLORS.greyDark,
+  },
+  payItemLabel: { fontSize: 13, color: COLORS.text2 },
+  payItemVal: { fontSize: 14, fontWeight: "700", color: COLORS.text1 },
+  payItemLabelTotal: { fontSize: 14, fontWeight: "700", color: COLORS.text1 },
+  payItemValTotal: { fontSize: 18, fontWeight: "800", color: COLORS.success },
 
   /* info */
   infoBox: {
     marginHorizontal: 16,
-    backgroundColor: COLORS.backgroundAlt,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.greyLight,
+    borderRadius: 16,
     padding: 14,
     gap: 6,
   },
@@ -726,8 +721,7 @@ const s = StyleSheet.create({
     borderRadius: 14,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
+    backgroundColor: COLORS.greyLight,
   },
   ctaSecondaryTxt: { fontSize: 15, fontWeight: "600", color: COLORS.text2 },
 });

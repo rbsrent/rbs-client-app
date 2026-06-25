@@ -1,7 +1,7 @@
 import { Image } from "expo-image";
 import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import { Bookmark, ChevronLeft, X } from "lucide-react-native";
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dimensions,
   FlatList,
@@ -118,7 +118,8 @@ export default function RouteGroupScreen() {
   );
   const [editing, setEditing] = useState(false);
 
-  const refresh = useRouteSavedStore((s) => s.refresh);
+  const refresh    = useRouteSavedStore((s) => s.refresh);
+  const markUnsaved = useRouteSavedStore((s) => s.markUnsaved);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -149,11 +150,12 @@ export default function RouteGroupScreen() {
   const handleDelete = useCallback(
     async (routeId: string) => {
       if (!id) return;
+      markUnsaved(routeId);
+      setItems((prev) => prev.filter((i) => i.route_id !== routeId));
       await removeRouteFromGroup(id, routeId);
       await refresh(routeId);
-      setItems((prev) => prev.filter((i) => i.route_id !== routeId));
     },
-    [id, refresh],
+    [id, refresh, markUnsaved],
   );
 
   const listData = useMemo<ListRow[]>(() => {

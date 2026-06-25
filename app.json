@@ -20,6 +20,12 @@
               "NSExceptionAllowsInsecureHTTPLoads": false,
               "NSExceptionMinimumTLSVersion": "TLSv1.0",
               "NSExceptionRequiresForwardSecrecy": false
+            },
+            "proxy.rbs.rent": {
+              "NSIncludesSubdomains": true,
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionMinimumTLSVersion": "TLSv1.0",
+              "NSExceptionRequiresForwardSecrecy": false
             }
           }
         }

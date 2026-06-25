@@ -2,7 +2,7 @@ import { Image } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useRouter } from 'expo-router';
 import { Clock } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, memo } from 'react';
 import {
   Animated,
   Pressable,
@@ -38,21 +38,23 @@ const CARD_H = 160;
 const GAP = 10;
 const INTERVAL = CARD_W + GAP;
 
-function RoutePreviewCard({ route }: { route: RoutePreview }) {
-  const router = useRouter();
+const RoutePreviewCard = memo(function RoutePreviewCard({ route }: { route: RoutePreview }) {
+  const router   = useRouter();
   const imageUrl = resolveImage(route.map_image_url);
+  const [imgErr, setImgErr] = useState(false);
 
   return (
     <Pressable
       style={({ pressed }) => [styles.card, pressed && { opacity: 0.9 }]}
       onPress={() => router.push(`/routes/${route.seo_slug ?? route.id}` as any)}
     >
-      {imageUrl ? (
+      {imageUrl && !imgErr ? (
         <Image
           source={{ uri: imageUrl }}
           style={StyleSheet.absoluteFill}
           contentFit="cover"
           cachePolicy="memory-disk"
+          onError={() => setImgErr(true)}
         />
       ) : (
         <View style={[StyleSheet.absoluteFill, styles.placeholder]} />
@@ -78,7 +80,7 @@ function RoutePreviewCard({ route }: { route: RoutePreview }) {
       </View>
     </Pressable>
   );
-}
+});
 
 
 export function RoutesPreview() {

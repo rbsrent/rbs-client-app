@@ -1,3 +1,4 @@
+import * as Haptics from 'expo-haptics';
 import { BottomSheetModal, BottomSheetScrollView, BottomSheetTextInput, BottomSheetView } from '@gorhom/bottom-sheet';
 import { Image } from 'expo-image';
 import { Check, MapPin, Plus } from 'lucide-react-native';
@@ -6,6 +7,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { COLORS } from '@/shared/colors';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
+import { useWishlistToast } from '@/shared/context/WishlistToastContext';
 import { useRouteSavedStore } from '@/store/useRouteSavedStore';
 import {
   addRouteToGroup,
@@ -36,6 +38,7 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
   const onCloseRef = useRef<(() => void) | undefined>(undefined);
 
   const refresh = useRouteSavedStore((s) => s.refresh);
+  const { show: showToast } = useWishlistToast();
 
   useImperativeHandle(ref, () => ({
     open: (r: RouteData, onClose?: () => void) => {
@@ -59,10 +62,30 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
 
   const toggle = async (groupId: string) => {
     if (!route) return;
-    if (inGroups.has(groupId)) {
-      await removeRouteFromGroup(groupId, route.route_id);
-    } else {
+    const group = groups.find((g) => g.id === groupId);
+    const groupName = group?.name ?? '';
+    const isAdding = !inGroups.has(groupId);
+    if (isAdding) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       await addRouteToGroup(groupId, route);
+      const capturedRoute = route;
+      showToast({
+        type: 'saved',
+        listName: groupName,
+        imageUrl: capturedRoute.map_image_url,
+        onEdit: () => {
+          loadGroups(capturedRoute.route_id);
+          sheetRef.current?.present();
+        },
+      });
+    } else {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      await removeRouteFromGroup(groupId, route.route_id);
+      showToast({
+        type: 'deleted',
+        listName: groupName,
+        imageUrl: route.map_image_url,
+      });
     }
     await refresh(route.route_id);
     sheetRef.current?.dismiss();
@@ -70,12 +93,16 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
 
   const handleCreate = async () => {
     if (!newName.trim() || !route) return;
-    const id = await createGroup(newName, 'route');
+    const groupName = newName.trim();
+    const id = await createGroup(groupName, 'route');
     await addRouteToGroup(id, route);
     await refresh(route.route_id);
-    setNewName('');
-    setPage('list');
-    loadGroups(route.route_id);
+    showToast({
+      type: 'saved',
+      listName: groupName,
+      imageUrl: route.map_image_url,
+    });
+    sheetRef.current?.dismiss();
   };
 
   return (

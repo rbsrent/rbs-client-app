@@ -124,6 +124,7 @@ export default function WishlistDetailScreen() {
   const [editing, setEditing] = useState(false);
 
   const removeBoatFromGroup = useWishlistStore((s) => s.removeBoatFromGroup);
+  const setBoatSaved        = useWishlistStore((s) => s.setBoatSaved);
 
   const load = useCallback(() => {
     if (!id) return;
@@ -138,14 +139,14 @@ export default function WishlistDetailScreen() {
   const handleRemove = useCallback(
     async (item: WishlistItem) => {
       if (!id) return;
-      // removeBoatFromGroup re-checks DB → HeartButton stays in sync
+      if (id !== RECENT_GROUP_ID) setBoatSaved(item.boat_id, false);
+      setItems((prev) => prev.filter((i) => i.boat_id !== item.boat_id));
       await removeBoatFromGroup(
         id === RECENT_GROUP_ID ? RECENT_GROUP_ID : id,
         item.boat_id,
       );
-      setItems((prev) => prev.filter((i) => i.boat_id !== item.boat_id));
     },
-    [id, removeBoatFromGroup],
+    [id, removeBoatFromGroup, setBoatSaved],
   );
 
   const listData = useMemo<ListRow[]>(() => {

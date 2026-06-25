@@ -13,8 +13,9 @@ async function getDb(): Promise<SQLite.SQLiteDatabase> {
   if (!dbPromise) {
     dbPromise = (async () => {
       const d = await SQLite.openDatabaseAsync(DB_NAME);
+      await d.runAsync('PRAGMA journal_mode = WAL');
+      await d.runAsync('PRAGMA foreign_keys = ON');
       await d.execAsync(`
-        PRAGMA journal_mode = WAL;
         CREATE TABLE IF NOT EXISTS wishlist_groups (
           id         TEXT PRIMARY KEY NOT NULL,
           name       TEXT NOT NULL,
