@@ -12,6 +12,7 @@ import ReAnimated, {
   useSharedValue,
 } from 'react-native-reanimated';
 
+import { resolveRouteImage } from '@/features/routes/types';
 import { COLORS } from '@/shared/colors';
 import { HomeRoute } from '@/store/useHomeStore';
 import { HomeRouteCard, ROUTE_CARD_H, ROUTE_CARD_W } from '../cards/HomeRouteCard';
@@ -54,7 +55,7 @@ export const RoutesPreviewSection = memo(function RoutesPreviewSection({ routes,
   const router = useRouter();
 
   const previews = useMemo(
-    () => routes.slice(0, 3).map((r) => r.map_image_url).filter(Boolean) as string[],
+    () => routes.slice(0, 3).map((r) => resolveRouteImage(r.map_image_url)).filter(Boolean) as string[],
     [routes],
   );
 
