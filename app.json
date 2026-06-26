@@ -67,10 +67,13 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
+          "backgroundColor": "#0D1421",
+          "image": "./assets/images/icon-rbs.png",
+          "imageWidth": 160,
+          "resizeMode": "contain",
           "android": {
-            "image": "./assets/images/splash-icon.png",
-            "imageWidth": 76
+            "image": "./assets/images/icon-rbs.png",
+            "imageWidth": 160
           }
         }
       ],
@@ -83,7 +86,8 @@
           "color": "#208AEF",
           "sounds": []
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": true,

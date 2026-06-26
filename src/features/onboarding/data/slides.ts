@@ -20,4 +20,9 @@ export const ONBOARDING_SLIDES: OnboardingSlide[] = [
     title: 'Отдыхай\nна воде',
     subtitle: 'Лучшие маршруты по рекам и каналам СПб',
   },
+  {
+    id: '4',
+    title: 'Скидки и\nспецпредложения',
+    subtitle: 'Выгодные акции каждую неделю — только в приложении',
+  },
 ];
