@@ -30,7 +30,9 @@ import {
   computeSlotSelection,
   durLabel,
   fmtHour,
+  fmtHourLabel,
 } from "@/features/booking/utils";
+import { buildBoatH1 } from "@/features/catalog/hooks/useBoatDetail";
 import { COLORS } from "@/shared/colors";
 import { CalendarPicker } from "@/shared/components/CalendarPicker";
 import { Spinner } from "@/shared/components/Spinner";
@@ -39,20 +41,12 @@ import { publicSupabase } from "@/shared/supabase/publicClient";
 const { width: W } = Dimensions.get("window");
 const COLS = 4;
 const SLOT_W = Math.floor((W - 32 - (COLS - 1) * 8) / COLS);
+const EXTRA_HOURS = 6;
+const TOTAL_HOURS = 24 + EXTRA_HOURS;
 
 const MONTHS_S = [
-  "янв",
-  "фев",
-  "мар",
-  "апр",
-  "май",
-  "июн",
-  "июл",
-  "авг",
-  "сен",
-  "окт",
-  "ноя",
-  "дек",
+  "янв", "фев", "мар", "апр", "май", "июн",
+  "июл", "авг", "сен", "окт", "ноя", "дек",
 ];
 const DAYS_S = ["вс", "пн", "вт", "ср", "чт", "пт", "сб"];
 function fmtDateShort(d: Date) {
@@ -89,6 +83,50 @@ export default function EditTripScreen() {
   }>();
 
   const minDuration = minDurParam ? Math.max(1, Number(minDurParam)) : 1;
+
+  // ── Boat name + pier (fetched from DB, same as date-select) ──
+  const [boatName, setBoatName] = useState<string | null>(
+    boatNameParam ? decodeURIComponent(boatNameParam) : null,
+  );
+  const [pierName, setPierName] = useState<string | null>(
+    pierNameParam ? decodeURIComponent(pierNameParam) : null,
+  );
+  const [pierAddress, setPierAddress] = useState<string | null>(
+    pierAddressParam ? decodeURIComponent(pierAddressParam) : null,
+  );
+
+  useEffect(() => {
+    if (!boatId) return;
+    void (async () => {
+      try {
+        const { data } = await publicSupabase
+          .from("boats")
+          .select("name, seo_h1, seo_name_ru, type, piers(name, address)")
+          .eq("id", boatId)
+          .single();
+        if (data) {
+          setBoatName(buildBoatH1(data as any));
+          const pier = (data as any).piers;
+          if (pier) {
+            setPierName(pier.name ?? null);
+            setPierAddress(pier.address ?? null);
+            return;
+          }
+        }
+        const { data: asgn } = await publicSupabase
+          .from("boat_pier_assignments")
+          .select("piers(name, address)")
+          .eq("boat_id", boatId)
+          .limit(1)
+          .single();
+        const p = (asgn as any)?.piers;
+        if (p) {
+          setPierName(p.name ?? null);
+          setPierAddress(p.address ?? null);
+        }
+      } catch {}
+    })();
+  }, [boatId]);
 
   // ── Piers ──
   const [piers, setPiers] = useState<Pier[]>(() => getCachedPiers());
@@ -146,7 +184,7 @@ export default function EditTripScreen() {
   });
   const [pierSheetOpen, setPierSheetOpen] = useState(false);
 
-  // ── Fetch busy slots ──
+  // ── Fetch busy slots (extended range for crossing midnight) ──
   const initialDateStr = useRef(date.toDateString());
 
   useEffect(() => {
@@ -154,30 +192,32 @@ export default function EditTripScreen() {
     let cancelled = false;
     setSlotsLoading(true);
     setBusyHours(new Set());
-    // Only reset selection when user changes date (not on initial mount)
     if (date.toDateString() !== initialDateStr.current) {
       setSelectedHours([]);
     }
 
     const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    const rangeEnd = new Date(dayStart.getTime() + TOTAL_HOURS * 3_600_000);
 
     void (async () => {
       try {
         const { data } = await publicSupabase.rpc("get_boat_busy_slots", {
           p_boat_id: boatId,
           p_start_datetime: dayStart.toISOString(),
-          p_end_datetime: dayEnd.toISOString(),
+          p_end_datetime: rangeEnd.toISOString(),
         });
         if (cancelled) return;
         const busy = new Set<number>();
+        const dayStartMs = dayStart.getTime();
         (data ?? []).forEach(
           (slot: { start_datetime: string; end_datetime: string }) => {
-            const s = new Date(slot.start_datetime);
-            const e = new Date(slot.end_datetime);
-            for (let h = s.getHours(); h < e.getHours(); h++) busy.add(h);
+            const sMs = new Date(slot.start_datetime).getTime();
+            const eMs = new Date(slot.end_datetime).getTime();
+            const startH = Math.floor((sMs - dayStartMs) / 3_600_000);
+            const endH = Math.floor((eMs - dayStartMs) / 3_600_000);
+            for (let h = Math.max(0, startH); h < Math.min(TOTAL_HOURS, endH); h++)
+              busy.add(h);
           },
         );
         setBusyHours(busy);
@@ -186,17 +226,17 @@ export default function EditTripScreen() {
         if (!cancelled) setSlotsLoading(false);
       }
     })();
-    return () => {
-      cancelled = true;
-    };
+    return () => { cancelled = true; };
   }, [date, boatId]);
 
   const unavailable = useCallback(
     (hour: number): boolean => {
       if (busyHours.has(hour)) return true;
-      const now = new Date();
-      if (date.toDateString() === now.toDateString() && hour <= now.getHours())
-        return true;
+      if (hour < 24) {
+        const now = new Date();
+        if (date.toDateString() === now.toDateString() && hour <= now.getHours())
+          return true;
+      }
       return false;
     },
     [busyHours, date],
@@ -254,6 +294,17 @@ export default function EditTripScreen() {
         <View style={{ width: 40 }} />
       </View>
 
+      {/* ── Boat + Pier sub-header (sticky, outside ScrollView) ── */}
+      {(boatName || pierName) && (
+        <View style={s.boatHeader}>
+          {boatName && <Text style={s.boatTitle}>{boatName}</Text>}
+          {pierName && <Text style={s.pierNameTxt}>{pierName}</Text>}
+          {pierAddress && (
+            <Text style={s.pierAddrTxt}>Санкт-Петербург, {pierAddress}</Text>
+          )}
+        </View>
+      )}
+
       <ScrollView
         style={s.scroll}
         contentContainerStyle={[
@@ -263,21 +314,6 @@ export default function EditTripScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* ── Boat + Pier header ── */}
-        {(boatNameParam || pierNameParam) && (
-          <View style={s.boatHeader}>
-            {boatNameParam ? (
-              <Text style={s.boatTitle}>{decodeURIComponent(boatNameParam)}</Text>
-            ) : null}
-            {pierNameParam ? (
-              <Text style={s.pierNameTxt}>{decodeURIComponent(pierNameParam)}</Text>
-            ) : null}
-            {pierAddressParam ? (
-              <Text style={s.pierAddrTxt}>Санкт-Петербург, {decodeURIComponent(pierAddressParam)}</Text>
-            ) : null}
-          </View>
-        )}
-
         {/* ── Calendar ── */}
         <View style={s.section}>
           <CalendarPicker
@@ -304,15 +340,11 @@ export default function EditTripScreen() {
           {/* Legend */}
           <View style={s.legend}>
             <View style={s.legendItem}>
-              <View
-                style={[s.legendDot, { backgroundColor: COLORS.brandNavy }]}
-              />
+              <View style={[s.legendDot, { backgroundColor: COLORS.brandNavy }]} />
               <Text style={s.legendTxt}>Выбрано</Text>
             </View>
             <View style={s.legendItem}>
-              <View
-                style={[s.legendDot, { backgroundColor: COLORS.greyLight }]}
-              />
+              <View style={[s.legendDot, { backgroundColor: COLORS.greyLight }]} />
               <Text style={s.legendTxt}>Свободно</Text>
             </View>
             <View style={s.legendItem}>
@@ -333,14 +365,14 @@ export default function EditTripScreen() {
               entering={ENTER}
               exiting={EXIT}
             >
-              {Array.from({ length: 24 }, (_, hour) => {
+              {Array.from({ length: TOTAL_HOURS }, (_, hour) => {
                 const busy = busyHours.has(hour);
                 const past = unavailable(hour) && !busy;
                 const off = busy || past;
                 const selected = selectedHours.includes(hour);
                 const isFirst = selected && hour === selectedHours[0];
-                const isLast =
-                  selected && hour === selectedHours[selectedHours.length - 1];
+                const isLast = selected && hour === selectedHours[selectedHours.length - 1];
+                const isNextDay = hour >= 24;
 
                 return (
                   <Pressable
@@ -366,6 +398,9 @@ export default function EditTripScreen() {
                     >
                       {fmtHour(hour)}
                     </Text>
+                    {isNextDay && !busy && (
+                      <Text style={[s.nextDayBadge, selected && s.nextDayBadgeSel]}>+1</Text>
+                    )}
                     {isFirst && !isLast && <View style={s.slotDot} />}
                     {(isLast || (isFirst && isLast)) && (
                       <Check size={11} color="#fff" strokeWidth={3} />
@@ -390,11 +425,7 @@ export default function EditTripScreen() {
               </View>
               <Animated.View layout={LAY}>
                 {selectedPier ? (
-                  <Animated.View
-                    key={selectedPier.id}
-                    entering={ENTER}
-                    exiting={EXIT}
-                  >
+                  <Animated.View key={selectedPier.id} entering={ENTER} exiting={EXIT}>
                     <Text style={s.pierName} numberOfLines={2}>
                       {selectedPier.name}
                     </Text>
@@ -405,12 +436,7 @@ export default function EditTripScreen() {
                     ) : null}
                   </Animated.View>
                 ) : (
-                  <Animated.Text
-                    key="ph"
-                    entering={ENTER}
-                    exiting={EXIT}
-                    style={s.placeholder}
-                  >
+                  <Animated.Text key="ph" entering={ENTER} exiting={EXIT} style={s.placeholder}>
                     Нажмите чтобы выбрать
                   </Animated.Text>
                 )}
@@ -425,7 +451,7 @@ export default function EditTripScreen() {
         <View style={s.selInfo}>
           <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
           <Text style={s.selTxt}>
-            {startH != null ? fmtHour(startH) : "–"} – {endH != null ? fmtHour(endH) : "–"}
+            {startH != null ? fmtHour(startH) : "–"} – {endH != null ? fmtHourLabel(endH) : "–"}
           </Text>
           <View style={s.durBadge}>
             <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
@@ -514,12 +540,7 @@ const s = StyleSheet.create({
     gap: 6,
     marginBottom: 12,
   },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: "700",
-    color: COLORS.text1,
-    flex: 1,
-  },
+  sectionTitle: { fontSize: 15, fontWeight: "700", color: COLORS.text1, flex: 1 },
   sectionDate: { fontSize: 13, color: COLORS.text3 },
   sectionAction: { fontSize: 13, fontWeight: "600", color: COLORS.brandNavy },
 
@@ -551,6 +572,8 @@ const s = StyleSheet.create({
   slotTxtOff: { color: "#C09090", fontWeight: "400" },
   slotTxtSel: { color: "#fff" },
   slotBusyLbl: { fontSize: 9, color: "#C09090" },
+  nextDayBadge: { fontSize: 9, fontWeight: "700", color: COLORS.brandNavy, lineHeight: 11 },
+  nextDayBadgeSel: { color: "rgba(255,255,255,0.8)" },
   slotDot: {
     width: 5,
     height: 5,
@@ -573,8 +596,6 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingTop: 14,
     backgroundColor: COLORS.white,
-    // borderTopWidth: StyleSheet.hairlineWidth,
-    // borderTopColor: COLORS.border,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.06,
@@ -584,7 +605,6 @@ const s = StyleSheet.create({
   },
   selInfo: { flex: 1, flexDirection: "row", alignItems: "center", gap: 6 },
   selTxt: { fontSize: 15, fontWeight: "700", color: COLORS.brandNavy },
-  selHint: { flex: 1, fontSize: 12, color: COLORS.text3 },
   durBadge: {
     backgroundColor: COLORS.brandNavy + "15",
     borderRadius: 6,
@@ -599,6 +619,5 @@ const s = StyleSheet.create({
     paddingHorizontal: 28,
     paddingVertical: 13,
   },
-  confirmBtnDim: { backgroundColor: COLORS.muted },
   confirmTxt: { fontSize: 15, fontWeight: "700", color: "#fff" },
 });

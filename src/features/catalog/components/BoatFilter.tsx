@@ -84,6 +84,9 @@ export const BoatFilter: React.FC<BoatFilterProps> = ({
       enablePanDownToClose
       backdropComponent={SheetBackdrop}
       backgroundStyle={s.sheetBg}
+      keyboardBehavior="extend"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
       handleComponent={() => (
         <View style={s.handleWrap}>
           <View style={s.handle} />
@@ -161,16 +164,13 @@ export const BoatFilter: React.FC<BoatFilterProps> = ({
                     style={s.priceInput}
                     placeholder="0"
                     placeholderTextColor={COLORS.text3}
-                    keyboardType="numeric"
-                    value={
-                      draft.priceMin !== null ? String(draft.priceMin) : ""
-                    }
-                    onChangeText={(v) =>
-                      onDraftChange({
-                        ...draft,
-                        priceMin: v ? Number(v) : null,
-                      })
-                    }
+                    keyboardType="number-pad"
+                    value={draft.priceMin !== null ? String(draft.priceMin) : ""}
+                    onChangeText={(v) => {
+                      const digits = v.replace(/[^0-9]/g, "");
+                      const num = digits ? parseInt(digits, 10) : null;
+                      onDraftChange({ ...draft, priceMin: num });
+                    }}
                   />
                 </View>
                 <View style={s.priceDash} />
@@ -180,16 +180,13 @@ export const BoatFilter: React.FC<BoatFilterProps> = ({
                     style={s.priceInput}
                     placeholder="∞"
                     placeholderTextColor={COLORS.text3}
-                    keyboardType="numeric"
-                    value={
-                      draft.priceMax !== null ? String(draft.priceMax) : ""
-                    }
-                    onChangeText={(v) =>
-                      onDraftChange({
-                        ...draft,
-                        priceMax: v ? Number(v) : null,
-                      })
-                    }
+                    keyboardType="number-pad"
+                    value={draft.priceMax !== null ? String(draft.priceMax) : ""}
+                    onChangeText={(v) => {
+                      const digits = v.replace(/[^0-9]/g, "");
+                      const num = digits ? parseInt(digits, 10) : null;
+                      onDraftChange({ ...draft, priceMax: num });
+                    }}
                   />
                 </View>
               </View>

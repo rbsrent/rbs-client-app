@@ -54,7 +54,7 @@ function HeartBtn({ route }: { route: WaterRoute }) {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       await removeRouteFromAllGroups(route.id);
       await refresh(route.id);
-      showToast({ type: 'deleted', listName: 'Маршруты', imageUrl: route.map_image_url });
+      showToast({ type: 'deleted', listName: 'Маршруты', imageUrl: resolveRouteImage(route.map_image_url) });
     } else {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
       openRoutePicker({

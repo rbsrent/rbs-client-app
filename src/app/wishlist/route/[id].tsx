@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { getCachedRoutes, setCachedRoutes } from "@/features/routes/store";
+import { getCachedRoutes, setCachedRoutes, setRoutePreview } from "@/features/routes/store";
 import { resolveRouteImage, WaterRoute } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
 import { publicSupabase } from "@/shared/supabase/publicClient";
@@ -25,6 +25,7 @@ import {
     ROUTES_GROUP_ID,
     WishlistGroup,
 } from "@/shared/wishlist";
+import { useWishlistToast } from "@/shared/context/WishlistToastContext";
 import { useRouteSavedStore } from "@/store/useRouteSavedStore";
 
 const W = Dimensions.get("window").width;
@@ -69,8 +70,11 @@ const RouteCard = memo(function RouteCard({
     <Pressable
       style={({ pressed }) => [s.card, pressed && { opacity: 0.92 }]}
       onPress={() => {
-        if (!editing)
-          router.push(`/routes/${route.seo_slug ?? route.id}` as any);
+        if (!editing) {
+          const slug = route.seo_slug ?? route.id;
+          setRoutePreview({ slug, name: route.name, imageUrl: resolveRouteImage(route.map_image_url) });
+          router.push(`/routes/${slug}` as any);
+        }
       }}
     >
       <View style={s.imgWrap}>
@@ -118,8 +122,9 @@ export default function RouteGroupScreen() {
   );
   const [editing, setEditing] = useState(false);
 
-  const refresh    = useRouteSavedStore((s) => s.refresh);
+  const refresh     = useRouteSavedStore((s) => s.refresh);
   const markUnsaved = useRouteSavedStore((s) => s.markUnsaved);
+  const { show: showToast } = useWishlistToast();
 
   const load = useCallback(() => {
     if (!id) return;
@@ -148,14 +153,19 @@ export default function RouteGroupScreen() {
   useFocusEffect(load);
 
   const handleDelete = useCallback(
-    async (routeId: string) => {
+    async (routeId: string, route: WaterRoute) => {
       if (!id) return;
       markUnsaved(routeId);
       setItems((prev) => prev.filter((i) => i.route_id !== routeId));
+      showToast({
+        type: 'deleted',
+        listName: group?.name ?? 'Маршруты',
+        imageUrl: resolveRouteImage(route.map_image_url),
+      });
       await removeRouteFromGroup(id, routeId);
       await refresh(routeId);
     },
-    [id, refresh, markUnsaved],
+    [id, refresh, markUnsaved, showToast, group],
   );
 
   const listData = useMemo<ListRow[]>(() => {
@@ -199,13 +209,13 @@ export default function RouteGroupScreen() {
           <RouteCard
             enriched={item.left}
             editing={editing}
-            onDelete={() => handleDelete(item.left.item.route_id)}
+            onDelete={() => handleDelete(item.left.item.route_id, item.left.route)}
           />
           {item.right ? (
             <RouteCard
               enriched={item.right}
               editing={editing}
-              onDelete={() => handleDelete(item.right!.item.route_id)}
+              onDelete={() => handleDelete(item.right!.item.route_id, item.right!.route)}
             />
           ) : (
             <View style={{ width: CARD_W }} />

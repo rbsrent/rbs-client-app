@@ -1,5 +1,4 @@
-import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   FlatList,
   RefreshControl,
@@ -12,51 +11,45 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
 import { publicSupabase } from '@/shared/supabase/publicClient';
+import { isRoutesStale, useRoutesStore } from '@/store/useRoutesStore';
 
 import { RouteCard } from '../components/RouteCard';
-import { getCachedRoutes, invalidateRoutesCache, setCachedRoutes } from '../store';
 import { WaterRoute } from '../types';
 
 export function RoutesScreen() {
   const insets = useSafeAreaInsets();
-  const [routes,     setRoutes]     = useState<WaterRoute[]>(() => getCachedRoutes() ?? []);
-  const [loading,    setLoading]    = useState(() => !getCachedRoutes());
+  const { routes, loading, setRoutes, setLoading, invalidate } = useRoutesStore();
   const [refreshing, setRefreshing] = useState(false);
+  const fetchingRef = useRef(false);
 
   const fetchRoutes = useCallback(async (force = false) => {
-    if (!force) {
-      const cached = getCachedRoutes();
-      if (cached) {
-        // Skip setState if data is the same reference (cache hit on re-focus)
-        setRoutes((prev) => (prev === cached ? prev : cached));
-        setLoading(false);
-        return;
-      }
-    }
+    if (!force && !isRoutesStale()) return;
+    if (fetchingRef.current) return;
+    fetchingRef.current = true;
     try {
       const { data } = await publicSupabase
         .from('water_routes')
         .select('*')
         .eq('is_active', true)
         .order('display_order', { ascending: true });
-      const list = (data as WaterRoute[]) ?? [];
-      setCachedRoutes(list);
-      setRoutes(list);
-    } finally {
+      setRoutes((data as WaterRoute[]) ?? []);
+    } catch {
       setLoading(false);
+    } finally {
       setRefreshing(false);
+      fetchingRef.current = false;
     }
-  }, []);
+  }, [setRoutes, setLoading]);
 
-  useFocusEffect(useCallback(() => {
+  useEffect(() => {
     fetchRoutes(false);
-  }, [fetchRoutes]));
+  }, []); // Zustand state persists across tab switches — no re-fetch on focus
 
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
-    invalidateRoutesCache();
+    invalidate();
     fetchRoutes(true);
-  }, [fetchRoutes]);
+  }, [fetchRoutes, invalidate]);
 
   const renderRoute = useCallback(
     ({ item }: { item: WaterRoute }) => <RouteCard route={item} />,

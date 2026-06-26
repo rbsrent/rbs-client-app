@@ -7,7 +7,7 @@ import { fmtDateFull } from '@/shared/components/CalendarPicker';
 import { PhoneInput } from '@/shared/components/PhoneInput';
 
 import { Pier } from '../types';
-import { durLabel, fmtHour, ruFmt } from '../utils';
+import { durLabel, fmtHour, fmtHourLabel, ruFmt } from '../utils';
 import { FormField, SummaryRow, shared } from './BookingRows';
 
 // ─── Props ────────────────────────────────────────────────────────────────────
@@ -51,7 +51,7 @@ export function BookingStep3({
       <View style={shared.summaryCard}>
         <Text style={shared.summaryCardTitle}>Сводка бронирования</Text>
         <SummaryRow label="Дата"              value={fmtDateFull(date)} />
-        <SummaryRow label="Время"             value={`${fmtHour(startHour)} – ${fmtHour(startHour + duration)}`} />
+        <SummaryRow label="Время"             value={`${fmtHour(startHour)} – ${fmtHourLabel(startHour + duration)}`} />
         <SummaryRow label="Продолжительность" value={durLabel(duration)} />
         {selectedPier && <SummaryRow label="Причал"  value={selectedPier.name} />}
         {selectedPier?.address && <SummaryRow label="Адрес" value={selectedPier.address} />}

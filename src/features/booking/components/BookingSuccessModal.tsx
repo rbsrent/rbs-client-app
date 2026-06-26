@@ -98,13 +98,12 @@ export function BookingSuccessModal({ visible, data, onClose }: Props) {
       <Animated.View
         style={[s.sheet, { paddingBottom: insets.bottom + 16 }, sheetStyle]}
       >
-        <Pressable
-          style={[s.closeBtn, { top: insets.top + 12 }]}
-          onPress={onClose}
-          hitSlop={10}
-        >
-          <X size={18} color={COLORS.text2} strokeWidth={2} />
-        </Pressable>
+        {/* Fixed topbar — always above scroll content */}
+        <View style={s.topBar}>
+          <Pressable style={s.closeBtn} onPress={onClose} hitSlop={10}>
+            <X size={18} color={COLORS.text2} strokeWidth={2} />
+          </Pressable>
+        </View>
 
         <ScrollView
           showsVerticalScrollIndicator={false}
@@ -262,10 +261,14 @@ const s = StyleSheet.create({
     borderTopRightRadius: 24,
     maxHeight: "92%",
   },
+  topBar: {
+    height: 52,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingHorizontal: 16,
+  },
   closeBtn: {
-    position: "absolute",
-    right: 16,
-    zIndex: 10,
     width: 36,
     height: 36,
     borderRadius: 18,
@@ -273,7 +276,7 @@ const s = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  scroll: { paddingTop: 8, paddingHorizontal: 16 },
+  scroll: { paddingTop: 0, paddingHorizontal: 16 },
 
   heroBox: { alignItems: "center", paddingVertical: 28, gap: 8 },
   successIconWrap: {

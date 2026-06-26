@@ -1,7 +1,7 @@
 import { BottomSheetModal } from '@gorhom/bottom-sheet';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
-import React, { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -12,9 +12,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useHomeData } from '@/features/home/hooks/useHomeData';
 import { COLORS } from '@/shared/colors';
-import { clearSelectedDate, saveSelectedDate } from '@/shared/selectedDate';
 import { ScreenHeader } from '@/shared/components/ScreenHeader';
 import { Spinner } from '@/shared/components/Spinner';
+import { clearSelectedDate, saveSelectedDate } from '@/shared/selectedDate';
 import { Boat } from '@/store/useCatalogStore';
 
 import { PromoCard } from '../../home/components/PromoCard';
@@ -38,11 +38,11 @@ export function AllBoatsScreen() {
   const filterRef = useRef<BottomSheetModal>(null);
 
   // Per-section mini sheet refs
-  const typeSheetRef  = useRef<BottomSheetModal>(null);
+  const typeSheetRef = useRef<BottomSheetModal>(null);
   const priceSheetRef = useRef<BottomSheetModal>(null);
-  const capSheetRef   = useRef<BottomSheetModal>(null);
-  const amenSheetRef  = useRef<BottomSheetModal>(null);
-  const durSheetRef   = useRef<BottomSheetModal>(null);
+  const capSheetRef = useRef<BottomSheetModal>(null);
+  const amenSheetRef = useRef<BottomSheetModal>(null);
+  const durSheetRef = useRef<BottomSheetModal>(null);
 
   // ── Initial filters from URL params ──
   const initialFilters = useMemo<Filters>(() => {
@@ -62,10 +62,10 @@ export function AllBoatsScreen() {
 
   // ── State ──
   const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
-  const [draft, setDraft]           = useState<Filters>(initialFilters);
-  const [sortBy, setSortBy]         = useState<SortBy>('popular');
+  const [draft, setDraft] = useState<Filters>(initialFilters);
+  const [sortBy, setSortBy] = useState<SortBy>('popular');
 
-  const total     = allBoats.length;
+  const total = allBoats.length;
   const hasActive = countActive(filters) > 0;
 
   // ── Filter & sort ──
@@ -131,11 +131,11 @@ export function AllBoatsScreen() {
   const openFilter = useCallback((section: FilterSection) => {
     setDraft(filters);
     switch (section) {
-      case 'type':      typeSheetRef.current?.present();  break;
-      case 'price':     priceSheetRef.current?.present(); break;
-      case 'capacity':  capSheetRef.current?.present();   break;
-      case 'amenities': amenSheetRef.current?.present();  break;
-      case 'duration':  durSheetRef.current?.present();   break;
+      case 'type': typeSheetRef.current?.present(); break;
+      case 'price': priceSheetRef.current?.present(); break;
+      case 'capacity': capSheetRef.current?.present(); break;
+      case 'amenities': amenSheetRef.current?.present(); break;
+      case 'duration': durSheetRef.current?.present(); break;
     }
   }, [filters]);
 
@@ -145,8 +145,8 @@ export function AllBoatsScreen() {
 
   const handleWeekDate = useCallback((date: Date | null) => {
     setFilters((f) => ({ ...f, dateTime: { ...f.dateTime, date } }));
-    if (date) saveSelectedDate(date).catch(() => {});
-    else clearSelectedDate().catch(() => {});
+    if (date) saveSelectedDate(date).catch(() => { });
+    else clearSelectedDate().catch(() => { });
   }, []);
 
   const renderBoat = useCallback(
@@ -294,9 +294,9 @@ export function AllBoatsScreen() {
 }
 
 const s = StyleSheet.create({
-  root:      { flex: 1, backgroundColor: COLORS.white },
+  root: { flex: 1, backgroundColor: COLORS.white },
   searchBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
-  loader:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list:      { gap: 12 },
-  row:       { gap: 12, paddingHorizontal: 16 },
+  loader: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  list: { gap: 12 },
+  row: { gap: 12, paddingHorizontal: 16 },
 });

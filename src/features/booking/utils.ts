@@ -9,7 +9,11 @@ const DAY_NAMES_RU = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
 // ─── Pure helpers ─────────────────────────────────────────────────────────────
 
 export function fmtHour(h: number): string {
-  return `${String(h).padStart(2, '0')}:00`;
+  return `${String(h % 24).padStart(2, '0')}:00`;
+}
+
+export function fmtHourLabel(h: number): string {
+  return h >= 24 ? `${fmtHour(h)} +1` : fmtHour(h);
 }
 
 export function fmtShort(d: Date): string {

@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import { memo, useState } from 'react';
 import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { setRoutePreview } from '@/features/routes/store';
 import { COLORS } from '@/shared/colors';
 import { SUPABASE_URL } from '@/shared/supabase/publicClient';
 import { HomeRoute } from '@/store/useHomeStore';
@@ -42,7 +43,11 @@ export const HomeRouteCard = memo(function HomeRouteCard({ route }: { route: Hom
   return (
     <Pressable
       style={({ pressed }) => [s.card, pressed && { opacity: 0.92 }]}
-      onPress={() => router.push(`/routes/${route.seo_slug ?? route.id}` as any)}
+      onPress={() => {
+        const slug = route.seo_slug ?? route.id;
+        setRoutePreview({ slug, name: route.name, imageUrl });
+        router.push(`/routes/${slug}` as any);
+      }}
     >
       {imageUrl && !imgErr ? (
         <Image

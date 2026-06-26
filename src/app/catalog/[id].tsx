@@ -466,10 +466,12 @@ export default function BoatDetailScreen() {
           priceNight={boat.public_price_per_hour_night}
           discount={activeDiscount}
           onBook={() => {
-            const params = selectedDate
-              ? `?boatId=${boat.id}&date=${selectedDate}`
-              : `?boatId=${boat.id}`;
-            router.push(`/booking/date-select${params}` as any);
+            const p = new URLSearchParams({ boatId: boat.id });
+            if (selectedDate) p.set("date", selectedDate);
+            p.set("boatName", getBoatH1(boat));
+            if (boat.piers?.name) p.set("pierName", boat.piers.name);
+            if (boat.piers?.address) p.set("pierAddress", boat.piers.address);
+            router.push(`/booking/date-select?${p.toString()}` as any);
           }}
           paddingBottom={insets.bottom + 8}
         />

@@ -10,6 +10,7 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { buildBoatH1 } from "@/features/catalog/hooks/useBoatDetail";
 import { computeSlotSelection } from "@/features/booking/utils";
 import { COLORS } from "@/shared/colors";
 import { CalendarPicker } from "@/shared/components/CalendarPicker";
@@ -36,20 +37,34 @@ function fmtDateShort(d: Date) {
   return `${d.getDate()} ${MONTHS_S[d.getMonth()]}, ${DAYS_S[d.getDay()]}`;
 }
 function fmtHour(h: number) {
-  return `${String(h).padStart(2, "0")}:00`;
+  return `${String(h % 24).padStart(2, "0")}:00`;
+}
+function fmtTimeLabel(h: number) {
+  return h >= 24 ? `${fmtHour(h)} +1` : fmtHour(h);
 }
 function durLabel(h: number) {
   return h === 1 ? "1 час" : h < 5 ? `${h} часа` : `${h} часов`;
 }
 
 const COLS = 4;
+const EXTRA_HOURS = 6; // allow booking up to 06:00 next day
+const TOTAL_HOURS = 24 + EXTRA_HOURS;
 
 export default function DateSelectScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { boatId, date: dateParam } = useLocalSearchParams<{
+  const {
+    boatId,
+    date: dateParam,
+    boatName: boatNameParam,
+    pierName: pierNameParam,
+    pierAddress: pierAddressParam,
+  } = useLocalSearchParams<{
     boatId: string;
     date?: string;
+    boatName?: string;
+    pierName?: string;
+    pierAddress?: string;
   }>();
 
   const [date, setDate] = useState<Date>(() => {
@@ -69,22 +84,28 @@ export default function DateSelectScreen() {
   const [busyHours, setBusyHours] = useState<Set<number>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
-  const [boatName, setBoatName] = useState<string | null>(null);
-  const [pierName, setPierName] = useState<string | null>(null);
-  const [pierAddress, setPierAddress] = useState<string | null>(null);
+  const [boatName, setBoatName] = useState<string | null>(
+    boatNameParam ?? null,
+  );
+  const [pierName, setPierName] = useState<string | null>(
+    pierNameParam ?? null,
+  );
+  const [pierAddress, setPierAddress] = useState<string | null>(
+    pierAddressParam ?? null,
+  );
 
-  // Fetch boat name + pier
+  // Fetch boat name + pier (silent background update; params already pre-fill UI)
   useEffect(() => {
     if (!boatId) return;
     void (async () => {
       try {
         const { data } = await publicSupabase
           .from("boats")
-          .select("name, piers(name, address)")
+          .select("name, seo_h1, seo_name_ru, type, piers(name, address)")
           .eq("id", boatId)
           .single();
         if (data) {
-          setBoatName((data as any).name ?? null);
+          setBoatName(buildBoatH1(data as any));
           const pier = (data as any).piers;
           if (pier) {
             setPierName(pier.name ?? null);
@@ -134,23 +155,26 @@ export default function DateSelectScreen() {
 
     const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
-    const dayEnd = new Date(date);
-    dayEnd.setHours(23, 59, 59, 999);
+    const rangeEnd = new Date(dayStart.getTime() + TOTAL_HOURS * 3600_000);
 
     void (async () => {
       try {
         const { data } = await publicSupabase.rpc("get_boat_busy_slots", {
           p_boat_id: boatId,
           p_start_datetime: dayStart.toISOString(),
-          p_end_datetime: dayEnd.toISOString(),
+          p_end_datetime: rangeEnd.toISOString(),
         });
         if (cancelled) return;
         const busy = new Set<number>();
+        const dayStartMs = dayStart.getTime();
         (data ?? []).forEach(
           (slot: { start_datetime: string; end_datetime: string }) => {
-            const s = new Date(slot.start_datetime);
-            const e = new Date(slot.end_datetime);
-            for (let h = s.getHours(); h < e.getHours(); h++) busy.add(h);
+            const sMs = new Date(slot.start_datetime).getTime();
+            const eMs = new Date(slot.end_datetime).getTime();
+            const startH = Math.floor((sMs - dayStartMs) / 3_600_000);
+            const endH = Math.floor((eMs - dayStartMs) / 3_600_000);
+            for (let h = Math.max(0, startH); h < Math.min(TOTAL_HOURS, endH); h++)
+              busy.add(h);
           },
         );
         setBusyHours(busy);
@@ -168,9 +192,11 @@ export default function DateSelectScreen() {
   const unavailable = useCallback(
     (hour: number): boolean => {
       if (busyHours.has(hour)) return true;
-      const now = new Date();
-      if (date.toDateString() === now.toDateString() && hour <= now.getHours())
-        return true;
+      if (hour < 24) {
+        const now = new Date();
+        if (date.toDateString() === now.toDateString() && hour <= now.getHours())
+          return true;
+      }
       return false;
     },
     [busyHours, date],
@@ -305,7 +331,7 @@ export default function DateSelectScreen() {
             </View>
           ) : (
             <View style={s.grid}>
-              {Array.from({ length: 24 }, (_, hour) => {
+              {Array.from({ length: TOTAL_HOURS }, (_, hour) => {
                 const busy = busyHours.has(hour);
                 const past = unavailable(hour) && !busy;
                 const off = busy || past;
@@ -313,6 +339,7 @@ export default function DateSelectScreen() {
                 const isFirst = selected && hour === selectedHours[0];
                 const isLast =
                   selected && hour === selectedHours[selectedHours.length - 1];
+                const isNextDay = hour >= 24;
 
                 return (
                   <Pressable
@@ -338,6 +365,9 @@ export default function DateSelectScreen() {
                     >
                       {fmtHour(hour)}
                     </Text>
+                    {isNextDay && !busy && (
+                      <Text style={[s.nextDayBadge, selected && s.nextDayBadgeSel]}>+1</Text>
+                    )}
                     {isFirst && !isLast && <View style={s.slotDot} />}
                     {(isLast || (isFirst && isLast)) && (
                       <Check size={11} color="#fff" strokeWidth={3} />
@@ -356,7 +386,7 @@ export default function DateSelectScreen() {
         <View style={s.selectionInfo}>
           <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
           <Text style={s.selTxt}>
-            {startH != null ? fmtHour(startH) : "–"} – {endH != null ? fmtHour(endH) : "–"}
+            {startH != null ? fmtHour(startH) : "–"} – {endH != null ? fmtTimeLabel(endH) : "–"}
           </Text>
           <View style={s.durBadge}>
             <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
@@ -465,6 +495,8 @@ const s = StyleSheet.create({
   slotTxtOff: { color: "#C09090", fontWeight: "400" },
   slotTxtSel: { color: "#fff" },
   slotBusyLbl: { fontSize: 9, color: "#C09090" },
+  nextDayBadge: { fontSize: 9, fontWeight: "700", color: COLORS.brandNavy, lineHeight: 11 },
+  nextDayBadgeSel: { color: "rgba(255,255,255,0.8)" },
   slotDot: {
     width: 5,
     height: 5,

@@ -3,10 +3,10 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { RefreshCw, Send, X } from "lucide-react-native";
 import { useCallback, useMemo, useRef, useState } from "react";
-import Animated, { FadeIn } from "react-native-reanimated";
 import {
   FlatList,
   KeyboardAvoidingView,
+  LayoutChangeEvent,
   ListRenderItem,
   Platform,
   Pressable,
@@ -15,6 +15,7 @@ import {
   TextInput,
   View,
 } from "react-native";
+import Animated, { FadeIn } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
@@ -47,15 +48,17 @@ export function AIChatScreen() {
   } = useAIChat();
 
   const [input, setInput] = useState("");
+  const [headerH, setHeaderH] = useState(0);
   const listRef = useRef<FlatList<ListItem>>(null);
 
   const canSend = input.trim().length > 0 && !isLoading;
 
-  // Typing bubble injected as last list item when loading
-  const listData = useMemo<ListItem[]>(
-    () => (isLoading ? [...messages, { id: TYPING_ID, _typing: true }] : messages),
-    [messages, isLoading]
-  );
+  // Inverted list: newest at bottom, typing bubble at bottom-most
+  const listData = useMemo<ListItem[]>(() => {
+    const reversed = [...messages].reverse();
+    if (isLoading) return [{ id: TYPING_ID, _typing: true }, ...reversed];
+    return reversed;
+  }, [messages, isLoading]);
 
   const renderItem: ListRenderItem<ListItem> = useCallback(
     ({ item }) => {
@@ -74,10 +77,6 @@ export function AIChatScreen() {
     [PERSONA_AVATAR]
   );
 
-  const scrollToBottom = useCallback(() => {
-    listRef.current?.scrollToEnd({ animated: true });
-  }, []);
-
   const handleSend = useCallback(() => {
     const text = input.trim();
     if (!text || isLoading) return;
@@ -85,14 +84,23 @@ export function AIChatScreen() {
     sendMessage(text);
   }, [input, isLoading, sendMessage]);
 
+  const onHeaderLayout = useCallback((e: LayoutChangeEvent) => {
+    setHeaderH(e.nativeEvent.layout.height);
+  }, []);
+
   return (
-    <View style={s.root}>
+    <KeyboardAvoidingView
+      style={s.root}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+      keyboardVerticalOffset={headerH}
+    >
       {/* Header */}
       <LinearGradient
         colors={[COLORS.brandNavy, COLORS.brandCyan]}
         start={{ x: 0, y: 0 }}
         end={{ x: 1, y: 0 }}
         style={s.header}
+        onLayout={onHeaderLayout}
       >
         <View style={s.headerLeft}>
           <Image source={{ uri: PERSONA_AVATAR }} style={s.headerAvatar} contentFit="cover" />
@@ -113,67 +121,63 @@ export function AIChatScreen() {
         </View>
       </LinearGradient>
 
-      <KeyboardAvoidingView
-        style={s.flex}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={0}
-      >
-        <FlatList
-          ref={listRef}
-          data={listData}
-          keyExtractor={keyExtractor}
-          renderItem={renderItem}
-          contentContainerStyle={s.list}
-          onContentSizeChange={scrollToBottom}
-          showsVerticalScrollIndicator={false}
-          removeClippedSubviews={Platform.OS === "android"}
-          maxToRenderPerBatch={8}
-          updateCellsBatchingPeriod={50}
-          windowSize={7}
-          initialNumToRender={20}
-        />
+      <FlatList
+        ref={listRef}
+        data={listData}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        contentContainerStyle={s.list}
+        inverted
+        keyboardDismissMode="on-drag"
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        removeClippedSubviews={Platform.OS === "android"}
+        maxToRenderPerBatch={8}
+        updateCellsBatchingPeriod={50}
+        windowSize={7}
+        initialNumToRender={20}
+      />
 
-        {isAdminMode && (
-          <View style={s.adminBanner}>
-            <Text style={s.adminText}>Менеджер подключился к чату</Text>
-          </View>
-        )}
-
-        <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>
-          <TextInput
-            style={s.input}
-            value={input}
-            onChangeText={setInput}
-            placeholder={inputPlaceholder}
-            placeholderTextColor={COLORS.text3}
-            multiline
-            maxLength={500}
-            returnKeyType="default"
-          />
-          <Pressable
-            style={canSend ? s.sendBtn : s.sendBtnDisabled}
-            onPress={handleSend}
-            disabled={!canSend}
-            hitSlop={4}
-          >
-            <Send size={18} color={COLORS.white} strokeWidth={2} />
-          </Pressable>
+      {isAdminMode && (
+        <View style={s.adminBanner}>
+          <Text style={s.adminText}>Менеджер подключился к чату</Text>
         </View>
-      </KeyboardAvoidingView>
-    </View>
+      )}
+
+      <View style={[s.inputRow, { paddingBottom: insets.bottom + 8 }]}>
+        <TextInput
+          style={s.input}
+          value={input}
+          onChangeText={setInput}
+          placeholder={inputPlaceholder}
+          placeholderTextColor={COLORS.text3}
+          multiline
+          maxLength={500}
+          returnKeyType="default"
+        />
+        <Pressable
+          style={canSend ? s.sendBtn : s.sendBtnDisabled}
+          onPress={handleSend}
+          disabled={!canSend}
+          hitSlop={4}
+        >
+          <Send size={18} color={COLORS.white} strokeWidth={2} />
+        </Pressable>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
 const s = StyleSheet.create({
   root: { flex: 1, backgroundColor: COLORS.white },
-  flex: { flex: 1 },
 
   header: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 14,
+    paddingBottom: 12,
   },
   headerLeft: { flexDirection: "row", alignItems: "center", gap: 10 },
   headerAvatar: {

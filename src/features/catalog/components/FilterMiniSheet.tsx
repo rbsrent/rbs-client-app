@@ -83,6 +83,9 @@ export const FilterMiniSheet: React.FC<Props> = ({
       enablePanDownToClose
       backdropComponent={SheetBackdrop}
       backgroundStyle={s.sheetBg}
+      keyboardBehavior="extend"
+      keyboardBlurBehavior="restore"
+      android_keyboardInputMode="adjustResize"
       handleComponent={() => (
         <View style={s.handleWrap}>
           <View style={s.handle} />
@@ -130,9 +133,13 @@ export const FilterMiniSheet: React.FC<Props> = ({
                   style={s.priceInput}
                   placeholder="0"
                   placeholderTextColor={COLORS.text3}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   value={draft.priceMin !== null ? String(draft.priceMin) : ''}
-                  onChangeText={(v) => onDraftChange({ ...draft, priceMin: v ? Number(v) : null })}
+                  onChangeText={(v) => {
+                    const digits = v.replace(/[^0-9]/g, '');
+                    const num = digits ? parseInt(digits, 10) : null;
+                    onDraftChange({ ...draft, priceMin: num });
+                  }}
                 />
               </View>
               <View style={s.priceDash} />
@@ -142,9 +149,13 @@ export const FilterMiniSheet: React.FC<Props> = ({
                   style={s.priceInput}
                   placeholder="∞"
                   placeholderTextColor={COLORS.text3}
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   value={draft.priceMax !== null ? String(draft.priceMax) : ''}
-                  onChangeText={(v) => onDraftChange({ ...draft, priceMax: v ? Number(v) : null })}
+                  onChangeText={(v) => {
+                    const digits = v.replace(/[^0-9]/g, '');
+                    const num = digits ? parseInt(digits, 10) : null;
+                    onDraftChange({ ...draft, priceMax: num });
+                  }}
                 />
               </View>
             </View>
@@ -280,10 +291,8 @@ const s = StyleSheet.create({
     gap: 8,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    backgroundColor: COLORS.backgroundAlt,
+    backgroundColor: COLORS.greyLight,
     borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
   },
   priceLabel: { fontSize: 13, color: COLORS.text3, fontWeight: '500' },
   priceInput: { flex: 1, fontSize: 14, color: COLORS.text1, padding: 0 },

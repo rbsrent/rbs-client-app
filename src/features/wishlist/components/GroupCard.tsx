@@ -1,3 +1,4 @@
+import { resolveRouteImage } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
 import {
   DEFAULT_GROUP_ID,
@@ -23,7 +24,10 @@ export function GroupCard({
   onDelete: () => void;
 }) {
   const isEmpty = group.item_count === 0;
-  const cover = group.preview_urls[0] ?? null;
+  const rawCover = group.preview_urls[0] ?? null;
+  const cover = rawCover
+    ? (isRoute ? resolveRouteImage(rawCover) : rawCover)
+    : null;
   const isDeletable =
     group.id !== DEFAULT_GROUP_ID && group.id !== ROUTES_GROUP_ID;
 

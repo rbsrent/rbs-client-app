@@ -28,9 +28,11 @@ export const ChatBubble = memo(function ChatBubble({ message }: Props) {
   if (isUser) {
     return (
       <Animated.View entering={FadeIn.duration(220)} style={s.rowUser}>
-        <View style={s.bubbleUser}>
+        <View style={[s.bubbleUser, message.queued && s.bubbleQueued]}>
           <Text style={s.textUser}>{message.content}</Text>
-          <Text style={s.timeUser}>{time}</Text>
+          <Text style={s.timeUser}>
+            {message.queued ? "⏳ не отправлено" : time}
+          </Text>
         </View>
       </Animated.View>
     );
@@ -77,6 +79,9 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
     paddingTop: 10,
     paddingBottom: 6,
+  },
+  bubbleQueued: {
+    opacity: 0.65,
   },
   // Solid color instead of LinearGradient — removes GPU compositing layer per bubble
   bubbleBot: {

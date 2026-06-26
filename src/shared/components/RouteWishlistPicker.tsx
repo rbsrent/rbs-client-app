@@ -101,7 +101,7 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
     showToast({
       type: 'saved',
       listName: groupName,
-      imageUrl: route.map_image_url,
+      imageUrl: resolveRouteImage(route.map_image_url ?? null),
     });
     sheetRef.current?.dismiss();
   };
@@ -125,7 +125,7 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
 
           {groups.map((g) => {
             const checked = inGroups.has(g.id);
-            const cover   = g.preview_urls[0] ?? null;
+            const cover   = g.preview_urls[0] ? resolveRouteImage(g.preview_urls[0]) : null;
             return (
               <Pressable
                 key={g.id}

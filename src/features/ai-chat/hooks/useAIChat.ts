@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AppState } from "react-native";
 
 import {
   publicSupabase,
@@ -17,6 +18,7 @@ export interface ChatMessage {
   created_at: string;
   boat_cards?: any[];
   pending?: boolean;
+  queued?: boolean;
 }
 
 const SESSION_KEY = "ai_chat_session_id";
@@ -95,10 +97,11 @@ async function persistMessage(
 }
 
 function cacheMessages(msgs: ChatMessage[]) {
-  // Strip pending flag and boat_cards from cache to keep it lean
   const toSave = msgs
-    .filter((m) => !m.pending)
-    .map(({ id, role, content, created_at }) => ({ id, role, content, created_at }));
+    .filter((m) => !m.pending || m.queued)
+    .map(({ id, role, content, created_at, queued }) => ({
+      id, role, content, created_at, ...(queued ? { queued: true } : {}),
+    }));
   AsyncStorage.setItem(MESSAGES_CACHE_KEY, JSON.stringify(toSave)).catch(() => {});
 }
 
@@ -113,9 +116,10 @@ export function useAIChat() {
   const historyRef = useRef<{ role: MessageRole; content: string }[]>([]);
   const contactNameRef = useRef<string | null>(null);
   const sessionIdRef = useRef<string | null>(null);
+  const messagesRef = useRef<ChatMessage[]>([]);
 
-  // Persist to AsyncStorage whenever messages change (skip pending)
   useEffect(() => {
+    messagesRef.current = messages;
     if (messages.length === 0) return;
     cacheMessages(messages);
   }, [messages]);
@@ -388,7 +392,7 @@ export function useAIChat() {
         }
       } catch {
         setMessages((prev) =>
-          prev.map((m) => (m.id === tempId ? { ...m, pending: false } : m))
+          prev.map((m) => (m.id === tempId ? { ...m, pending: false, queued: true } : m))
         );
       } finally {
         setIsLoading(false);
@@ -427,6 +431,56 @@ export function useAIChat() {
       .then(() => persistMessage(sid, "assistant", WELCOME_TEXT))
       .catch(() => {});
   }, []);
+
+  const flushQueue = useCallback(async () => {
+    const sid = sessionIdRef.current;
+    if (!sid) return;
+    const queued = messagesRef.current.filter((m) => m.queued && m.role === "user");
+    if (queued.length === 0) return;
+
+    for (const msg of queued) {
+      try {
+        const res = await fetch(`${SUPABASE_URL}/functions/v1/ai-chat-assistant`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+          },
+          body: JSON.stringify({
+            message: msg.content,
+            sessionId: sid,
+            conversationHistory: historyRef.current.slice(-20),
+          }),
+        });
+        const data = await res.json();
+        if (data?.response) {
+          const botMsg: ChatMessage = {
+            id: generateId(),
+            role: "assistant",
+            content: data.response,
+            created_at: new Date().toISOString(),
+            boat_cards: data.boats_with_photos ?? undefined,
+          };
+          setMessages((prev) => {
+            const next = prev.map((m) =>
+              m.id === msg.id ? { ...m, queued: false } : m
+            );
+            return [...next, botMsg];
+          });
+          historyRef.current.push({ role: "assistant", content: data.response });
+        }
+      } catch {
+        break;
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (state) => {
+      if (state === "active") flushQueue();
+    });
+    return () => sub.remove();
+  }, [flushQueue]);
 
   const inputPlaceholder =
     contactStep === "name"
