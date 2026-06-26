@@ -13,16 +13,16 @@ import { Booking } from "../types";
 const _RU_FMT = new Intl.NumberFormat("ru-RU");
 
 const STATUS_LABELS: Record<string, { label: string; color: string }> = {
-  pending_payment:  { label: "Ожидает оплаты",      color: COLORS.warning },
-  pending:          { label: "Ожидает оплаты",      color: COLORS.warning },
-  partially_paid:   { label: "Частично оплачено",   color: COLORS.brandCyan },
-  confirmed:        { label: "Подтверждено",         color: COLORS.success },
-  paid:             { label: "Оплачено",             color: COLORS.success },
-  fully_paid:       { label: "Оплачено",             color: COLORS.success },
-  client_confirmed: { label: "Подтверждено",         color: COLORS.success },
-  client_arrived:   { label: "Клиент прибыл",        color: COLORS.brandViolet },
-  completed:        { label: "Завершено",             color: COLORS.text3 },
-  cancelled:        { label: "Отменено",              color: COLORS.error },
+  pending_payment: { label: "Ожидает оплаты", color: COLORS.warning },
+  pending: { label: "Ожидает оплаты", color: COLORS.warning },
+  partially_paid: { label: "Частично оплачено", color: COLORS.brandCyan },
+  confirmed: { label: "Подтверждено", color: COLORS.success },
+  paid: { label: "Оплачено", color: COLORS.success },
+  fully_paid: { label: "Оплачено", color: COLORS.success },
+  client_confirmed: { label: "Подтверждено", color: COLORS.success },
+  client_arrived: { label: "Клиент прибыл", color: COLORS.brandViolet },
+  completed: { label: "Завершено", color: COLORS.text3 },
+  cancelled: { label: "Отменено", color: COLORS.error },
 };
 
 function bookingShortId(id: string) {
@@ -85,7 +85,7 @@ export const BookingCard = memo(function BookingCard({
 
   const handleCTA = () => {
     if (isPendingPayment) {
-      router.push(`/bookings/${booking.id}` as any);
+      router.push(`/bookings/${booking.id}?status=${booking.booking_status}` as any);
     } else if (isUpcoming && isPaid) {
       const addr = booking.pier_address ?? booking.pier_name ?? "";
       const mapsUrl = `https://maps.apple.com/?q=${encodeURIComponent(addr)}`;
@@ -118,7 +118,7 @@ export const BookingCard = memo(function BookingCard({
   return (
     <Pressable
       style={styles.card}
-      onPress={() => router.push(`/bookings/${booking.id}` as any)}
+      onPress={() => router.push(`/bookings/${booking.id}?status=${booking.booking_status}` as any)}
     >
       {/* ── Top row: ID + status ── */}
       <View style={styles.cardTopRow}>
@@ -209,13 +209,13 @@ export const BookingCard = memo(function BookingCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: COLORS.white,
+    backgroundColor: COLORS.greyLight,
     borderRadius: 16,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    elevation: 3,
+    // shadowColor: "#000",
+    // shadowOffset: { width: 0, height: 2 },
+    // shadowOpacity: 0.07,
+    // shadowRadius: 8,
+    // elevation: 3,
     marginBottom: 4,
   },
   cardTopRow: {
@@ -225,7 +225,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
   },
-  bookingId: { fontSize: 13, fontWeight: "600", color: COLORS.text2 },
+  bookingId: { fontSize: 13, fontWeight: "600", color: COLORS.brandNavy },
   statusBadge: {
     borderRadius: 8,
     paddingHorizontal: 10,

@@ -5,7 +5,6 @@ import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FlatList,
   Pressable,
-  RefreshControl,
   StyleSheet,
   View,
 } from 'react-native';
@@ -56,26 +55,18 @@ export function AllBoatsScreen() {
   const [filters, setFilters] = useState<Filters>(initialFilters);
 
   // ── Data ──
-  const { boats: allBoats, isLoadingBoats: loading, refetch } = useHomeData();
+  const { boats: allBoats, isLoadingBoats: loading } = useHomeData();
   const allPiers = usePiersCache();
   const { availMap, loading: availLoading } = useAvailabilityCache(filters.dateTime);
   const discountsMap = useDiscountsCache();
 
   // ── State ──
-  const [refreshing, setRefreshing] = useState(false);
-  const [viewMode, setViewMode]     = useState<'list' | 'map'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'map'>('list');
   const [draft, setDraft]           = useState<Filters>(initialFilters);
   const [sortBy, setSortBy]         = useState<SortBy>('popular');
 
   const total     = allBoats.length;
   const hasActive = countActive(filters) > 0;
-
-  // ── Refresh ──
-  const handleRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await refetch();
-    setRefreshing(false);
-  }, [refetch]);
 
   // ── Filter & sort ──
   const applyBoatFilter = useCallback((f: Filters) => {
@@ -243,9 +234,6 @@ export function AllBoatsScreen() {
         maxToRenderPerBatch={4}
         windowSize={5}
         scrollEnabled={!loading}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={COLORS.brandNavy} />
-        }
         ListHeaderComponent={listHeader as any}
         ListEmptyComponent={ListEmpty}
       />
@@ -309,6 +297,6 @@ const s = StyleSheet.create({
   root:      { flex: 1, backgroundColor: COLORS.white },
   searchBtn: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center' },
   loader:    { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  list:      { gap: 12, paddingHorizontal: 16 },
-  row:       { gap: 12 },
+  list:      { gap: 12 },
+  row:       { gap: 12, paddingHorizontal: 16 },
 });

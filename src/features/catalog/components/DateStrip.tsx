@@ -18,7 +18,8 @@ import { COLORS } from "@/shared/colors";
 import { MONTHS_RU } from "../constants";
 
 const SCREEN_W = Dimensions.get("window").width;
-const CELL_W = Math.round(SCREEN_W / 9);
+const STRIP_PADDING_LEFT = 16;
+const CELL_W = Math.round((SCREEN_W - STRIP_PADDING_LEFT) / 9);
 const TOTAL_DAYS = 240;
 const DAY_RU = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
 const RED = "#E04747";
@@ -352,6 +353,7 @@ const s = StyleSheet.create({
   wrap: {
     paddingTop: 6,
     paddingBottom: 8,
+    paddingLeft: 16,
   },
   wrapDisabled: {
     opacity: 0.4,
@@ -365,7 +367,7 @@ const s = StyleSheet.create({
 
   monthLabel: {
     position: "absolute",
-    left: 16,
+    left: 0,
     top: 0,
     fontSize: 14,
     fontWeight: "500",
@@ -374,7 +376,7 @@ const s = StyleSheet.create({
 
   secLabel: {
     position: "absolute",
-    left: 16,
+    left: 0,
     top: 0,
     fontSize: 14,
     fontWeight: "500",

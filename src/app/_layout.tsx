@@ -10,6 +10,8 @@ import { PersistGate } from 'redux-persist/integration/react';
 import { authSupabase } from '@/shared/supabase/authClient';
 import { PendingPaymentProvider } from '@/shared/context/PendingPaymentContext';
 import { WishlistToastProvider } from '@/shared/context/WishlistToastContext';
+import { BookingSuccessProvider } from '@/shared/context/BookingSuccessContext';
+import { BookingSuccessModalGlobal } from '@/shared/components/BookingSuccessModalGlobal';
 import { PendingPaymentOverlay } from '@/shared/components/PendingPaymentOverlay';
 import { WishlistToast } from '@/shared/components/WishlistToast';
 import { WishlistPickerProvider } from '@/shared/components/WishlistPickerContext';
@@ -132,6 +134,7 @@ export default function RootLayout() {
         <PersistGate loading={null} persistor={persistor}>
           <BottomSheetModalProvider>
             <WishlistToastProvider>
+          <BookingSuccessProvider>
           <PendingPaymentProvider>
             <WishlistPickerProvider>
             <RouteWishlistPickerProvider>
@@ -148,7 +151,7 @@ export default function RootLayout() {
               <Stack.Screen name="permissions/auth-gate" options={{ animation: 'fade', gestureEnabled: false }} />
               <Stack.Screen name="(tabs)" options={{ gestureEnabled: false }} />
               <Stack.Screen name="auth" options={{ presentation: 'modal', gestureEnabled: true }} />
-              <Stack.Screen name="catalog" options={{ animation: 'slide_from_bottom', headerShown: false }} />
+              <Stack.Screen name="catalog" options={{ animation: 'slide_from_right', headerShown: false }} />
               <Stack.Screen name="booking/[boatId]" options={{ presentation: 'card', gestureEnabled: false, animation: 'slide_from_bottom' }} />
               <Stack.Screen name="booking/conditions" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="booking/oferta" options={{ presentation: 'card', animation: 'slide_from_right' }} />
@@ -174,9 +177,11 @@ export default function RootLayout() {
             </Stack>
             <WishlistToast />
             <PendingPaymentOverlay />
+            <BookingSuccessModalGlobal />
             </RouteWishlistPickerProvider>
             </WishlistPickerProvider>
             </PendingPaymentProvider>
+          </BookingSuccessProvider>
           </WishlistToastProvider>
           </BottomSheetModalProvider>
         </PersistGate>

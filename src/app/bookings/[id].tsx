@@ -24,7 +24,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { COLORS } from "@/shared/colors";
 import { ScreenHeader } from "@/shared/components/ScreenHeader";
 import { Spinner } from '@/shared/components/Spinner';
-import { publicSupabase } from "@/shared/supabase/publicClient";
+import { getCachedBooking } from "@/features/bookings/bookingCache";
+import { publicSupabase, SUPABASE_URL } from "@/shared/supabase/publicClient";
 
 type PaymentState = "loading" | "pending" | "success" | "failed" | "error";
 
@@ -109,13 +110,22 @@ const POLL_INTERVAL = 3000;
 const MAX_POLLS = 20;
 
 export default function BookingDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, status: statusParam } = useLocalSearchParams<{ id: string; status?: string }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
 
-  const [state, setState] = useState<PaymentState>("loading");
-  const [booking, setBooking] = useState<BookingData | null>(null);
-  const [coverUri, setCoverUri] = useState<string | null>(null);
+  const cached = id ? getCachedBooking(id) : null;
+  const [state, setState] = useState<PaymentState>(() => {
+    if (cached) return classifyStatus(cached.booking_status);
+    if (statusParam) return classifyStatus(statusParam);
+    return "loading";
+  });
+  const [booking, setBooking] = useState<BookingData | null>(cached as BookingData | null);
+  const [coverUri, setCoverUri] = useState<string | null>(() => {
+    if (!cached?.boats?.boat_images?.length) return null;
+    const sorted = [...cached.boats.boat_images].sort((a, b) => a.position - b.position);
+    return `${SUPABASE_URL}/storage/v1/object/public/boat_images/${sorted[0].image_path}`;
+  });
   const [rechecking, setRechecking] = useState(false);
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -328,7 +338,7 @@ export default function BookingDetailScreen() {
     <View style={[s.root]}>
       <ScreenHeader
         title="Бронирование"
-        onBack={() => router.replace('/(tabs)/' as any)}
+        onBack={() => router.back()}
       />
 
       <ScrollView

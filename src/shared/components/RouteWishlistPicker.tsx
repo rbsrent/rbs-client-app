@@ -8,6 +8,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { COLORS } from '@/shared/colors';
 import { SheetBackdrop } from '@/shared/components/SheetBackdrop';
 import { useWishlistToast } from '@/shared/context/WishlistToastContext';
+import { resolveRouteImage } from '@/features/routes/types';
 import { useRouteSavedStore } from '@/store/useRouteSavedStore';
 import {
   addRouteToGroup,
@@ -72,7 +73,7 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
       showToast({
         type: 'saved',
         listName: groupName,
-        imageUrl: capturedRoute.map_image_url,
+        imageUrl: resolveRouteImage(capturedRoute.map_image_url),
         onEdit: () => {
           loadGroups(capturedRoute.route_id);
           sheetRef.current?.present();
@@ -84,7 +85,7 @@ export const RouteWishlistPicker = forwardRef<RouteWishlistPickerHandle>((_, ref
       showToast({
         type: 'deleted',
         listName: groupName,
-        imageUrl: route.map_image_url,
+        imageUrl: resolveRouteImage(route.map_image_url),
       });
     }
     await refresh(route.route_id);

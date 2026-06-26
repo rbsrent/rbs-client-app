@@ -19,9 +19,11 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
 import { Spinner } from "@/shared/components/Spinner";
+import { usePendingPayment } from "@/shared/context/PendingPaymentContext";
 import { authSupabase } from "@/shared/supabase/authClient";
 import { phoneVariants } from "@/shared/utils/phone";
 import { useAuthStore } from "@/store/useAuthStore";
+import { setCachedBookings } from "../bookingCache";
 import { BookingCard } from "../components/BookingCard";
 import { Booking } from "../types";
 
@@ -33,6 +35,7 @@ export const BookingsScreen = memo(function BookingsScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { session, smsUser } = useAuthStore();
+  const { pending } = usePendingPayment();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tab, setTab] = useState<"upcoming" | "past" | "all">("upcoming");
@@ -91,7 +94,9 @@ export const BookingsScreen = memo(function BookingsScreen() {
         data = res.data;
       }
 
-      setBookings((data ?? []) as any[]);
+      const list = (data ?? []) as Booking[];
+      setCachedBookings(list);
+      setBookings(list);
     } finally {
       setIsLoading(false);
     }
@@ -100,6 +105,13 @@ export const BookingsScreen = memo(function BookingsScreen() {
   useEffect(() => {
     fetchBookings();
   }, [fetchBookings]);
+
+  // Refetch when overlay is dismissed (payment resolved or cancelled) while on this screen
+  const prevPendingRef = useRef(pending);
+  useEffect(() => {
+    if (prevPendingRef.current !== null && pending === null) fetchBookings();
+    prevPendingRef.current = pending;
+  }, [pending]);
 
   const filtered = useMemo(() => {
     const now = new Date();
@@ -223,7 +235,7 @@ export const BookingsScreen = memo(function BookingsScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.white },
-  gateRoot: { backgroundColor: "#fff", paddingHorizontal: 16 },
+  gateRoot: { backgroundColor: COLORS.white, paddingHorizontal: 16 },
   topBar: {
     flexDirection: "row",
     alignItems: "center",

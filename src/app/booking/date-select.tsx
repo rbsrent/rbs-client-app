@@ -2,6 +2,12 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Check, Clock } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { computeSlotSelection } from "@/features/booking/utils";
@@ -63,8 +69,46 @@ export default function DateSelectScreen() {
   const [busyHours, setBusyHours] = useState<Set<number>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
+  const [boatName, setBoatName] = useState<string | null>(null);
+  const [pierName, setPierName] = useState<string | null>(null);
+  const [pierAddress, setPierAddress] = useState<string | null>(null);
 
-  // Fetch boat min_duration_hours once (column may not exist yet — defaults to 1)
+  // Fetch boat name + pier
+  useEffect(() => {
+    if (!boatId) return;
+    void (async () => {
+      try {
+        const { data } = await publicSupabase
+          .from("boats")
+          .select("name, piers(name, address)")
+          .eq("id", boatId)
+          .single();
+        if (data) {
+          setBoatName((data as any).name ?? null);
+          const pier = (data as any).piers;
+          if (pier) {
+            setPierName(pier.name ?? null);
+            setPierAddress(pier.address ?? null);
+            return;
+          }
+        }
+        // fallback: boat_pier_assignments (many-to-many)
+        const { data: asgn } = await publicSupabase
+          .from("boat_pier_assignments")
+          .select("piers(name, address)")
+          .eq("boat_id", boatId)
+          .limit(1)
+          .single();
+        const p = (asgn as any)?.piers;
+        if (p) {
+          setPierName(p.name ?? null);
+          setPierAddress(p.address ?? null);
+        }
+      } catch {}
+    })();
+  }, [boatId]);
+
+  // Fetch min_duration_hours separately (column may not exist yet)
   useEffect(() => {
     if (!boatId) return;
     void (async () => {
@@ -155,10 +199,25 @@ export default function DateSelectScreen() {
   }, [canNext, date, boatId, startH, selectedHours.length, router]);
 
   const slotWidth = useMemo(() => {
-    // computed in render is fine — screen width doesn't change
     const { width } = require("react-native").Dimensions.get("window");
     return Math.floor((width - 32 - (COLS - 1) * 8) / COLS);
   }, []);
+
+  // ── Button animation (same timing as CalendarPicker expand/collapse) ──
+  const btnProgress = useSharedValue(0);
+  useEffect(() => {
+    if (canNext) {
+      btnProgress.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+    } else {
+      btnProgress.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.cubic) });
+    }
+  }, [canNext]);
+
+  const btnStyle = useAnimatedStyle(() => ({
+    opacity: btnProgress.value,
+    transform: [{ translateY: (1 - btnProgress.value) * 16 }],
+    pointerEvents: btnProgress.value > 0 ? "auto" : "none",
+  }));
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -170,6 +229,17 @@ export default function DateSelectScreen() {
         <Text style={s.headerTitle}>Дата и время</Text>
         <View style={{ width: 40 }} />
       </View>
+
+      {/* ── Boat + Pier sub-header ── */}
+      {(boatName || pierName) && (
+        <View style={s.boatHeader}>
+          {boatName && <Text style={s.boatTitle}>{boatName}</Text>}
+          {pierName && <Text style={s.pierNameTxt}>{pierName}</Text>}
+          {pierAddress && (
+            <Text style={s.pierAddrTxt}>Санкт-Петербург, {pierAddress}</Text>
+          )}
+        </View>
+      )}
 
       <ScrollView
         style={s.scroll}
@@ -282,34 +352,24 @@ export default function DateSelectScreen() {
       </ScrollView>
 
       {/* Bottom bar */}
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
+      <Animated.View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }, btnStyle]}>
         <View style={s.selectionInfo}>
-          {canNext ? (
-            <>
-              <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
-              <Text style={s.selTxt}>
-                {fmtHour(startH!)} – {fmtHour(endH!)}
-              </Text>
-              <View style={s.durBadge}>
-                <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
-              </View>
-            </>
-          ) : (
-            <Text style={s.selHint}>Выберите начало и продолжительность</Text>
-          )}
+          <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
+          <Text style={s.selTxt}>
+            {startH != null ? fmtHour(startH) : "–"} – {endH != null ? fmtHour(endH) : "–"}
+          </Text>
+          <View style={s.durBadge}>
+            <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
+          </View>
         </View>
         <Pressable
-          style={({ pressed }) => [
-            s.nextBtn,
-            !canNext && s.nextBtnDim,
-            pressed && canNext && { opacity: 0.85 },
-          ]}
+          style={({ pressed }) => [s.nextBtn, pressed && { opacity: 0.85 }]}
           onPress={handleNext}
           disabled={!canNext}
         >
           <Text style={s.nextTxt}>Далее</Text>
         </Pressable>
-      </View>
+      </Animated.View>
     </View>
   );
 }
@@ -332,6 +392,31 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
+
+  boatHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: COLORS.white,
+    gap: 2,
+  },
+  boatTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.text1,
+    lineHeight: 28,
+    marginBottom: 6,
+  },
+  pierNameTxt: {
+    fontSize: 14,
+    color: COLORS.text1,
+    fontWeight: "400",
+  },
+  pierAddrTxt: {
+    fontSize: 13,
+    color: COLORS.text3,
+    marginTop: 1,
+  },
 
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 8 },

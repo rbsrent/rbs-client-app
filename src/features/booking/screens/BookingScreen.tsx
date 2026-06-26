@@ -53,6 +53,8 @@ import {
 } from "@/shared/utils/phone";
 import { useAuthStore } from "@/store/useAuthStore";
 
+import { useBookingSuccess } from "@/shared/context/BookingSuccessContext";
+import { BookingSuccessData } from "../components/BookingSuccessModal";
 import { cachePiers, setTripEditCallback } from "../tripEditResult";
 import { Boat, Pier, PricingResult } from "../types";
 import { buildDatetime, durLabel, fmtHour, ruFmt, uuid } from "../utils";
@@ -144,9 +146,11 @@ export function BookingScreen() {
   const [clientPhoneDigits, setClientPhoneDigits] = useState("");
   const [clientEmail, setClientEmail] = useState("");
   const [paying, setPaying] = useState(false);
+  const { show: showSuccess } = useBookingSuccess();
   const { pending: pendingPayment, save: savePendingPayment, clear: clearPendingPayment } = usePendingPayment();
 
   const bookingIdRef = useRef<string | null>(null);
+  const snapshotRef = useRef<Omit<BookingSuccessData, "bookingId"> | null>(null);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const contactSheetRef = useRef<BottomSheetModal>(null);
   const appStateRef = useRef(AppState.currentState);
@@ -206,7 +210,7 @@ export function BookingScreen() {
         bookingIdRef.current
       ) {
         awaitingReturn.current = false;
-        startPolling(bookingIdRef.current);
+        startPolling(bookingIdRef.current, snapshotRef.current ?? {} as any);
       }
       appStateRef.current = next;
     });
@@ -217,7 +221,7 @@ export function BookingScreen() {
   }, []);
 
   const startPolling = useCallback(
-    (bId: string) => {
+    (bId: string, snapshot: Omit<BookingSuccessData, "bookingId">) => {
       if (pollRef.current) clearInterval(pollRef.current);
       let attempts = 0;
       pollRef.current = setInterval(async () => {
@@ -232,7 +236,8 @@ export function BookingScreen() {
           clearInterval(pollRef.current!);
           setPaying(false);
           clearPendingPayment();
-          router.replace(`/bookings/${bId}` as any);
+          router.replace("/(tabs)/" as any);
+          showSuccess({ bookingId: bId, ...snapshot });
         } else if (status === "cancelled") {
           clearInterval(pollRef.current!);
           setPaying(false);
@@ -243,7 +248,7 @@ export function BookingScreen() {
         }
       }, 2000);
     },
-    [router],
+    [router, showSuccess, clearPendingPayment],
   );
 
   // ── Reset time on date change (suppress when edit-trip callback fires) ───
@@ -404,8 +409,11 @@ export function BookingScreen() {
     });
     const dateISO = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
     const minDur = boat?.min_duration_hours ?? 1;
+    const boatName = encodeURIComponent(boat?.name ?? "");
+    const pierName = encodeURIComponent(selectedPier?.name ?? "");
+    const pierAddress = encodeURIComponent(selectedPier?.address ?? "");
     router.push(
-      `/booking/edit-trip?boatId=${boatId}&date=${dateISO}&startHour=${startHour}&duration=${duration}&pierId=${selectedPier?.id ?? ""}&minDuration=${minDur}` as any,
+      `/booking/edit-trip?boatId=${boatId}&date=${dateISO}&startHour=${startHour}&duration=${duration}&pierId=${selectedPier?.id ?? ""}&minDuration=${minDur}&boatName=${boatName}&pierName=${pierName}&pierAddress=${pierAddress}` as any,
     );
   }, [piers, date, startHour, duration, selectedPier, boatId, router]);
 
@@ -578,6 +586,20 @@ export function BookingScreen() {
       const bId = data.public_booking_id as string;
       const confirmUrl = data.confirmation_url as string;
       bookingIdRef.current = bId;
+      snapshotRef.current = {
+        boatName: boat?.name ?? "",
+        boatType: boat?.type ?? null,
+        coverImageUrl: boat?.cover_image_url ?? null,
+        date,
+        startHour,
+        duration,
+        pier: selectedPier,
+        clientName,
+        payOnline,
+        prepaymentAmt,
+        remainingAmt,
+        totalAfterPromo,
+      };
       awaitingReturn.current = true;
       const returnUrl = Linking.createURL("booking/return");
       const result = await openAuthSessionAsync(confirmUrl, returnUrl, {
@@ -961,6 +983,16 @@ export function BookingScreen() {
             </Text>
           </View>
 
+          {/* Pending payment notice */}
+          {pendingPayment && (
+            <View style={s.pendingBanner}>
+              <Clock size={14} color="#C47A00" strokeWidth={2} />
+              <Text style={s.pendingBannerTxt}>
+                У вас есть незавершённая оплата — завершите или отмените её, чтобы создать новую бронь.
+              </Text>
+            </View>
+          )}
+
           {/* Pay button */}
           <Pressable
             style={({ pressed }) => [
@@ -1190,8 +1222,7 @@ const s = StyleSheet.create({
 
   summaryCard: {
     backgroundColor: COLORS.white,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
+    borderRadius: 24,
     marginTop: 8,
     padding: 20,
     paddingBottom: 8,
@@ -1225,9 +1256,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.brandNavy + "30",
-    backgroundColor: COLORS.brandNavy + "08",
+    backgroundColor: COLORS.greyLight,
   },
   editBtnTxt: { fontSize: 11, fontWeight: "700", color: COLORS.brandNavy },
 
@@ -1312,6 +1341,24 @@ const s = StyleSheet.create({
   },
   payBtnContact: { backgroundColor: "#25D366" },
   payBtnTxt: { fontSize: 17, fontWeight: "700", color: COLORS.white },
+
+  pendingBanner: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    backgroundColor: "#FFF8E7",
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#F5C842",
+    padding: 12,
+    marginTop: 16,
+  },
+  pendingBannerTxt: {
+    flex: 1,
+    fontSize: 12,
+    color: "#7A5000",
+    lineHeight: 17,
+  },
 
   consentTxt: {
     marginTop: 16,

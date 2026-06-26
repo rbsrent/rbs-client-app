@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Check, Clock, MapPin } from "lucide-react-native";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   Dimensions,
   Pressable,
@@ -14,10 +14,13 @@ import Animated, {
   FadeIn,
   FadeOut,
   LinearTransition,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { PierMapSheet } from "@/features/booking/components/PierMapSheet";
+import { PierSelectModal } from "@/features/booking/components/PierSelectModal";
 import {
   getCachedPiers,
   resolveTripEdit,
@@ -70,6 +73,9 @@ export default function EditTripScreen() {
     duration: durParam,
     pierId,
     minDuration: minDurParam,
+    boatName: boatNameParam,
+    pierName: pierNameParam,
+    pierAddress: pierAddressParam,
   } = useLocalSearchParams<{
     boatId: string;
     date?: string;
@@ -77,11 +83,35 @@ export default function EditTripScreen() {
     duration?: string;
     pierId?: string;
     minDuration?: string;
+    boatName?: string;
+    pierName?: string;
+    pierAddress?: string;
   }>();
 
   const minDuration = minDurParam ? Math.max(1, Number(minDurParam)) : 1;
-  const piers = getCachedPiers();
+
+  // ── Piers ──
+  const [piers, setPiers] = useState<Pier[]>(() => getCachedPiers());
   const multiPier = piers.length > 1;
+
+  useEffect(() => {
+    if (piers.length > 0 || !boatId) return;
+    void (async () => {
+      const { data: asgn } = await publicSupabase
+        .from("boat_pier_assignments")
+        .select("pier_id, piers(id, name, address, latitude, longitude)")
+        .eq("boat_id", boatId);
+      const list: Pier[] = asgn?.length
+        ? (asgn as any[]).map((a: any) => a.piers).filter(Boolean)
+        : [];
+      if (list.length) {
+        setPiers(list);
+        setSelectedPier((prev) =>
+          prev ? list.find((p) => p.id === prev.id) ?? list[0] : list[0],
+        );
+      }
+    })();
+  }, [boatId]);
 
   // ── Date ──
   const [date, setDate] = useState<Date>(() => {
@@ -117,12 +147,17 @@ export default function EditTripScreen() {
   const [pierSheetOpen, setPierSheetOpen] = useState(false);
 
   // ── Fetch busy slots ──
+  const initialDateStr = useRef(date.toDateString());
+
   useEffect(() => {
     if (!boatId) return;
     let cancelled = false;
     setSlotsLoading(true);
     setBusyHours(new Set());
-    setSelectedHours([]);
+    // Only reset selection when user changes date (not on initial mount)
+    if (date.toDateString() !== initialDateStr.current) {
+      setSelectedHours([]);
+    }
 
     const dayStart = new Date(date);
     dayStart.setHours(0, 0, 0, 0);
@@ -183,6 +218,21 @@ export default function EditTripScreen() {
   const canConfirm =
     selectedHours.length >= minDuration && (multiPier ? !!selectedPier : true);
 
+  const btnProgress = useSharedValue(0);
+  useEffect(() => {
+    if (canConfirm) {
+      btnProgress.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+    } else {
+      btnProgress.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.cubic) });
+    }
+  }, [canConfirm]);
+
+  const btnStyle = useAnimatedStyle(() => ({
+    opacity: btnProgress.value,
+    transform: [{ translateY: (1 - btnProgress.value) * 16 }],
+    pointerEvents: btnProgress.value > 0 ? "auto" : "none",
+  }));
+
   const handleConfirm = () => {
     resolveTripEdit({
       date,
@@ -213,6 +263,21 @@ export default function EditTripScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
+        {/* ── Boat + Pier header ── */}
+        {(boatNameParam || pierNameParam) && (
+          <View style={s.boatHeader}>
+            {boatNameParam ? (
+              <Text style={s.boatTitle}>{decodeURIComponent(boatNameParam)}</Text>
+            ) : null}
+            {pierNameParam ? (
+              <Text style={s.pierNameTxt}>{decodeURIComponent(pierNameParam)}</Text>
+            ) : null}
+            {pierAddressParam ? (
+              <Text style={s.pierAddrTxt}>Санкт-Петербург, {decodeURIComponent(pierAddressParam)}</Text>
+            ) : null}
+          </View>
+        )}
+
         {/* ── Calendar ── */}
         <View style={s.section}>
           <CalendarPicker
@@ -356,37 +421,27 @@ export default function EditTripScreen() {
       </ScrollView>
 
       {/* ── Bottom bar ── */}
-      <View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }]}>
+      <Animated.View style={[s.bottomBar, { paddingBottom: insets.bottom + 12 }, btnStyle]}>
         <View style={s.selInfo}>
-          {selectedHours.length >= minDuration ? (
-            <>
-              <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
-              <Text style={s.selTxt}>
-                {fmtHour(startH!)} – {fmtHour(endH!)}
-              </Text>
-              <View style={s.durBadge}>
-                <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
-              </View>
-            </>
-          ) : (
-            <Text style={s.selHint}>Выберите начало и продолжительность</Text>
-          )}
+          <Clock size={15} color={COLORS.brandNavy} strokeWidth={2} />
+          <Text style={s.selTxt}>
+            {startH != null ? fmtHour(startH) : "–"} – {endH != null ? fmtHour(endH) : "–"}
+          </Text>
+          <View style={s.durBadge}>
+            <Text style={s.durTxt}>{durLabel(selectedHours.length)}</Text>
+          </View>
         </View>
         <Pressable
-          style={({ pressed }) => [
-            s.confirmBtn,
-            !canConfirm && s.confirmBtnDim,
-            pressed && canConfirm && { opacity: 0.85 },
-          ]}
+          style={({ pressed }) => [s.confirmBtn, pressed && { opacity: 0.85 }]}
           onPress={handleConfirm}
           disabled={!canConfirm}
         >
           <Text style={s.confirmTxt}>Подтвердить</Text>
         </Pressable>
-      </View>
+      </Animated.View>
 
       {multiPier && (
-        <PierMapSheet
+        <PierSelectModal
           visible={pierSheetOpen}
           piers={piers}
           selectedPier={selectedPier}
@@ -416,6 +471,31 @@ const s = StyleSheet.create({
     justifyContent: "center",
   },
   headerTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
+
+  boatHeader: {
+    paddingHorizontal: 16,
+    paddingTop: 20,
+    paddingBottom: 16,
+    backgroundColor: COLORS.white,
+    gap: 2,
+  },
+  boatTitle: {
+    fontSize: 22,
+    fontWeight: "800",
+    color: COLORS.text1,
+    lineHeight: 28,
+    marginBottom: 6,
+  },
+  pierNameTxt: {
+    fontSize: 14,
+    color: COLORS.text1,
+    fontWeight: "400",
+  },
+  pierAddrTxt: {
+    fontSize: 13,
+    color: COLORS.text3,
+    marginTop: 1,
+  },
 
   scroll: { flex: 1 },
   scrollContent: { paddingTop: 8 },

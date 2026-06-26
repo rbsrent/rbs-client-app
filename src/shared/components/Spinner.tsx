@@ -12,7 +12,7 @@ interface Props {
 export function Spinner({
   size = 36,
   color = '#3B82F6',
-  trackColor = '#E8E8E8',
+  trackColor = 'transparent',
   strokeWidth = 3,
   style,
 }: Props) {

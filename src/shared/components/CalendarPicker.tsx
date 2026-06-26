@@ -1,4 +1,4 @@
-import { ArrowLeft, ChevronRight } from "lucide-react-native";
+import { ChevronLeft, ChevronRight } from "lucide-react-native";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Animated,
@@ -366,7 +366,7 @@ export function CalendarPicker({ selected, onSelect, collapsible = true, initial
           hitSlop={14}
           disabled={!canGoPrev}
         >
-          <ArrowLeft size={20} color={canGoPrev ? COLORS.text2 : COLORS.border} strokeWidth={2} />
+          <ChevronLeft size={20} color={canGoPrev ? COLORS.text2 : COLORS.border} strokeWidth={2} />
         </Pressable>
 
         {/* Title: same 2-label system as DateStrip, adapted for bidirectional */}
