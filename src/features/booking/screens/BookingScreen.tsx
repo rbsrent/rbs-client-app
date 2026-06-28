@@ -54,6 +54,8 @@ import {
 import { useAuthStore } from "@/store/useAuthStore";
 
 import { useBookingSuccess } from "@/shared/context/BookingSuccessContext";
+import { addGuestBooking } from "@/store/offlineStore";
+import { offlineReduxStore } from "@/store/offlineStore";
 import { BookingSuccessData } from "../components/BookingSuccessModal";
 import { cachePiers, setTripEditCallback } from "../tripEditResult";
 import { Boat, Pier, PricingResult } from "../types";
@@ -220,6 +222,39 @@ export function BookingScreen() {
     };
   }, []);
 
+  const saveGuestBooking = (
+    bId: string,
+    snapshot: Omit<BookingSuccessData, "bookingId">,
+    status: string,
+  ) => {
+    const IMG_PREFIX = `${SUPABASE_URL}/storage/v1/object/public/boat_images/`;
+    const imagePath = snapshot.coverImageUrl?.startsWith(IMG_PREFIX)
+      ? snapshot.coverImageUrl.slice(IMG_PREFIX.length)
+      : null;
+    const startDt = new Date(snapshot.date);
+    startDt.setHours(snapshot.startHour, 0, 0, 0);
+    const endDt = new Date(snapshot.date);
+    endDt.setHours(snapshot.startHour + snapshot.duration, 0, 0, 0);
+    offlineReduxStore.dispatch(addGuestBooking({
+      id: bId,
+      boat_id: null,
+      start_datetime: startDt.toISOString(),
+      end_datetime: endDt.toISOString(),
+      booking_status: status,
+      total_price: snapshot.totalAfterPromo,
+      prepayment_amount: snapshot.prepaymentAmt,
+      remaining_amount: snapshot.remainingAmt,
+      pier_name: snapshot.pier?.name ?? null,
+      pier_address: snapshot.pier?.address ?? null,
+      client_name: snapshot.clientName,
+      boats: {
+        name: snapshot.boatName,
+        type: snapshot.boatType ?? "",
+        boat_images: imagePath ? [{ image_path: imagePath, position: 0 }] : [],
+      },
+    }));
+  };
+
   const startPolling = useCallback(
     (bId: string, snapshot: Omit<BookingSuccessData, "bookingId">) => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -238,6 +273,7 @@ export function BookingScreen() {
           clearPendingPayment();
           router.replace("/(tabs)/" as any);
           showSuccess({ bookingId: bId, ...snapshot });
+          saveGuestBooking(bId, snapshot, status);
         } else if (status === "cancelled") {
           clearInterval(pollRef.current!);
           setPaying(false);

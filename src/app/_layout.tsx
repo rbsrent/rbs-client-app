@@ -11,7 +11,9 @@ import { authSupabase } from '@/shared/supabase/authClient';
 import { PendingPaymentProvider } from '@/shared/context/PendingPaymentContext';
 import { WishlistToastProvider } from '@/shared/context/WishlistToastContext';
 import { BookingSuccessProvider } from '@/shared/context/BookingSuccessContext';
+import { SharePreviewProvider, useSharePreview } from '@/shared/context/SharePreviewContext';
 import { BookingSuccessModalGlobal } from '@/shared/components/BookingSuccessModalGlobal';
+import { SharePreviewModalGlobal } from '@/shared/components/SharePreviewModalGlobal';
 import { PendingPaymentOverlay } from '@/shared/components/PendingPaymentOverlay';
 import { WishlistToast } from '@/shared/components/WishlistToast';
 import { WishlistPickerProvider } from '@/shared/components/WishlistPickerContext';
@@ -108,6 +110,26 @@ function NotificationNavigator() {
   return null;
 }
 
+function DeepLinkHandler() {
+  const { show } = useSharePreview();
+
+  const handle = (url: string | null) => {
+    if (!url) return;
+    const catalogMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)catalog\/([^/?#]+)/);
+    if (catalogMatch) { show({ type: "boat", id: catalogMatch[1] }); return; }
+    const routeMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)routes\/([^/?#]+)/);
+    if (routeMatch) { show({ type: "route", slug: routeMatch[1] }); }
+  };
+
+  useEffect(() => {
+    Linking.getInitialURL().then(handle);
+    const sub = Linking.addEventListener("url", ({ url }) => handle(url));
+    return () => sub.remove();
+  }, []);
+
+  return null;
+}
+
 function AuthRedirect() {
   const router = useRouter();
   const segments = useSegments();
@@ -135,11 +157,13 @@ export default function RootLayout() {
           <BottomSheetModalProvider>
             <WishlistToastProvider>
           <BookingSuccessProvider>
+          <SharePreviewProvider>
           <PendingPaymentProvider>
             <WishlistPickerProvider>
             <RouteWishlistPickerProvider>
             <AuthListener />
             <AuthRedirect />
+            <DeepLinkHandler />
             <PushRegistrar />
             <NotificationColdStart />
             <NotificationNavigator />
@@ -178,9 +202,11 @@ export default function RootLayout() {
             <WishlistToast />
             <PendingPaymentOverlay />
             <BookingSuccessModalGlobal />
+            <SharePreviewModalGlobal />
             </RouteWishlistPickerProvider>
             </WishlistPickerProvider>
             </PendingPaymentProvider>
+          </SharePreviewProvider>
           </BookingSuccessProvider>
           </WishlistToastProvider>
           </BottomSheetModalProvider>

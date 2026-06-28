@@ -17,11 +17,14 @@ import Animated, {
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
+import { useSelector } from "react-redux";
+
 import { COLORS } from "@/shared/colors";
 import { Spinner } from "@/shared/components/Spinner";
 import { usePendingPayment } from "@/shared/context/PendingPaymentContext";
 import { authSupabase } from "@/shared/supabase/authClient";
 import { phoneVariants } from "@/shared/utils/phone";
+import { OfflineRootState } from "@/store/offlineStore";
 import { useAuthStore } from "@/store/useAuthStore";
 import { setCachedBookings } from "../bookingCache";
 import { BookingCard } from "../components/BookingCard";
@@ -36,6 +39,7 @@ export const BookingsScreen = memo(function BookingsScreen() {
   const router = useRouter();
   const { session, smsUser } = useAuthStore();
   const { pending } = usePendingPayment();
+  const guestBookings = useSelector((s: OfflineRootState) => s.offline.guestBookings);
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [tab, setTab] = useState<"upcoming" | "past" | "all">("upcoming");
@@ -146,24 +150,52 @@ export const BookingsScreen = memo(function BookingsScreen() {
 
   if (!session) {
     return (
-      <View
-        style={[styles.container, styles.gateRoot, { paddingTop: insets.top }]}
-      >
-        <Text style={styles.pageTitle}>Поездки</Text>
-        <View style={styles.gateBody}>
-          <Text style={styles.gateTitle}>
-            Войдите, чтобы посмотреть{"\n"}свои поездки
-          </Text>
-          <Text style={styles.gateDesc}>
-            Для просмотра ваших бронирований необходимо войти в аккаунт.
-          </Text>
-          <Pressable
-            style={styles.gateBtn}
-            onPress={() => router.push("/auth" as any)}
-          >
-            <Text style={styles.gateBtnTxt}>Вход</Text>
-          </Pressable>
+      <View style={[styles.container, { paddingTop: insets.top }]}>
+        <View style={styles.header}>
+          <View style={styles.topBar}>
+            <Pressable style={styles.backBtn} onPress={() => router.back()} hitSlop={8}>
+              <ArrowLeft size={22} color="#000" strokeWidth={2} />
+            </Pressable>
+            <Text style={styles.pageTitle}>Мои бронирования</Text>
+            <View style={styles.backBtn} />
+          </View>
         </View>
+
+        {guestBookings.length > 0 ? (
+          <>
+            <Pressable
+              style={styles.loginBanner}
+              onPress={() => router.push("/auth" as any)}
+            >
+              <Text style={styles.loginBannerTxt}>
+                Войдите, чтобы видеть все бронирования
+              </Text>
+              <Text style={styles.loginBannerLink}>Войти →</Text>
+            </Pressable>
+            <FlatList
+              data={guestBookings}
+              keyExtractor={(b) => b.id}
+              renderItem={renderItem}
+              contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + 80 }]}
+              showsVerticalScrollIndicator={false}
+            />
+          </>
+        ) : (
+          <View style={styles.gateBody}>
+            <Text style={styles.gateTitle}>
+              Войдите, чтобы посмотреть{"\n"}свои поездки
+            </Text>
+            <Text style={styles.gateDesc}>
+              Для просмотра ваших бронирований необходимо войти в аккаунт.
+            </Text>
+            <Pressable
+              style={styles.gateBtn}
+              onPress={() => router.push("/auth" as any)}
+            >
+              <Text style={styles.gateBtnTxt}>Вход</Text>
+            </Pressable>
+          </View>
+        )}
       </View>
     );
   }
@@ -245,7 +277,20 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 44, height: 44, alignItems: "center", justifyContent: "center" },
   pageTitle: { flex: 1, fontSize: 17, fontWeight: "700", color: "#000", textAlign: "center" },
-  gateBody: { paddingTop: 24, gap: 10 },
+  gateBody: { paddingTop: 24, gap: 10, paddingHorizontal: 16 },
+  loginBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginHorizontal: 16,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: COLORS.greyLight,
+    borderRadius: 12,
+  },
+  loginBannerTxt: { fontSize: 13, color: COLORS.text2, flex: 1 },
+  loginBannerLink: { fontSize: 13, fontWeight: "700", color: COLORS.brandNavy },
   gateTitle: { fontSize: 24, fontWeight: "700", color: "#000", lineHeight: 32 },
   gateDesc: { fontSize: 15, color: "#888", lineHeight: 22 },
   gateBtn: {
