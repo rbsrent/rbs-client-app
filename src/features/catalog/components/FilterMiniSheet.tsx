@@ -37,7 +37,7 @@ const SECTION_TITLES: Record<FilterSection, string> = {
 
 const SNAP: Record<FilterSection, string[]> = {
   type:      ['48%'],
-  price:     ['52%'],
+  price:     ['62%', '85%'],
   capacity:  ['45%'],
   amenities: ['42%'],
   duration:  ['42%'],
