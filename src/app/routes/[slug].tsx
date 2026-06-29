@@ -142,11 +142,13 @@ export default function RouteDetailScreen() {
   const handleShare = useCallback(async () => {
     try {
       const name = route?.name ?? "Маршрут";
-      const webUrl = `https://rbs.rent/routes/${slug}?from=share_${Platform.OS}`;
-      const appUrl = `rbsrent://routes/${slug}`;
+      const routePath = route?.id
+        ? `${route.id}/${route.seo_slug ?? slug}`
+        : slug;
+      const webUrl = `https://rbs.rent/routes/${routePath}?from=share_${Platform.OS}`;
       await Share.share(
         Platform.OS === "ios"
-          ? { title: name, message: appUrl, url: webUrl }
+          ? { title: name, url: webUrl }
           : { title: name, message: `${name}\n${webUrl}` },
       );
     } catch { }

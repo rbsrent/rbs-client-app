@@ -2,7 +2,7 @@ import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
 import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Provider } from 'react-redux';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { PersistGate } from 'redux-persist/integration/react';
@@ -11,7 +11,7 @@ import { authSupabase } from '@/shared/supabase/authClient';
 import { PendingPaymentProvider } from '@/shared/context/PendingPaymentContext';
 import { WishlistToastProvider } from '@/shared/context/WishlistToastContext';
 import { BookingSuccessProvider } from '@/shared/context/BookingSuccessContext';
-import { SharePreviewProvider, useSharePreview } from '@/shared/context/SharePreviewContext';
+import { SharePreviewProvider } from '@/shared/context/SharePreviewContext';
 import { BookingSuccessModalGlobal } from '@/shared/components/BookingSuccessModalGlobal';
 import { SharePreviewModalGlobal } from '@/shared/components/SharePreviewModalGlobal';
 import { PendingPaymentOverlay } from '@/shared/components/PendingPaymentOverlay';
@@ -111,21 +111,35 @@ function NotificationNavigator() {
 }
 
 function DeepLinkHandler() {
-  const { show } = useSharePreview();
+  const router = useRouter();
+  const navState = useRootNavigationState();
+  const pendingUrl = useRef<string | null>(null);
 
-  const handle = (url: string | null) => {
-    if (!url) return;
-    const catalogMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)catalog\/([^/?#]+)/);
-    if (catalogMatch) { show({ type: "boat", id: catalogMatch[1] }); return; }
+  const navigate = useCallback((url: string) => {
+    // Boat: /boats/<uuid> or /catalog/<uuid>
+    const boatMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)(?:boats|catalog)\/([0-9a-fA-F-]{36})/);
+    if (boatMatch) { router.push(`/catalog/${boatMatch[1]}` as any); return; }
+
+    // Route: /routes/<uuid-or-slug>[/<anything>]
     const routeMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)routes\/([^/?#]+)/);
-    if (routeMatch) { show({ type: "route", slug: routeMatch[1] }); }
-  };
+    if (routeMatch) { router.push(`/routes/${routeMatch[1]}` as any); }
+  }, [router]);
 
   useEffect(() => {
-    Linking.getInitialURL().then(handle);
-    const sub = Linking.addEventListener("url", ({ url }) => handle(url));
+    Linking.getInitialURL().then((url) => { if (url) pendingUrl.current = url; });
+    const sub = Linking.addEventListener("url", ({ url }) => {
+      if (navState?.key) navigate(url);
+      else pendingUrl.current = url;
+    });
     return () => sub.remove();
   }, []);
+
+  useEffect(() => {
+    if (!navState?.key || !pendingUrl.current) return;
+    const url = pendingUrl.current;
+    pendingUrl.current = null;
+    navigate(url);
+  }, [navState?.key]);
 
   return null;
 }

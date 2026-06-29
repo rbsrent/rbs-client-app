@@ -140,11 +140,10 @@ export default function BoatDetailScreen() {
   const handleShare = useCallback(async () => {
     try {
       const name = boat?.name ?? "Судно";
-      const webUrl = `https://rbs.rent/catalog/${id}?from=share_${Platform.OS}`;
-      const appUrl = `rbsrent://catalog/${id}`;
+      const webUrl = `https://rbs.rent/boats/${id}?from=share_${Platform.OS}`;
       await Share.share(
         Platform.OS === "ios"
-          ? { title: name, message: appUrl, url: webUrl }
+          ? { title: name, url: webUrl }
           : { title: name, message: `${name}\n${webUrl}` },
       );
     } catch {}
