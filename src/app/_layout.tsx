@@ -121,12 +121,12 @@ function DeepLinkHandler() {
 
   const navigate = useCallback((url: string, coldStart = false) => {
     // Boat: /boats/<uuid> or /catalog/<uuid> — handle double or triple slash (rbsrent:///boats/...)
+    // boats/[id].tsx handles the Expo Router side; DeepLinkHandler sets up the back stack.
     const boatMatch = url.match(/(?:rbsrent:\/\/\/?|rbs\.rent\/)(?:boats|catalog)\/([0-9a-fA-F-]{36})/);
     if (boatMatch) {
-      // On cold start the base screen may be Unmatched Route — replace with home first
-      // so the back stack is /(tabs) → target instead of 404 → target.
       if (coldStart) router.replace('/(tabs)' as any);
-      router.push(`/catalog/${boatMatch[1]}` as any);
+      // navigate() focuses existing screen instead of pushing a duplicate
+      router.navigate(`/catalog/${boatMatch[1]}` as any);
       return;
     }
 
@@ -134,7 +134,8 @@ function DeepLinkHandler() {
     const routeMatch = url.match(/(?:rbsrent:\/\/\/?|rbs\.rent\/)routes\/([^/?#]+)/);
     if (routeMatch) {
       if (coldStart) router.replace('/(tabs)' as any);
-      router.push(`/routes/${routeMatch[1]}` as any);
+      // navigate() prevents double-push when Expo Router also routes to this URL
+      router.navigate(`/routes/${routeMatch[1]}` as any);
     }
   }, [router]);
 
@@ -144,16 +145,15 @@ function DeepLinkHandler() {
   useEffect(() => {
     // Use ref so the callback always sees the latest navState, even if it resolves
     // after navState is already ready (race condition on cold start).
+    // Cold start only — warm start URLs are handled by the route files directly
+    // (boats/[id].tsx, boats/[id]/[...rest].tsx, routes/[slug]/[...rest].tsx)
+    // so that the placeholder screen (not DeepLinkHandler) controls the navigation
+    // and avoids leaving a dark screen in the back stack.
     Linking.getInitialURL().then((url) => {
       if (!url) return;
       if (navStateRef.current?.key) navigateRef.current(url, true);
       else { pendingUrl.current = url; pendingIsColdStart.current = true; }
     });
-    const sub = Linking.addEventListener("url", ({ url }) => {
-      if (navStateRef.current?.key) navigateRef.current(url, false);
-      else pendingUrl.current = url;
-    });
-    return () => sub.remove();
   }, []);
 
   useEffect(() => {
@@ -227,8 +227,11 @@ export default function RootLayout() {
               <Stack.Screen name="certificates" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="gift-cert" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="boats/index" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="boats/[id]" options={{ animation: 'none', headerShown: false }} />
+              <Stack.Screen name="boats/[id]/[...rest]" options={{ animation: 'none', headerShown: false }} />
               <Stack.Screen name="boats/search" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="routes/[slug]" options={{ presentation: 'card', animation: 'slide_from_right' }} />
+              <Stack.Screen name="routes/[slug]/[...rest]" options={{ animation: 'none', headerShown: false }} />
               <Stack.Screen name="services/boat" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/yacht" options={{ presentation: 'card', animation: 'slide_from_right' }} />
               <Stack.Screen name="services/cruise" options={{ presentation: 'card', animation: 'slide_from_right' }} />
