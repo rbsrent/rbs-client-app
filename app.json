@@ -12,7 +12,10 @@
       "bundleIdentifier": "com.rbsrent.app",
       "buildNumber": "2",
       "supportsTablet": true,
-      "associatedDomains": ["applinks:rbs.rent"],
+      "associatedDomains": [
+        "applinks:rbs.rent",
+        "applinks:rbs.rent"
+      ],
       "infoPlist": {
         "NSAppTransportSecurity": {
           "NSExceptionDomains": {
@@ -29,7 +32,8 @@
               "NSExceptionRequiresForwardSecrecy": false
             }
           }
-        }
+        },
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
@@ -68,7 +72,10 @@
               "pathPrefix": "/routes"
             }
           ],
-          "category": ["BROWSABLE", "DEFAULT"]
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
         }
       ]
     },
