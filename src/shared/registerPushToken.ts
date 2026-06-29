@@ -7,6 +7,8 @@ import { authSupabase } from './supabase/authClient';
 
 export async function registerPushToken(): Promise<string | null> {
   if (!Device.isDevice) return null;
+  // Remote push not supported in Expo Go since SDK 53
+  if (Constants.appOwnership === 'expo') return null;
 
   const { status } = await Notifications.getPermissionsAsync();
   if (status !== 'granted') return null;

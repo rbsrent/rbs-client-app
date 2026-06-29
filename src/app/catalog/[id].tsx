@@ -139,7 +139,7 @@ export default function BoatDetailScreen() {
 
   const handleShare = useCallback(async () => {
     try {
-      const name = boat?.name ?? "Судно";
+      const name = boat ? getBoatH1(boat) : "Судно";
       const webUrl = `https://rbs.rent/boats/${id}?from=share_${Platform.OS}`;
       await Share.share(
         Platform.OS === "ios"
@@ -147,7 +147,7 @@ export default function BoatDetailScreen() {
           : { title: name, message: `${name}\n${webUrl}` },
       );
     } catch {}
-  }, [boat?.name, id]);
+  }, [boat, id]);
 
   const handleHeart = useCallback(async () => {
     if (!boat) return;

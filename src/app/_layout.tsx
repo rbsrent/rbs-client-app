@@ -1,6 +1,7 @@
 import { BottomSheetModalProvider } from '@gorhom/bottom-sheet';
 import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
+import { StatusBar } from 'expo-status-bar';
 import { Stack, useRouter, useRootNavigationState, useSegments } from 'expo-router';
 import { useCallback, useEffect, useRef } from 'react';
 import { Provider } from 'react-redux';
@@ -166,6 +167,7 @@ function AuthRedirect() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
+      <StatusBar style="dark" translucent backgroundColor="transparent" />
       <Provider store={offlineReduxStore}>
         <PersistGate loading={null} persistor={persistor}>
           <BottomSheetModalProvider>

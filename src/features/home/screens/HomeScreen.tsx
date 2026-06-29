@@ -1,14 +1,13 @@
 import { useRouter } from "expo-router";
 import { Bot, Search } from "lucide-react-native";
-import { memo, useCallback, useRef } from "react";
-import {
-  Animated,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { memo } from "react";
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import Animated, {
+  interpolateColor,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { COLORS } from "@/shared/colors";
@@ -28,46 +27,29 @@ export const HomeScreen = memo(function HomeScreen() {
   const lastFetch = useHomeStore((s) => s.lastFetch);
   const isFirstLoad = loading && lastFetch === null;
 
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useSharedValue(0);
 
-  const topBarBg = scrollY.interpolate({
-    inputRange: [0, 50, 120],
-    outputRange: [
-      "rgba(255,255,255,0)",
-      "rgba(255,255,255,0.85)",
-      "rgba(255,255,255,1)",
-    ],
-    extrapolate: "clamp",
-  });
-  const topBarShadow = scrollY.interpolate({
-    inputRange: [0, 100],
-    outputRange: [0, 0.07],
-    extrapolate: "clamp",
-  });
-  const topBarBorderColor = scrollY.interpolate({
-    inputRange: [60, 100],
-    outputRange: ["rgba(0,0,0,0)", "rgba(0,0,0,0.07)"],
-    extrapolate: "clamp",
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
+    },
   });
 
-  const onScroll = useCallback(
-    Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-      useNativeDriver: false,
-    }),
-    [],
-  );
+  const topBarStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      scrollY.value,
+      [0, 50, 120],
+      ["rgba(255,255,255,0)", "rgba(255,255,255,0.85)", "rgba(255,255,255,1)"],
+    ),
+  }));
 
   return (
     <View style={s.root}>
       <Animated.View
         style={[
           s.topBar,
-          {
-            paddingTop: insets.top + 8,
-            backgroundColor: topBarBg,
-            shadowOpacity: topBarShadow,
-            borderBottomColor: topBarBorderColor,
-          },
+          { paddingTop: insets.top + 8 },
+          topBarStyle,
         ]}
       >
         <Pressable
@@ -86,7 +68,7 @@ export const HomeScreen = memo(function HomeScreen() {
         </Pressable>
       </Animated.View>
 
-      <ScrollView
+      <Animated.ScrollView
         style={s.scroll}
         contentContainerStyle={[
           s.scrollContent,
@@ -124,7 +106,7 @@ export const HomeScreen = memo(function HomeScreen() {
         <View style={s.tepSection}>
           <TourCard />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 });
@@ -142,11 +124,6 @@ const s = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 16,
     paddingBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 8,
-    elevation: 6,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   searchBar: {
     flex: 1,

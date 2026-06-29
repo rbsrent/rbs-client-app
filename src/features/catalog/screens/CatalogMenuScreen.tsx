@@ -1,13 +1,13 @@
 import { useRouter } from 'expo-router';
 import { Search } from 'lucide-react-native';
-import { memo, useCallback, useRef } from 'react';
-import {
-  Animated,
-  Pressable,
-  StyleSheet,
-  Text,
-  View
-} from 'react-native';
+import { memo } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { COLORS } from '@/shared/colors';
@@ -65,32 +65,28 @@ const THUMB = 76;
 export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useSharedValue(0);
 
-  const topBarBg = scrollY.interpolate({
-    inputRange: [0, 40, 90],
-    outputRange: [
-      'rgba(247,247,247,0)',
-      'rgba(247,247,247,0.9)',
-      'rgba(247,247,247,1)',
-    ],
-    extrapolate: 'clamp',
+  const onScroll = useAnimatedScrollHandler({
+    onScroll: (e) => {
+      scrollY.value = e.contentOffset.y;
+    },
   });
 
-  const onScroll = useCallback(
-    Animated.event(
-      [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-      { useNativeDriver: false },
+  const topBarStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      scrollY.value,
+      [0, 40, 90],
+      ['rgba(247,247,247,0)', 'rgba(247,247,247,0.9)', 'rgba(247,247,247,1)'],
     ),
-    [],
-  );
+  }));
 
   const topPad = insets.top + TOPBAR_H;
 
   return (
     <View style={s.root}>
       <Animated.ScrollView
-        contentContainerStyle={[s.list, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 10 }]} //100
+        contentContainerStyle={[s.list, { paddingTop: topPad + 16, paddingBottom: insets.bottom + 10 }]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={onScroll}
@@ -104,7 +100,6 @@ export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
                 onPress={() => router.push(item.route as any)}
               >
                 <Text style={s.allTitle}>{item.title}</Text>
-                {/* <View style={s.thumb} /> */}
               </Pressable>
             );
           }
@@ -115,25 +110,13 @@ export const CatalogMenuScreen = memo(function CatalogMenuScreen() {
               onPress={() => router.push(item.route as any)}
             >
               <Text style={s.cardTitle}>{item.title}</Text>
-              {/* <View style={s.thumb}>
-                {item.imageUrl ? (
-                  <Image
-                    source={{ uri: item.imageUrl }}
-                    style={StyleSheet.absoluteFill}
-                    contentFit="cover"
-                    cachePolicy="memory-disk"
-                  />
-                ) : (
-                  <View style={[StyleSheet.absoluteFill, s.thumbPlaceholder]} />
-                )}
-              </View> */}
             </Pressable>
           );
         })}
       </Animated.ScrollView>
 
       <Animated.View
-        style={[s.topBar, { paddingTop: insets.top + 8, backgroundColor: topBarBg }]}
+        style={[s.topBar, { paddingTop: insets.top + 8 }, topBarStyle]}
       >
         <Pressable
           style={s.searchBar}
