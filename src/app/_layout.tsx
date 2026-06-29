@@ -115,17 +115,27 @@ function DeepLinkHandler() {
   const router = useRouter();
   const navState = useRootNavigationState();
   const pendingUrl = useRef<string | null>(null);
+  const pendingIsColdStart = useRef(false);
   const navStateRef = useRef(navState);
   navStateRef.current = navState;
 
-  const navigate = useCallback((url: string) => {
+  const navigate = useCallback((url: string, coldStart = false) => {
     // Boat: /boats/<uuid> or /catalog/<uuid> — handle double or triple slash (rbsrent:///boats/...)
     const boatMatch = url.match(/(?:rbsrent:\/\/\/?|rbs\.rent\/)(?:boats|catalog)\/([0-9a-fA-F-]{36})/);
-    if (boatMatch) { router.push(`/catalog/${boatMatch[1]}` as any); return; }
+    if (boatMatch) {
+      // On cold start the base screen may be Unmatched Route — replace with home first
+      // so the back stack is /(tabs) → target instead of 404 → target.
+      if (coldStart) router.replace('/(tabs)' as any);
+      router.push(`/catalog/${boatMatch[1]}` as any);
+      return;
+    }
 
     // Route: /routes/<uuid-or-slug>[/<anything>]
     const routeMatch = url.match(/(?:rbsrent:\/\/\/?|rbs\.rent\/)routes\/([^/?#]+)/);
-    if (routeMatch) { router.push(`/routes/${routeMatch[1]}` as any); }
+    if (routeMatch) {
+      if (coldStart) router.replace('/(tabs)' as any);
+      router.push(`/routes/${routeMatch[1]}` as any);
+    }
   }, [router]);
 
   const navigateRef = useRef(navigate);
@@ -136,11 +146,11 @@ function DeepLinkHandler() {
     // after navState is already ready (race condition on cold start).
     Linking.getInitialURL().then((url) => {
       if (!url) return;
-      if (navStateRef.current?.key) navigateRef.current(url);
-      else pendingUrl.current = url;
+      if (navStateRef.current?.key) navigateRef.current(url, true);
+      else { pendingUrl.current = url; pendingIsColdStart.current = true; }
     });
     const sub = Linking.addEventListener("url", ({ url }) => {
-      if (navStateRef.current?.key) navigateRef.current(url);
+      if (navStateRef.current?.key) navigateRef.current(url, false);
       else pendingUrl.current = url;
     });
     return () => sub.remove();
@@ -149,8 +159,10 @@ function DeepLinkHandler() {
   useEffect(() => {
     if (!navState?.key || !pendingUrl.current) return;
     const url = pendingUrl.current;
+    const coldStart = pendingIsColdStart.current;
     pendingUrl.current = null;
-    navigate(url);
+    pendingIsColdStart.current = false;
+    navigate(url, coldStart);
   }, [navState?.key]);
 
   return null;
