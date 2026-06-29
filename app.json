@@ -118,7 +118,9 @@
       [
         "expo-status-bar",
         {
-          "style": "dark"
+          "style": "dark",
+          "backgroundColor": "#00000000",
+          "translucent": true
         }
       ]
     ],

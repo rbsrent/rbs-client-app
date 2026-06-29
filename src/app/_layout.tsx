@@ -115,21 +115,32 @@ function DeepLinkHandler() {
   const router = useRouter();
   const navState = useRootNavigationState();
   const pendingUrl = useRef<string | null>(null);
+  const navStateRef = useRef(navState);
+  navStateRef.current = navState;
 
   const navigate = useCallback((url: string) => {
-    // Boat: /boats/<uuid> or /catalog/<uuid>
-    const boatMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)(?:boats|catalog)\/([0-9a-fA-F-]{36})/);
+    // Boat: /boats/<uuid> or /catalog/<uuid> — handle double or triple slash (rbsrent:///boats/...)
+    const boatMatch = url.match(/(?:rbsrent:\/\/\/?|rbs\.rent\/)(?:boats|catalog)\/([0-9a-fA-F-]{36})/);
     if (boatMatch) { router.push(`/catalog/${boatMatch[1]}` as any); return; }
 
     // Route: /routes/<uuid-or-slug>[/<anything>]
-    const routeMatch = url.match(/(?:rbsrent:\/\/|rbs\.rent\/)routes\/([^/?#]+)/);
+    const routeMatch = url.match(/(?:rbsrent:\/\/\/?|rbs\.rent\/)routes\/([^/?#]+)/);
     if (routeMatch) { router.push(`/routes/${routeMatch[1]}` as any); }
   }, [router]);
 
+  const navigateRef = useRef(navigate);
+  navigateRef.current = navigate;
+
   useEffect(() => {
-    Linking.getInitialURL().then((url) => { if (url) pendingUrl.current = url; });
+    // Use ref so the callback always sees the latest navState, even if it resolves
+    // after navState is already ready (race condition on cold start).
+    Linking.getInitialURL().then((url) => {
+      if (!url) return;
+      if (navStateRef.current?.key) navigateRef.current(url);
+      else pendingUrl.current = url;
+    });
     const sub = Linking.addEventListener("url", ({ url }) => {
-      if (navState?.key) navigate(url);
+      if (navStateRef.current?.key) navigateRef.current(url);
       else pendingUrl.current = url;
     });
     return () => sub.remove();
@@ -167,7 +178,7 @@ function AuthRedirect() {
 export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <StatusBar style="dark" translucent backgroundColor="transparent" />
+      <StatusBar style="dark" />
       <Provider store={offlineReduxStore}>
         <PersistGate loading={null} persistor={persistor}>
           <BottomSheetModalProvider>
