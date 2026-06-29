@@ -39,6 +39,12 @@ export const useAuthStore = create<AuthState>((set) => ({
   setLoading: (isLoading) => set({ isLoading }),
 
   signOut: async () => {
+    try {
+      const { data: { user } } = await authSupabase.auth.getUser();
+      if (user) {
+        await authSupabase.from('push_tokens').delete().eq('user_id', user.id);
+      }
+    } catch {}
     await authSupabase.auth.signOut();
     set({ session: null, smsUser: null });
   },

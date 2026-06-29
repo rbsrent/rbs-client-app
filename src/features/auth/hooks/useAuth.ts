@@ -110,6 +110,12 @@ export function useAuth() {
   };
 
   const signOut = async () => {
+    try {
+      const { data: { user } } = await authSupabase.auth.getUser();
+      if (user) {
+        await authSupabase.from('push_tokens').delete().eq('user_id', user.id);
+      }
+    } catch {}
     await authSupabase.auth.signOut();
     setSession(null);
     setSmsUser(null);
