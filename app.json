@@ -36,11 +36,6 @@
         "ITSAppUsesNonExemptEncryption": false
       }
     },
-    "androidStatusBar": {
-      "barStyle": "dark-content",
-      "backgroundColor": "#00000000",
-      "translucent": true
-    },
     "android": {
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
@@ -119,7 +114,13 @@
           "sounds": []
         }
       ],
-      "expo-video"
+      "expo-video",
+      [
+        "expo-status-bar",
+        {
+          "style": "dark"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
