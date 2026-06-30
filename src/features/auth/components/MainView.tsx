@@ -65,7 +65,7 @@ export function MainView({
           <Phone size={18} color={COLORS.brandNavy} strokeWidth={2} />
           <View>
             <Text style={s.phoneBtnText}>Войти по номеру телефона</Text>
-            <Text style={s.phoneBtnSub}>Код по SMS или MAX</Text>
+            <Text style={s.phoneBtnSub}>Код по SMS</Text>
           </View>
         </Pressable>
       </View>

@@ -4,8 +4,6 @@ import { authSupabase } from '@/shared/supabase/authClient';
 import { normalizePhone } from '@/shared/utils/phone';
 import { useAuthStore } from '@/store/useAuthStore';
 
-type Channel = 'sms' | 'max';
-
 export function useAuth() {
   const { setSession, setSmsUser, setLoading, isLoading } = useAuthStore();
   const [error, setError] = useState<string | null>(null);
@@ -17,13 +15,12 @@ export function useAuth() {
     } catch {}
   };
 
-  const sendCode = async (phone: string, channel: Channel) => {
+  const sendCode = async (phone: string) => {
     setError(null);
     setLoading(true);
     try {
       const normalized = normalizePhone(phone).replace(/^8/, '7');
-      const fn = channel === 'sms' ? 'send-sms-verification' : 'send-max-verification';
-      const { error: fnError } = await authSupabase.functions.invoke(fn, {
+      const { error: fnError } = await authSupabase.functions.invoke('send-sms-verification', {
         body: { phone: normalized },
       });
       if (fnError) throw fnError;

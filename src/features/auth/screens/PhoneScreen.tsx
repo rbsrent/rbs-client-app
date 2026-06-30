@@ -37,7 +37,6 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
   const insets = useSafeAreaInsets();
   const { sendCode, isLoading, error } = useAuth();
   const [digits, setDigits] = useState('');
-  const [channel, setChannel] = useState<'sms' | 'max'>('sms');
   const inputRef = useRef<TextInput>(null);
 
   const progress = useSharedValue(0);
@@ -53,7 +52,7 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
   const handleSend = async () => {
     if (!isValidDigits(digits)) return;
     const e164 = digitsToE164(digits);
-    const res = await sendCode(e164, channel);
+    const res = await sendCode(e164);
     if (res.success) onCodeSent(normalizePhone(e164).replace(/^8/, '7'));
   };
 
@@ -75,20 +74,6 @@ export function PhoneScreen({ onBack, onCodeSent }: Props) {
           <Text style={s.subtitle}>
             Введите номер телефона — отправим код подтверждения
           </Text>
-        </View>
-
-        <View style={s.segmentedControl}>
-          {(['sms', 'max'] as const).map((ch) => (
-            <Pressable
-              key={ch}
-              style={[s.segmentBtn, channel === ch && s.segmentBtnActive]}
-              onPress={() => setChannel(ch)}
-            >
-              <Text style={[s.segmentText, channel === ch && s.segmentTextActive]}>
-                {ch === 'sms' ? 'SMS' : 'MAX'}
-              </Text>
-            </Pressable>
-          ))}
         </View>
 
         <Pressable style={s.inputWrap} onPress={() => inputRef.current?.focus()}>
@@ -166,36 +151,6 @@ const s = StyleSheet.create({
     fontSize: 14,
     color: COLORS.text2,
     lineHeight: 21,
-  },
-  segmentedControl: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.muted,
-    borderRadius: 12,
-    padding: 3,
-    gap: 3,
-  },
-  segmentBtn: {
-    flex: 1,
-    paddingVertical: 9,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  segmentBtnActive: {
-    backgroundColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.08,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  segmentText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.text3,
-  },
-  segmentTextActive: {
-    color: COLORS.brandNavy,
-    fontWeight: '700',
   },
   inputWrap: {
     flexDirection: 'row',

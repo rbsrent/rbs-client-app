@@ -68,7 +68,7 @@ export function OtpScreen({ phone, onBack }: Props) {
 
   const handleResend = async () => {
     if (resendTimer > 0) return;
-    await sendCode(phone, 'sms');
+    await sendCode(phone);
     setResendTimer(60);
   };
 
