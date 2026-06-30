@@ -2,11 +2,12 @@ import { Image } from "expo-image";
 import { LinearGradient } from "expo-linear-gradient";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { ArrowLeft, Clock, Heart, MapPin, Share2 } from "lucide-react-native";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Dimensions,
   Platform,
   Pressable,
+  ScrollView,
   Share,
   StyleSheet,
   Text,
@@ -31,11 +32,14 @@ import {
   setCachedRoute,
 } from "@/features/routes/store";
 import {
+  AssignedBoat,
   DIFFICULTY,
+  resolveBoatImage,
   resolveRouteImage,
   WaterRoute,
 } from "@/features/routes/types";
 import { COLORS } from "@/shared/colors";
+import { BoatCard } from "@/shared/components/BoatCard";
 import { useRouteWishlistPicker } from "@/shared/components/RouteWishlistPickerContext";
 import { Spinner } from "@/shared/components/Spinner";
 import { publicSupabase } from "@/shared/supabase/publicClient";
@@ -132,12 +136,52 @@ export default function RouteDetailScreen() {
   const cached = useRef(getCachedRoute(slug as string)).current;
   const [route, setRoute] = useState<WaterRoute | null>(cached);
   const [loading, setLoading] = useState(!cached);
+  const [assignedBoats, setAssignedBoats] = useState<AssignedBoat[]>([]);
+  const vesselCardData = useMemo(() =>
+    assignedBoats.map(boat => {
+      const mainImg = boat.boat_images?.find(i => i.position === 0) ?? boat.boat_images?.[0];
+      return {
+        id: boat.id,
+        cardData: {
+          id: boat.id,
+          name: boat.name,
+          type: boat.type,
+          cover_image_url: resolveBoatImage(mainImg?.image_path ?? null),
+          price_per_hour: boat.price_per_hour,
+          capacity: boat.capacity,
+        },
+        route: `/boats/${boat.id}` as const,
+      };
+    }),
+  [assignedBoats]);
 
   const { openRoutePicker } = useRouteWishlistPicker();
   const isSaved = useRouteSavedStore((s) => (route ? s.savedIds.has(route.id) : false));
   const hydrate = useRouteSavedStore((s) => s.hydrate);
 
   useEffect(() => { hydrate(); }, []);
+
+  useEffect(() => {
+    if (!route?.id) return;
+    let cancelled = false;
+    (async () => {
+      const { data } = await publicSupabase
+        .from('water_route_vessels')
+        .select(`
+          display_order,
+          boats (
+            id, name, type, price_per_hour, capacity,
+            boat_images (image_path, position)
+          )
+        `)
+        .eq('route_id', route.id)
+        .order('display_order', { ascending: true });
+      if (!cancelled && data) {
+        setAssignedBoats(data.map((r: any) => r.boats).filter(Boolean));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [route?.id]);
 
   const handleShare = useCallback(async () => {
     try {
@@ -370,6 +414,31 @@ export default function RouteDetailScreen() {
                   </View>
                 </View>
               )}
+
+              {assignedBoats.length > 0 && (
+                <View style={s.vesselSection}>
+                  <View style={s.vesselHeader}>
+                    <Text style={s.sectionTitle}>Суда для этого маршрута</Text>
+                    <Pressable onPress={() => router.push('/boats')} hitSlop={8}>
+                      <Text style={s.vesselSeeAll}>Все</Text>
+                    </Pressable>
+                  </View>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={s.vesselScroll}
+                  >
+                    {vesselCardData.map(({ id, cardData, route }) => (
+                      <BoatCard
+                        key={id}
+                        boat={cardData}
+                        layout="strip"
+                        route={route}
+                      />
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
             </Animated.View>
           )}
         </View>
@@ -543,6 +612,10 @@ const s = StyleSheet.create({
   spacer: { height: 8 },
 
   highlightsSection: { paddingHorizontal: 20, gap: 12 },
+  vesselSection: { gap: 12 },
+  vesselHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 16 },
+  vesselSeeAll: { fontSize: 14, fontWeight: '600', color: COLORS.brandBlue },
+  vesselScroll: { paddingHorizontal: 16, gap: 12, paddingRight: 32 },
   sectionTitle: { fontSize: 17, fontWeight: "700", color: COLORS.text1 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   chip: {

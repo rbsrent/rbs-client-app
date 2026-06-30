@@ -39,6 +39,22 @@ export const DIFFICULTY: Record<string, { label: string; color: string }> = {
   hard:   { label: 'Сложный',  color: COLORS.error },
 };
 
+export interface AssignedBoat {
+  id: string;
+  name: string;
+  type: string | null;
+  price_per_hour: number;
+  capacity: number | null;
+  boat_images: { image_path: string; position: number }[];
+}
+
+const BOAT_BUCKET = 'boat_images';
+
+export function resolveBoatImage(imagePath: string | null): string | null {
+  if (!imagePath) return null;
+  return `${SUPABASE_URL}/storage/v1/object/public/${BOAT_BUCKET}/${imagePath}`;
+}
+
 export const VESSEL_FILTERS = [
   { key: 'all',   label: 'Все' },
   { key: 'boat',  label: 'Катера' },
