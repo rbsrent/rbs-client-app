@@ -14,14 +14,16 @@ export function MainView({
   error,
   onTelegram,
   onPhone,
+  bottomInset = 0,
 }: {
   isLoading: boolean;
   error: string | null;
   onTelegram: () => void;
   onPhone: () => void;
+  bottomInset?: number;
 }) {
   return (
-    <View style={s.body}>
+    <View style={[s.body, { paddingBottom: 32 + bottomInset }]}>
       <View style={s.top}>
         <View style={s.iconWrap}>
           <Send size={30} color={COLORS.white} strokeWidth={1.8} />
@@ -78,7 +80,6 @@ const s = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 24,
     paddingTop: 72,
-    paddingBottom: 32,
   },
   top: {
     gap: 12,

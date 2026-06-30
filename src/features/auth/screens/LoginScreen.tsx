@@ -207,7 +207,7 @@ export function LoginScreen() {
         <Pressable
           onPress={() => router.back()}
           hitSlop={10}
-          style={s.closeBtn}
+          style={[s.closeBtn, { top: insets.top + 12 }]}
         >
           <X size={18} color={COLORS.text2} strokeWidth={2} />
         </Pressable>
@@ -237,6 +237,7 @@ export function LoginScreen() {
               error={error}
               onTelegram={startTelegram}
               onPhone={() => { setError(null); navigate('phone', 1); }}
+              bottomInset={insets.bottom}
             />
           )}
         </Animated.View>
