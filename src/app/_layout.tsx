@@ -61,19 +61,32 @@ function PushRegistrar() {
 function NotificationColdStart() {
   const router = useRouter();
   const navState = useRootNavigationState();
+  const segments = useSegments();
   const handled = useRef(false);
+  const pendingRoute = useRef<string | null>(null);
 
+  // Step 1: read notification URL as soon as navigation is ready
   useEffect(() => {
     if (!navState?.key || handled.current) return;
     Notifications.getLastNotificationResponseAsync().then((response) => {
-      if (!response) return;
-      handled.current = true;
+      if (!response || handled.current) return;
       const raw = response.notification.request.content.data?.url as string | undefined;
       if (!raw) return;
       const route = resolveNotifUrl(raw);
-      if (route) router.push(route as any);
+      if (route) pendingRoute.current = route;
     });
   }, [navState?.key]);
+
+  // Step 2: push only once SplashScreen has naturally navigated away to (tabs).
+  // Avoids race where SplashScreen's MIN_MS timer fires after our push and replaces the target screen.
+  useEffect(() => {
+    if (handled.current || !pendingRoute.current) return;
+    if (segments[0] !== '(tabs)') return;
+    handled.current = true;
+    const route = pendingRoute.current;
+    pendingRoute.current = null;
+    router.push(route as any);
+  }, [segments]);
 
   return null;
 }
