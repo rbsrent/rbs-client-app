@@ -1,17 +1,7 @@
 import { BottomSheetModal, BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
-import {
-  Anchor,
-  CalendarCheck,
-  Gift,
-  MapPin,
-  MoreHorizontal,
-  Route,
-  Sailboat,
-  Ship
-} from "lucide-react-native";
 import React, { memo, useCallback, useMemo, useRef } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   useAnimatedStyle,
   useSharedValue,
@@ -25,7 +15,7 @@ import { SheetBackdrop } from "@/shared/components/SheetBackdrop";
 interface Service {
   key: string;
   label: string;
-  icon: React.ReactNode;
+  icon: number;
   bg: string;
   route: string;
   badge?: string;
@@ -36,27 +26,25 @@ interface ServiceGroup {
   items: Service[];
 }
 
-const IC = COLORS.brandNavy;
-
 const ALL: Service[] = [
   {
     key: "boat",
     label: "Катер",
-    icon: <Anchor size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/motorboat.png"),
     bg: "",
     route: "/boats?type=boat",
   },
   {
     key: "yacht",
     label: "Яхта",
-    icon: <Sailboat size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/motor-yacht.png"),
     bg: "",
     route: "/boats?type=yacht",
   },
   {
     key: "ship",
     label: "Теплоход",
-    icon: <Ship size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/river-ship.png"),
     bg: "",
     route: "/services/teplokhod",
     badge: "Скоро",
@@ -64,28 +52,28 @@ const ALL: Service[] = [
   {
     key: "routes",
     label: "Маршруты",
-    icon: <Route size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/routes.png"),
     bg: "",
     route: "/routes",
   },
   {
     key: "piers",
     label: "Причалы",
-    icon: <MapPin size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/piers.png"),
     bg: "",
     route: "/piers",
   },
   {
     key: "cert",
     label: "Сертификат",
-    icon: <Gift size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/certificate.png"),
     bg: "",
     route: "/gift-cert",
   },
   {
     key: "bookings",
     label: "Мои брони",
-    icon: <CalendarCheck size={22} color={IC} strokeWidth={2} />,
+    icon: require("../../../../assets/icons/bookings.png"),
     bg: "",
     route: "/bookings",
   },
@@ -118,6 +106,12 @@ const GROUPS: ServiceGroup[] = [
 
 const AnimPressable = Animated.createAnimatedComponent(Pressable);
 
+const SheetHandle = () => (
+  <View style={s.handleWrap}>
+    <View style={s.handle} />
+  </View>
+);
+
 const ServiceItem = memo(function ServiceItem({
   item,
   iconSize = 56,
@@ -143,13 +137,12 @@ const ServiceItem = memo(function ServiceItem({
       }}
       onPress={() => onPress(item.route)}
     >
-      <View
-        style={[
-          s.iconBox,
-          { width: iconSize, height: iconSize, borderRadius: iconSize * 0.26 },
-        ]}
-      >
-        {item.icon}
+      <View style={{ width: iconSize, height: iconSize }}>
+        <Image
+          source={item.icon}
+          style={{ width: iconSize, height: iconSize }}
+          resizeMode="contain"
+        />
         {item.badge ? (
           <View style={s.badge}>
             <Text style={s.badgeTxt}>{item.badge}</Text>
@@ -193,10 +186,12 @@ export const ServiceGrid = memo(function ServiceGrid() {
           style={s.moreItem}
           onPress={() => sheetRef.current?.present()}
         >
-          <View
-            style={[s.iconBox, { width: 56, height: 56, borderRadius: 15 }]}
-          >
-            <MoreHorizontal size={22} color={COLORS.text2} strokeWidth={2} />
+          <View style={{ width: 56, height: 56 }}>
+            <Image
+              source={require("../../../../assets/icons/more.png")}
+              style={{ width: 56, height: 56 }}
+              resizeMode="contain"
+            />
           </View>
           <Text style={s.label}>Ещё</Text>
         </Pressable>
@@ -210,11 +205,7 @@ export const ServiceGrid = memo(function ServiceGrid() {
         enablePanDownToClose
         backdropComponent={SheetBackdrop}
         backgroundStyle={s.sheetBg}
-        handleComponent={() => (
-          <View style={s.handleWrap}>
-            <View style={s.handle} />
-          </View>
-        )}
+        handleComponent={SheetHandle}
       >
         <BottomSheetScrollView
           contentContainerStyle={[s.sheetContent, { paddingBottom: bottom + 32 }]}
@@ -259,11 +250,6 @@ const s = StyleSheet.create({
     width: 72,
     alignItems: "center",
     gap: 6,
-  },
-  iconBox: {
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: COLORS.greyLight,
   },
   badge: {
     position: "absolute",
