@@ -92,17 +92,14 @@ export function AllBoatsScreen() {
       return true;
     });
 
-    const sorted = sortBoats(pass, {
+    return sortBoats(pass, {
       pierIds: f.pierIds,
       availMap,
       allPiers,
       radiusKm: f.pierRadiusKm,
       dateActive: f.dateTime.date !== null,
+      sortBy,
     });
-
-    if (sortBy === 'price_asc') return [...sorted].sort((a, b) => a.price_per_hour - b.price_per_hour);
-    if (sortBy === 'price_desc') return [...sorted].sort((a, b) => b.price_per_hour - a.price_per_hour);
-    return sorted;
   }, [allBoats, availMap, allPiers, sortBy]);
 
   const filtered = useMemo(
@@ -149,6 +146,10 @@ export function AllBoatsScreen() {
     else clearSelectedDate().catch(() => { });
   }, []);
 
+  const handleTimeSelect = useCallback((startHour: number) => {
+    setFilters((f) => ({ ...f, dateTime: { ...f.dateTime, startHour } }));
+  }, []);
+
   const renderBoat = useCallback(
     ({ item }: { item: Boat }) => (
       <PromoCard
@@ -156,9 +157,11 @@ export function AllBoatsScreen() {
         availInfo={availMap[item.id]}
         discount={discountsMap.get(item.id)}
         selectedDate={filters.dateTime.date ? toLocalDateISO(filters.dateTime.date) : undefined}
+        selectedHour={filters.dateTime.date ? filters.dateTime.startHour : undefined}
+        selectedDuration={filters.dateTime.date ? filters.dateTime.durationHours : undefined}
       />
     ),
-    [availMap, discountsMap, filters.dateTime.date],
+    [availMap, discountsMap, filters.dateTime.date, filters.dateTime.startHour, filters.dateTime.durationHours],
   );
 
   const listContentStyle = useMemo(
@@ -171,6 +174,7 @@ export function AllBoatsScreen() {
       filters={filters}
       setFilters={setFilters}
       onDateSelect={handleWeekDate}
+      onTimeSelect={handleTimeSelect}
       onOpenFilter={openFilter}
       viewMode={viewMode}
       setView={(m) => {
@@ -184,7 +188,7 @@ export function AllBoatsScreen() {
       sortBy={sortBy}
       onSortChange={setSortBy}
     />
-  ), [filters, setFilters, handleWeekDate, openFilter, viewMode, filtered.length, total, availLoading, loading, sortBy]);
+  ), [filters, setFilters, handleWeekDate, handleTimeSelect, openFilter, viewMode, filtered.length, total, availLoading, loading, sortBy]);
 
   const handleResetFilters = useCallback(() => setFilters(DEFAULT), []);
 

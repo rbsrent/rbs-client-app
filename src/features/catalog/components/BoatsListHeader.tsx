@@ -5,7 +5,8 @@ import {
   Map,
   X,
 } from "lucide-react-native";
-import React, { useEffect, useMemo } from "react";
+import { BottomSheetModal } from "@gorhom/bottom-sheet";
+import React, { useEffect, useMemo, useRef } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import Animated, {
   Easing,
@@ -23,10 +24,12 @@ import Animated, {
 import { COLORS } from "@/shared/colors";
 import { Spinner } from "@/shared/components/Spinner";
 import { TYPE_CHIPS } from "../constants";
+import { useHourlyAvailability } from "../hooks/useHourlyAvailability";
 import { DEFAULT, Filters } from "../types";
-import { ruFmt } from "../utils/filterUtils";
+import { fmtHour, fmtShort, ruFmt } from "../utils/filterUtils";
 import { DateStrip } from "./DateStrip";
 import { FilterSection } from "./FilterMiniSheet";
+import { TimeSelectSheet } from "./TimeSelectSheet";
 
 export type SortBy = "popular" | "price_asc" | "price_desc";
 
@@ -49,6 +52,7 @@ interface Props {
   filters: Filters;
   setFilters: (f: Filters | ((prev: Filters) => Filters)) => void;
   onDateSelect: (date: Date | null) => void;
+  onTimeSelect: (hour: number) => void;
   onOpenFilter: (section: FilterSection) => void;
   viewMode: "list" | "map";
   setView: (mode: "list" | "map") => void;
@@ -64,6 +68,7 @@ export const BoatsListHeader: React.FC<Props> = ({
   filters,
   setFilters,
   onDateSelect,
+  onTimeSelect,
   onOpenFilter,
   viewMode,
   setView,
@@ -74,6 +79,31 @@ export const BoatsListHeader: React.FC<Props> = ({
   sortBy,
   onSortChange,
 }) => {
+  const { availableHours, loading: hoursLoading } = useHourlyAvailability(
+    filters.dateTime.date,
+    filters.dateTime.durationHours,
+  );
+
+  // Selected hour turned out unavailable (e.g. after switching date) →
+  // jump to the nearest hour that still has boats.
+  useEffect(() => {
+    if (!availableHours) return;
+    if (availableHours[filters.dateTime.startHour]) return;
+    const nextFree = Object.keys(availableHours)
+      .map(Number)
+      .sort((a, b) => a - b)
+      .find((h) => availableHours[h]);
+    if (nextFree !== undefined) onTimeSelect(nextFree);
+  }, [availableHours]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Time picker — compact chip trigger that opens a bottom sheet ──
+  const timeSheetRef = useRef<BottomSheetModal>(null);
+
+  const handleDateSelect = (date: Date | null) => {
+    onDateSelect(date);
+    if (date !== null) timeSheetRef.current?.present();
+  };
+
   const cycleSortBy = () => {
     const idx = SORT_OPTS.findIndex((o) => o.key === sortBy);
     onSortChange(SORT_OPTS[(idx + 1) % SORT_OPTS.length].key);
@@ -86,13 +116,15 @@ export const BoatsListHeader: React.FC<Props> = ({
   const amenActive = filters.hasTarp || filters.hasToilet || filters.hasHeating;
   const durActive =
     filters.dateTime.durationHours !== DEFAULT.dateTime.durationHours;
+  const dtActive = filters.dateTime.date !== null;
   const anyActive =
     sortActive ||
     typeActive ||
     priceActive ||
     capActive ||
     amenActive ||
-    durActive;
+    durActive ||
+    dtActive;
 
   const clearAll = () => {
     setFilters(DEFAULT);
@@ -106,6 +138,7 @@ export const BoatsListHeader: React.FC<Props> = ({
   const capP = useSharedValue(capActive ? 1 : 0);
   const amenP = useSharedValue(amenActive ? 1 : 0);
   const durP = useSharedValue(durActive ? 1 : 0);
+  const dtP = useSharedValue(dtActive ? 1 : 0);
 
   useEffect(() => {
     sortP.value = withTiming(sortActive ? 1 : 0, TIMING);
@@ -125,6 +158,9 @@ export const BoatsListHeader: React.FC<Props> = ({
   useEffect(() => {
     durP.value = withTiming(durActive ? 1 : 0, TIMING);
   }, [durActive]);
+  useEffect(() => {
+    dtP.value = withTiming(dtActive ? 1 : 0, TIMING);
+  }, [dtActive]);
 
   // Background color for each chip
   const sortBgS = useAnimatedStyle(() => ({
@@ -165,6 +201,13 @@ export const BoatsListHeader: React.FC<Props> = ({
   const durBgS = useAnimatedStyle(() => ({
     backgroundColor: interpolateColor(
       durP.value,
+      [0, 1],
+      [COLORS.greyLight2, COLORS.brandNavy],
+    ),
+  }));
+  const dtBgS = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      dtP.value,
       [0, 1],
       [COLORS.greyLight2, COLORS.brandNavy],
     ),
@@ -213,16 +256,23 @@ export const BoatsListHeader: React.FC<Props> = ({
       [COLORS.brandNavy, COLORS.white],
     ),
   }));
+  const dtTxtS = useAnimatedStyle(() => ({
+    color: interpolateColor(
+      dtP.value,
+      [0, 1],
+      [COLORS.brandNavy, COLORS.white],
+    ),
+  }));
 
   // ── Sorted filter chip order: active first, then inactive ──
   const sortedFilterKeys = useMemo(() => {
-    const all = ['type', 'price', 'capacity', 'amenities', 'duration'] as const;
-    const isActive = { type: typeActive, price: priceActive, capacity: capActive, amenities: amenActive, duration: durActive };
+    const all = ['datetime', 'type', 'price', 'capacity', 'amenities', 'duration'] as const;
+    const isActive = { datetime: dtActive, type: typeActive, price: priceActive, capacity: capActive, amenities: amenActive, duration: durActive };
     return [
       ...all.filter((k) => isActive[k]),
       ...all.filter((k) => !isActive[k]),
     ];
-  }, [typeActive, priceActive, capActive, amenActive, durActive]);
+  }, [dtActive, typeActive, priceActive, capActive, amenActive, durActive]);
 
   // ── Labels ──
   const typeLabel = typeActive
@@ -258,9 +308,13 @@ export const BoatsListHeader: React.FC<Props> = ({
         : `${durH} часов`
     : "Продолжительность";
 
+  const dtLabel = dtActive
+    ? `${fmtShort(filters.dateTime.date!)} · ${fmtHour(filters.dateTime.startHour)}`
+    : "Дата и время";
+
   return (
     <View>
-      <DateStrip selected={filters.dateTime.date} onSelect={onDateSelect} disabled={isLoading} />
+      <DateStrip selected={filters.dateTime.date} onSelect={handleDateSelect} disabled={isLoading} />
 
       {/* ── Gorbilet-style filter chips ── */}
       <ScrollView
@@ -292,6 +346,16 @@ export const BoatsListHeader: React.FC<Props> = ({
         {/* Filter chips — active ones float to front, layout animates position */}
         {sortedFilterKeys.map((k) => {
           switch (k) {
+            case 'datetime':
+              // No date picked yet → nothing for the time sheet to attach to;
+              // pick a date via the strip above first. Chip is just a label
+              // until then, not a dead-end trigger for an empty sheet.
+              if (!dtActive) return null;
+              return (
+                <AnimPressable key="datetime" style={[s.fChip, dtBgS]} onPress={() => timeSheetRef.current?.present()} layout={LAY_CFG}>
+                  <Animated.Text style={[s.fChipTxt, dtTxtS]} layout={LAY_CFG}>{dtLabel}</Animated.Text>
+                </AnimPressable>
+              );
             case 'type':
               return (
                 <AnimPressable key="type" style={[s.fChip, typeBgS]} onPress={() => onOpenFilter('type')} layout={LAY_CFG}>
@@ -347,9 +411,17 @@ export const BoatsListHeader: React.FC<Props> = ({
                   )}
                 </AnimPressable>
               );
-          }
-        })}
+              }
+            })}
       </ScrollView>
+
+      <TimeSelectSheet
+        modalRef={timeSheetRef}
+        selected={filters.dateTime.startHour}
+        onSelect={onTimeSelect}
+        availableHours={availableHours}
+        loading={hoursLoading}
+      />
 
       {/* ── Counter + view toggle ── */}
       <View style={s.barRow}>

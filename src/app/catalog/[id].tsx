@@ -60,9 +60,11 @@ function Divider() {
 }
 
 export default function BoatDetailScreen() {
-  const { id, selectedDate } = useLocalSearchParams<{
+  const { id, selectedDate, selectedHour, selectedDuration } = useLocalSearchParams<{
     id: string;
     selectedDate?: string;
+    selectedHour?: string;
+    selectedDuration?: string;
   }>();
   const insets = useSafeAreaInsets();
   const router = useRouter();
@@ -467,6 +469,8 @@ export default function BoatDetailScreen() {
           onBook={() => {
             const p = new URLSearchParams({ boatId: boat.id });
             if (selectedDate) p.set("date", selectedDate);
+            if (selectedHour) p.set("time", selectedHour);
+            if (selectedDuration) p.set("duration", selectedDuration);
             p.set("boatName", getBoatH1(boat));
             if (boat.piers?.name) p.set("pierName", boat.piers.name);
             if (boat.piers?.address) p.set("pierAddress", boat.piers.address);

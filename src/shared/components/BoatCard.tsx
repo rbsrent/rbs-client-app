@@ -22,6 +22,12 @@ const { width: W } = Dimensions.get("window");
 export type BoatCardLayout = "grid" | "strip";
 export type BoatCardVariant = "home" | "catalog";
 
+export interface BadgeInfo {
+  label: string;
+  variant: "dark" | "light";
+  dot?: boolean;
+}
+
 export interface BoatCardData {
   id: string;
   name: string;
@@ -39,7 +45,7 @@ export interface BoatCardData {
 interface Props {
   boat: BoatCardData;
   layout?: BoatCardLayout;
-  badge?: string;
+  badge?: string | BadgeInfo | null;
   availInfo?: AvailInfo;
   discount?: ActiveDiscount;
   route?: string;
@@ -85,7 +91,9 @@ export const BoatCard = memo(function BoatCard({
         : GRID_IMG_H;
   const cardSrc = boat.cover_image_url ?? null;
   const availLabel = availInfo ? availBadgeLabel(availInfo) : null;
-  const topBadge = availLabel ?? badge ?? null;
+  const badgeInfo: BadgeInfo | null =
+    typeof badge === "string" ? { label: badge, variant: "light" } : badge ?? null;
+  const topBadge = availLabel ?? badgeInfo?.label ?? null;
 
   const { displayPrice, originalPrice, discountPct } = getBoatPriceInfo(
     boat.price_per_hour,
@@ -174,8 +182,25 @@ export const BoatCard = memo(function BoatCard({
                   <Text style={s.catalogBadgeTxt}>{topBadge}</Text>
                 </LinearGradient>
               ) : (
-                <View style={[s.badgePill, availLabel ? s.badgeAvail : s.badgeDefault]}>
-                  <Text style={s.badgeTxt}>{topBadge}</Text>
+                <View
+                  style={[
+                    s.badgePill,
+                    availLabel
+                      ? s.badgeAvail
+                      : badgeInfo?.variant === "dark"
+                        ? s.badgeDark
+                        : s.badgeDefault,
+                  ]}
+                >
+                  {badgeInfo?.dot && !availLabel && <View style={s.badgeDot} />}
+                  <Text
+                    style={[
+                      s.badgeTxt,
+                      !availLabel && badgeInfo?.variant === "dark" && s.badgeTxtDark,
+                    ]}
+                  >
+                    {topBadge}
+                  </Text>
                 </View>
               )
             ) : null}
@@ -183,9 +208,11 @@ export const BoatCard = memo(function BoatCard({
           <HeartButton boat={heartData} size={18} />
         </View>
 
-        {isCatalog && discountPct ? (
+        {isCatalog && discountPct && discount ? (
           <View style={s.catalogImgDiscountBadge}>
-            <Text style={s.catalogImgDiscountTxt}>−{discountPct}%</Text>
+            <Text style={s.catalogImgDiscountTxt} numberOfLines={1}>
+              {discount.name}
+            </Text>
           </View>
         ) : null}
         {!isCatalog && (
@@ -313,7 +340,7 @@ const s = StyleSheet.create({
     gap: 4,
   },
   tagFilled: {
-    borderRadius: 8,
+    borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
@@ -342,12 +369,22 @@ const s = StyleSheet.create({
   },
 
   badgePill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     borderRadius: 6,
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   badgeDefault: { backgroundColor: "rgba(255,255,255,0.88)" },
   badgeAvail: { backgroundColor: "rgba(37,160,119,0.9)" },
+  badgeDark: { backgroundColor: "rgba(27,42,65,0.92)" },
+  badgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.success,
+  },
   badgeTxt: {
     fontSize: 10,
     fontWeight: "700",
@@ -355,6 +392,7 @@ const s = StyleSheet.create({
     letterSpacing: 0.4,
     textTransform: "uppercase",
   },
+  badgeTxtDark: { color: "#fff" },
 
   gradient: {
     position: "absolute",
@@ -384,14 +422,15 @@ const s = StyleSheet.create({
     position: "absolute",
     bottom: 10,
     left: 10,
-    backgroundColor: COLORS.redDark,
+    maxWidth: GRID_W - 20,
+    backgroundColor: COLORS.warning,
     borderRadius: 5,
     paddingHorizontal: 8,
     paddingVertical: 4,
   },
   catalogImgDiscountTxt: {
-    fontSize: 12,
-    fontWeight: "800",
+    fontSize: 11,
+    fontWeight: "600",
     color: "#fff",
   },
   discountPill: {

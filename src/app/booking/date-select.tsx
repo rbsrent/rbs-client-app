@@ -1,21 +1,52 @@
 import { useLocalSearchParams, useRouter } from "expo-router";
-import { ArrowLeft, Check, Clock } from "lucide-react-native";
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { ArrowLeft, Check, ChevronRight, Clock } from "lucide-react-native";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  LayoutAnimation,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  UIManager,
+  View,
+} from "react-native";
 import Animated, {
   Easing,
+  interpolate,
   useAnimatedStyle,
   useSharedValue,
   withTiming,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { buildBoatH1 } from "@/features/catalog/hooks/useBoatDetail";
 import { computeSlotSelection } from "@/features/booking/utils";
+import { DURATION_OPTS } from "@/features/catalog/constants";
+import { buildBoatH1 } from "@/features/catalog/hooks/useBoatDetail";
 import { COLORS } from "@/shared/colors";
 import { CalendarPicker } from "@/shared/components/CalendarPicker";
 import { Spinner } from "@/shared/components/Spinner";
 import { publicSupabase } from "@/shared/supabase/publicClient";
+
+if (
+  Platform.OS === "android" &&
+  UIManager.setLayoutAnimationEnabledExperimental
+) {
+  UIManager.setLayoutAnimationEnabledExperimental(true);
+}
+
+const EXPAND_CONFIG = {
+  duration: 320,
+  create: { type: LayoutAnimation.Types.spring, property: LayoutAnimation.Properties.scaleXY, springDamping: 0.85 },
+  update: { type: LayoutAnimation.Types.spring, springDamping: 0.85 },
+  delete: { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+};
+const COLLAPSE_CONFIG = {
+  duration: 240,
+  create: { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+  update: { type: LayoutAnimation.Types.easeInEaseOut },
+  delete: { type: LayoutAnimation.Types.easeOut, property: LayoutAnimation.Properties.opacity },
+};
 
 const MONTHS_S = [
   "янв",
@@ -56,12 +87,16 @@ export default function DateSelectScreen() {
   const {
     boatId,
     date: dateParam,
+    time: timeParam,
+    duration: durationParam,
     boatName: boatNameParam,
     pierName: pierNameParam,
     pierAddress: pierAddressParam,
   } = useLocalSearchParams<{
     boatId: string;
     date?: string;
+    time?: string;
+    duration?: string;
     boatName?: string;
     pierName?: string;
     pierAddress?: string;
@@ -81,6 +116,9 @@ export default function DateSelectScreen() {
   });
 
   const [minDuration, setMinDuration] = useState(1);
+  const [selectedDuration, setSelectedDuration] = useState(
+    durationParam ? parseInt(durationParam, 10) : 2,
+  );
   const [busyHours, setBusyHours] = useState<Set<number>>(new Set());
   const [slotsLoading, setSlotsLoading] = useState(false);
   const [selectedHours, setSelectedHours] = useState<number[]>([]);
@@ -92,6 +130,19 @@ export default function DateSelectScreen() {
   );
   const [pierAddress, setPierAddress] = useState<string | null>(
     pierAddressParam ?? null,
+  );
+
+  // Section stays open — time already chosen on the catalog screen shows up
+  // pre-highlighted in the grid/duration chips instead of being tucked away
+  // behind a summary pill. Collapse is still available (tap to re-pick).
+  const [timeOpen, setTimeOpen] = useState(true);
+  const prefillRef = useRef(
+    timeParam
+      ? {
+          hour: parseInt(timeParam, 10),
+          duration: durationParam ? parseInt(durationParam, 10) : 2,
+        }
+      : null,
   );
 
   // Fetch boat name + pier (silent background update; params already pre-fill UI)
@@ -139,8 +190,10 @@ export default function DateSelectScreen() {
           .select("min_duration_hours")
           .eq("id", boatId)
           .single();
-        if (!error && data?.min_duration_hours)
+        if (!error && data?.min_duration_hours) {
           setMinDuration(data.min_duration_hours);
+          setSelectedDuration((d) => Math.max(d, data.min_duration_hours));
+        }
       } catch {}
     })();
   }, [boatId]);
@@ -178,6 +231,24 @@ export default function DateSelectScreen() {
           },
         );
         setBusyHours(busy);
+
+        // Try to honor the date+time already chosen on the catalog screen.
+        if (prefillRef.current) {
+          const { hour, duration } = prefillRef.current;
+          prefillRef.current = null;
+          const now = new Date();
+          const isToday = date.toDateString() === now.toDateString();
+          const range = Array.from({ length: duration }, (_, i) => hour + i);
+          const clear = range.every(
+            (h) => !busy.has(h) && !(h < 24 && isToday && h <= now.getHours()),
+          );
+          if (clear) {
+            setSelectedHours(range);
+            setSelectedDuration(duration);
+          } else {
+            expandTime();
+          }
+        }
       } catch {
       } finally {
         if (!cancelled) setSlotsLoading(false);
@@ -206,10 +277,23 @@ export default function DateSelectScreen() {
     (hour: number) => {
       if (unavailable(hour)) return;
       setSelectedHours((prev) =>
-        computeSlotSelection(prev, hour, minDuration, unavailable),
+        computeSlotSelection(prev, hour, selectedDuration, unavailable),
       );
     },
-    [unavailable, minDuration],
+    [unavailable, selectedDuration],
+  );
+
+  const handleDurationSelect = useCallback(
+    (h: number) => {
+      const eff = Math.max(h, minDuration);
+      setSelectedDuration(eff);
+      setSelectedHours((prev) => {
+        if (prev.length === 0) return prev;
+        const range = Array.from({ length: eff }, (_, i) => prev[0] + i);
+        return range.some(unavailable) ? prev : range;
+      });
+    },
+    [minDuration, unavailable],
   );
 
   const startH = selectedHours[0];
@@ -244,6 +328,28 @@ export default function DateSelectScreen() {
     transform: [{ translateY: (1 - btnProgress.value) * 16 }],
     pointerEvents: btnProgress.value > 0 ? "auto" : "none",
   }));
+
+  // ── Time section expand/collapse — same pattern as CalendarPicker ──
+  const timeFade = useSharedValue(timeOpen ? 1 : 0);
+  const timePillStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(timeFade.value, [0, 0.5], [1, 0], "clamp"),
+    transform: [{ translateY: interpolate(timeFade.value, [0, 0.4], [0, -6], "clamp") }],
+  }));
+  const timeBodyStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(timeFade.value, [0.2, 1], [0, 1], "clamp"),
+    transform: [{ translateY: interpolate(timeFade.value, [0, 1], [10, 0], "clamp") }],
+  }));
+
+  const expandTime = () => {
+    LayoutAnimation.configureNext(EXPAND_CONFIG);
+    timeFade.value = withTiming(1, { duration: 300, easing: Easing.out(Easing.cubic) });
+    setTimeOpen(true);
+  };
+  const collapseTime = () => {
+    LayoutAnimation.configureNext(COLLAPSE_CONFIG);
+    timeFade.value = withTiming(0, { duration: 220, easing: Easing.in(Easing.cubic) });
+    setTimeOpen(false);
+  };
 
   return (
     <View style={[s.root, { paddingTop: insets.top }]}>
@@ -288,95 +394,136 @@ export default function DateSelectScreen() {
 
         <View style={s.divider} />
 
-        {/* Time slots */}
+        {/* Time slots — collapsible, same transition as the calendar above */}
         <View style={s.section}>
-          <View style={s.slotHeader}>
-            <Clock size={15} color={COLORS.text2} strokeWidth={2} />
-            <Text style={s.slotTitle}>Время</Text>
-            <Text style={s.slotDate}>
-              {fmtDateShort(date)}
-              {minDuration > 1 ? `  ·  мин. ${durLabel(minDuration)}` : ""}
-            </Text>
-          </View>
-
-          {/* Legend */}
-          <View style={s.legend}>
-            <View style={s.legendItem}>
-              <View
-                style={[s.legendDot, { backgroundColor: COLORS.brandNavy }]}
-              />
-              <Text style={s.legendTxt}>Выбрано</Text>
-            </View>
-            <View style={s.legendItem}>
-              <View
-                style={[
-                  s.legendDot,
-                  {
-                    backgroundColor: COLORS.greyLight,
-                  },
-                ]}
-              />
-              <Text style={s.legendTxt}>Свободно</Text>
-            </View>
-            <View style={s.legendItem}>
-              <View style={[s.legendDot, { backgroundColor: "#F3E8E8" }]} />
-              <Text style={s.legendTxt}>Занято</Text>
-            </View>
-          </View>
-
-          {slotsLoading ? (
-            <View style={s.loader}>
-              <Spinner />
-              <Text style={s.loaderTxt}>Загружаем слоты…</Text>
-            </View>
+          {!timeOpen ? (
+            <Animated.View style={timePillStyle}>
+              <Pressable style={s.collapsed} onPress={expandTime}>
+                <Text style={s.collapsedLabel}>Выбранное время</Text>
+                <View style={s.collapsedRow}>
+                  <Text style={s.collapsedDate}>
+                    {startH != null
+                      ? `${fmtHour(startH)} – ${fmtTimeLabel(endH!)} · ${durLabel(selectedHours.length)}`
+                      : "Выберите время"}
+                  </Text>
+                  <ChevronRight size={15} color={COLORS.brandNavy} strokeWidth={2} />
+                </View>
+              </Pressable>
+            </Animated.View>
           ) : (
-            <View style={s.grid}>
-              {Array.from({ length: TOTAL_HOURS }, (_, hour) => {
-                const busy = busyHours.has(hour);
-                const past = unavailable(hour) && !busy;
-                const off = busy || past;
-                const selected = selectedHours.includes(hour);
-                const isFirst = selected && hour === selectedHours[0];
-                const isLast =
-                  selected && hour === selectedHours[selectedHours.length - 1];
-                const isNextDay = hour >= 24;
+            <Animated.View style={timeBodyStyle}>
+              <View style={s.slotHeader}>
+                <Clock size={15} color={COLORS.text2} strokeWidth={2} />
+                <Text style={s.slotTitle}>Время</Text>
+                <Text style={s.slotDate}>{fmtDateShort(date)}</Text>
+              </View>
 
-                return (
-                  <Pressable
-                    key={hour}
-                    style={({ pressed }) => [
-                      s.slot,
-                      { width: slotWidth },
-                      off && s.slotOff,
-                      selected && s.slotSel,
-                      isFirst && s.slotFirst,
-                      isLast && s.slotLast,
-                      !off && !selected && pressed && s.slotPressed,
-                    ]}
-                    onPress={() => handleSlot(hour)}
-                    disabled={off}
-                  >
-                    <Text
-                      style={[
-                        s.slotTxt,
-                        off && s.slotTxtOff,
-                        selected && s.slotTxtSel,
-                      ]}
+              {/* Продолжительность */}
+              <View style={s.durOptRow}>
+                {DURATION_OPTS.map((h) => {
+                  const on = selectedDuration === h;
+                  const disabled = h < minDuration;
+                  return (
+                    <Pressable
+                      key={h}
+                      style={[s.durOptChip, on && s.durOptChipOn, disabled && s.durOptChipOff]}
+                      onPress={() => !disabled && handleDurationSelect(h)}
+                      disabled={disabled}
                     >
-                      {fmtHour(hour)}
-                    </Text>
-                    {isNextDay && !busy && (
-                      <Text style={[s.nextDayBadge, selected && s.nextDayBadgeSel]}>+1</Text>
-                    )}
-                    {isFirst && !isLast && <View style={s.slotDot} />}
-                    {(isLast || (isFirst && isLast)) && (
-                      <Check size={11} color="#fff" strokeWidth={3} />
-                    )}
-                    {busy && <Text style={s.slotBusyLbl}>занято</Text>}
-                  </Pressable>
-                );
-              })}
-            </View>
+                      <Text
+                        style={[
+                          s.durOptTxt,
+                          on && s.durOptTxtOn,
+                          disabled && s.durOptTxtOff,
+                        ]}
+                      >
+                        {durLabel(h)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {/* Legend */}
+              <View style={s.legend}>
+                <View style={s.legendItem}>
+                  <View
+                    style={[s.legendDot, { backgroundColor: COLORS.brandNavy }]}
+                  />
+                  <Text style={s.legendTxt}>Выбрано</Text>
+                </View>
+                <View style={s.legendItem}>
+                  <View
+                    style={[
+                      s.legendDot,
+                      {
+                        backgroundColor: COLORS.greyLight,
+                      },
+                    ]}
+                  />
+                  <Text style={s.legendTxt}>Свободно</Text>
+                </View>
+                <View style={s.legendItem}>
+                  <View style={[s.legendDot, { backgroundColor: "#F3E8E8" }]} />
+                  <Text style={s.legendTxt}>Занято</Text>
+                </View>
+              </View>
+
+              {slotsLoading ? (
+                <View style={s.loader}>
+                  <Spinner />
+                  <Text style={s.loaderTxt}>Загружаем слоты…</Text>
+                </View>
+              ) : (
+                <View style={s.grid}>
+                  {Array.from({ length: TOTAL_HOURS }, (_, hour) => {
+                    const busy = busyHours.has(hour);
+                    const past = unavailable(hour) && !busy;
+                    const off = busy || past;
+                    const selected = selectedHours.includes(hour);
+                    const isFirst = selected && hour === selectedHours[0];
+                    const isLast =
+                      selected && hour === selectedHours[selectedHours.length - 1];
+                    const isNextDay = hour >= 24;
+
+                    return (
+                      <Pressable
+                        key={hour}
+                        style={({ pressed }) => [
+                          s.slot,
+                          { width: slotWidth },
+                          off && s.slotOff,
+                          selected && s.slotSel,
+                          isFirst && s.slotFirst,
+                          isLast && s.slotLast,
+                          !off && !selected && pressed && s.slotPressed,
+                        ]}
+                        onPress={() => handleSlot(hour)}
+                        disabled={off}
+                      >
+                        <Text
+                          style={[
+                            s.slotTxt,
+                            off && s.slotTxtOff,
+                            selected && s.slotTxtSel,
+                          ]}
+                        >
+                          {fmtHour(hour)}
+                        </Text>
+                        {isNextDay && !busy && (
+                          <Text style={[s.nextDayBadge, selected && s.nextDayBadgeSel]}>+1</Text>
+                        )}
+                        {isFirst && !isLast && <View style={s.slotDot} />}
+                        {(isLast || (isFirst && isLast)) && (
+                          <Check size={11} color="#fff" strokeWidth={3} />
+                        )}
+                        {busy && <Text style={s.slotBusyLbl}>занято</Text>}
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+            </Animated.View>
           )}
         </View>
       </ScrollView>
@@ -456,7 +603,7 @@ const s = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 16,
   },
-  divider: { height: 8 },
+  divider: { height: 8, backgroundColor: COLORS.backgroundAlt },
 
   slotHeader: {
     flexDirection: "row",
@@ -466,6 +613,40 @@ const s = StyleSheet.create({
   },
   slotTitle: { fontSize: 15, fontWeight: "700", color: COLORS.text1, flex: 1 },
   slotDate: { fontSize: 13, color: COLORS.text3 },
+
+  collapsed: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    borderRadius: 14,
+    backgroundColor: COLORS.greyLight,
+  },
+  collapsedLabel: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: COLORS.text3,
+    marginBottom: 4,
+    textTransform: "uppercase",
+    letterSpacing: 0.6,
+  },
+  collapsedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  collapsedDate: { fontSize: 16, fontWeight: "700", color: COLORS.brandNavy },
+
+  durOptRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  durOptChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.greyLight,
+  },
+  durOptChipOn: { backgroundColor: COLORS.brandNavy },
+  durOptChipOff: { opacity: 0.4 },
+  durOptTxt: { fontSize: 13, fontWeight: "500", color: COLORS.brandNavy },
+  durOptTxtOn: { color: "#fff", fontWeight: "700" },
+  durOptTxtOff: { color: COLORS.text3 },
 
   legend: { flexDirection: "row", gap: 14, marginBottom: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },

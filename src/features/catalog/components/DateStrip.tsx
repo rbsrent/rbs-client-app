@@ -211,6 +211,7 @@ export const DateStrip = React.memo(function DateStrip({
   const pendingSecNameRef = useRef<string | null>(null);
   const crossingRef = useRef(false);
   const crossingFwdRef = useRef(false);
+  const lastCheckedXRef = useRef(0);
 
   // After primMonth text commits to native:
   // - Always: move secBaseX to pending position (safe — text already committed)
@@ -242,6 +243,13 @@ export const DateStrip = React.memo(function DateStrip({
         useNativeDriver: true,
         listener: (e: any) => {
           const x: number = e.nativeEvent.contentOffset.x;
+
+          // Cheap early-out: the boundary search only needs to re-run once
+          // we've moved roughly a cell's width — skips most of the 60fps
+          // callbacks during a scroll without affecting the (native-driven,
+          // untouched) label opacity/position animation.
+          if (Math.abs(x - lastCheckedXRef.current) < CELL_W) return;
+          lastCheckedXRef.current = x;
 
           let prim = monthBounds[0];
           let primIdx = 0;

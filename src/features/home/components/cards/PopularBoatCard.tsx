@@ -3,7 +3,7 @@ import { Dimensions } from 'react-native';
 
 import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
 import { buildBoatH1 } from '@/features/catalog/hooks/useBoatDetail';
-import { BoatCard } from '@/shared/components/BoatCard';
+import { BadgeInfo, BoatCard } from '@/shared/components/BoatCard';
 import { HomeBoat } from '@/store/useHomeStore';
 
 const { width: W } = Dimensions.get('window');
@@ -12,7 +12,7 @@ export const IMG_H  = Math.round(CARD_W * 1.05);
 
 interface Props {
   boat:      HomeBoat;
-  badge?:    string;
+  badge?:    BadgeInfo | null;
   discount?: ActiveDiscount;
 }
 

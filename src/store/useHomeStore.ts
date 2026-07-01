@@ -18,6 +18,7 @@ export interface HomeBoat {
   pier_name: string | null;
   cover_image_url: string | null;
   images: any;
+  badge_override: string | null;
 }
 
 export interface HomeRoute {

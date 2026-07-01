@@ -11,14 +11,58 @@ interface CacheEntry {
 
 const _cache = new Map<string, CacheEntry>();
 
+// Reused across different time windows so a boat whose availability didn't
+// actually change (same status/hours) keeps the same object reference —
+// otherwise every re-fetch hands out brand-new objects for all boats, which
+// breaks React.memo on BoatCard/PromoCard and re-renders the whole grid.
+const _stablePool = new Map<string, AvailInfo>();
+
+function stableAvailInfo(boatId: string, next: AvailInfo): AvailInfo {
+  const prev = _stablePool.get(boatId);
+  if (
+    prev &&
+    prev.status === next.status &&
+    prev.available_hours === next.available_hours &&
+    prev.total_hours_in_period === next.total_hours_in_period
+  ) {
+    return prev;
+  }
+  _stablePool.set(boatId, next);
+  return next;
+}
+
 function cacheKey(start: string, end: string) {
   return `${start}|${end}`;
 }
 
-function toIsoMsk(date: Date, extraHours = 0): string {
+export function toIsoMsk(date: Date, extraHours = 0): string {
   const d = new Date(date.getTime() + extraHours * 3_600_000);
   const p = (n: number) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:00:00+03:00`;
+}
+
+export async function fetchAvailabilitySnapshot(
+  pStart: string,
+  pEnd: string,
+): Promise<Record<string, AvailInfo>> {
+  const key = cacheKey(pStart, pEnd);
+  const cached = _cache.get(key);
+  if (cached && Date.now() - cached.ts < CACHE_TTL) return cached.data;
+
+  const { data } = await publicSupabase.rpc('get_boats_with_availability', {
+    p_start_datetime: pStart,
+    p_end_datetime: pEnd,
+  });
+  const map: Record<string, AvailInfo> = {};
+  (data as any[] ?? []).forEach((row) => {
+    map[row.boat_id] = stableAvailInfo(row.boat_id, {
+      status: row.availability_status,
+      available_hours: row.available_hours ?? 0,
+      total_hours_in_period: row.total_hours_in_period ?? 0,
+    });
+  });
+  _cache.set(key, { data: map, ts: Date.now() });
+  return map;
 }
 
 export interface DateTimeFilter {
@@ -66,21 +110,8 @@ export function useAvailabilityCache(dt: DateTimeFilter): {
 
     (async () => {
       try {
-        const { data } = await publicSupabase.rpc('get_boats_with_availability', {
-          p_start_datetime: pStart,
-          p_end_datetime: pEnd,
-        });
+        const map = await fetchAvailabilitySnapshot(pStart, pEnd);
         if (ctrl.signal.aborted) return;
-        if (!data) { setLoading(false); return; }
-        const map: Record<string, AvailInfo> = {};
-        (data as any[]).forEach((row) => {
-          map[row.boat_id] = {
-            status: row.availability_status,
-            available_hours: row.available_hours ?? 0,
-            total_hours_in_period: row.total_hours_in_period ?? 0,
-          };
-        });
-        _cache.set(key, { data: map, ts: Date.now() });
         setAvailMap(map);
       } finally {
         if (!ctrl.signal.aborted) setLoading(false);

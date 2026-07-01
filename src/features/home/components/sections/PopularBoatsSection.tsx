@@ -21,12 +21,20 @@ import ReAnimated, {
 
 import { useDiscountsCache } from "@/features/catalog/hooks/useDiscountsCache";
 import { COLORS } from "@/shared/colors";
-import { STRIP_IMG_H, STRIP_W } from "@/shared/components/BoatCard";
+import { BadgeInfo, STRIP_IMG_H, STRIP_W } from "@/shared/components/BoatCard";
 import { HomeBoat } from "@/store/useHomeStore";
 import { CARD_W, PopularBoatCard } from "../cards/PopularBoatCard";
 import { PopularSeeAllCard } from "../cards/PopularSeeAllCard";
 
 const SHIMMER = ["transparent", "rgba(255,255,255,0.5)", "transparent"] as const;
+
+function getBadge(boat: HomeBoat, index: number): BadgeInfo | null {
+  const ov = boat.badge_override;
+  if (ov === 'top_choice') return { label: 'Топ выбор', variant: 'dark' };
+  if (ov === 'premium') return { label: 'Premium', variant: 'light', dot: true };
+  if (index === 0) return { label: 'Топ выбор', variant: 'dark' };
+  return null;
+}
 
 function SkeletonCard({ tx }: { tx: Animated.Value }) {
   return (
@@ -77,7 +85,6 @@ interface RowProps {
   subtitle: string;
   typeRoute: string;
   boats: HomeBoat[];
-  badge?: string;
   discountsMap: ReturnType<typeof useDiscountsCache>;
 }
 
@@ -88,7 +95,6 @@ const PopularRow = memo(function PopularRow({
   subtitle,
   typeRoute,
   boats,
-  badge,
   discountsMap,
 }: RowProps) {
   const router = useRouter();
@@ -159,11 +165,11 @@ const PopularRow = memo(function PopularRow({
         onLayout={(e) => { viewW.value = e.nativeEvent.layout.width; }}
         onContentSizeChange={(w) => { contentW.value = w; }}
       >
-        {boats.map((b) => (
+        {boats.map((b, i) => (
           <PopularBoatCard
             key={b.boat_id}
             boat={b}
-            badge={badge}
+            badge={getBadge(b, i)}
             discount={discountsMap.get(b.boat_id)}
           />
         ))}
@@ -223,7 +229,6 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         subtitle="На основе бронирований за 30 дней"
         typeRoute="/boats"
         boats={popular}
-        // badge="Топ выбор"
         discountsMap={discountsMap}
       />
       <PopularRow
@@ -231,7 +236,6 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=boat"
         boats={katera.slice(0, 10)}
-        // badge="Катер"
         discountsMap={discountsMap}
       />
       <PopularRow
@@ -239,7 +243,6 @@ export const PopularBoatsSection = memo(function PopularBoatsSection({
         subtitle="в Санкт-Петербурге"
         typeRoute="/boats?type=yacht"
         boats={yakhty.slice(0, 10)}
-        // badge="Яхта"
         discountsMap={discountsMap}
       />
     </View>

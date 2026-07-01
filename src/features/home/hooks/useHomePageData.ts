@@ -36,6 +36,7 @@ function mapDirectBoat(b: any): HomeBoat {
       ? `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${imgs[0].image_path}`
       : null,
     images: imgs,
+    badge_override: b.badge_override ?? null,
   };
 }
 
@@ -54,6 +55,7 @@ function mapRpcBoat(b: any): HomeBoat {
     pier_name:       b.pier_name ?? null,
     cover_image_url: resolveBoatImage(b.images),
     images:          b.images,
+    badge_override:  b.badge_override ?? null,
   };
 }
 
@@ -74,14 +76,14 @@ export function useHomePageData() {
       publicSupabase.rpc('get_popular_boats', { limit_count: 8 }),
       publicSupabase
         .from('boats')
-        .select('id,name,seo_h1,seo_name_ru,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
+        .select('id,name,seo_h1,seo_name_ru,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,badge_override,boat_images(image_path,position)')
         .eq('is_hidden', false)
         .eq('moderation_status', 'approved')
         .eq('type', 'катер')
         .order('display_order', { ascending: true }),
       publicSupabase
         .from('boats')
-        .select('id,name,seo_h1,seo_name_ru,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,boat_images(image_path,position)')
+        .select('id,name,seo_h1,seo_name_ru,type,price_per_hour,public_price_per_hour_night,capacity,length_meters,badge_override,boat_images(image_path,position)')
         .eq('is_hidden', false)
         .eq('moderation_status', 'approved')
         .eq('type', 'яхта')

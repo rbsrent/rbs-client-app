@@ -5,17 +5,23 @@ import { ActiveDiscount } from '@/features/catalog/hooks/useDiscountsCache';
 import { Boat } from '@/store/useCatalogStore';
 
 interface Props {
-  boat:          Boat;
-  availInfo?:    AvailInfo;
-  discount?:     ActiveDiscount;
-  variant?:      BoatCardVariant;
-  selectedDate?: string;
+  boat:              Boat;
+  availInfo?:        AvailInfo;
+  discount?:         ActiveDiscount;
+  variant?:          BoatCardVariant;
+  selectedDate?:     string;
+  selectedHour?:     number;
+  selectedDuration?: number;
 }
 
-export const PromoCard = React.memo(function PromoCard({ boat, availInfo, discount, variant = "catalog", selectedDate }: Props) {
-  const route = selectedDate
-    ? `/catalog/${boat.id}?selectedDate=${selectedDate}`
-    : `/catalog/${boat.id}`;
+export const PromoCard = React.memo(function PromoCard({ boat, availInfo, discount, variant = "catalog", selectedDate, selectedHour, selectedDuration }: Props) {
+  const route = useMemo(() => {
+    if (!selectedDate) return `/catalog/${boat.id}`;
+    const p = new URLSearchParams({ selectedDate });
+    if (selectedHour != null) p.set('selectedHour', String(selectedHour));
+    if (selectedDuration != null) p.set('selectedDuration', String(selectedDuration));
+    return `/catalog/${boat.id}?${p.toString()}`;
+  }, [boat.id, selectedDate, selectedHour, selectedDuration]);
 
   const boatData = useMemo(() => ({
     id:              boat.id,

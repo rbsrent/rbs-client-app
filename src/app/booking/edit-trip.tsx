@@ -32,6 +32,7 @@ import {
   fmtHour,
   fmtHourLabel,
 } from "@/features/booking/utils";
+import { DURATION_OPTS } from "@/features/catalog/constants";
 import { buildBoatH1 } from "@/features/catalog/hooks/useBoatDetail";
 import { COLORS } from "@/shared/colors";
 import { CalendarPicker } from "@/shared/components/CalendarPicker";
@@ -176,6 +177,9 @@ export default function EditTripScreen() {
     }
     return [];
   });
+  const [selectedDuration, setSelectedDuration] = useState(() =>
+    Math.max(durParam ? Number(durParam) : 2, minDuration),
+  );
 
   // ── Pier ──
   const [selectedPier, setSelectedPier] = useState<Pier | null>(() => {
@@ -246,10 +250,23 @@ export default function EditTripScreen() {
     (hour: number) => {
       if (unavailable(hour)) return;
       setSelectedHours((prev) =>
-        computeSlotSelection(prev, hour, minDuration, unavailable),
+        computeSlotSelection(prev, hour, selectedDuration, unavailable),
       );
     },
-    [unavailable, minDuration],
+    [unavailable, selectedDuration],
+  );
+
+  const handleDurationSelect = useCallback(
+    (h: number) => {
+      const eff = Math.max(h, minDuration);
+      setSelectedDuration(eff);
+      setSelectedHours((prev) => {
+        if (prev.length === 0) return prev;
+        const range = Array.from({ length: eff }, (_, i) => prev[0] + i);
+        return range.some(unavailable) ? prev : range;
+      });
+    },
+    [minDuration, unavailable],
   );
 
   // ── Confirm ──
@@ -335,6 +352,32 @@ export default function EditTripScreen() {
               {fmtDateShort(date)}
               {minDuration > 1 ? `  ·  мин. ${durLabel(minDuration)}` : ""}
             </Text>
+          </View>
+
+          {/* Продолжительность */}
+          <View style={s.durOptRow}>
+            {DURATION_OPTS.map((h) => {
+              const on = selectedDuration === h;
+              const disabled = h < minDuration;
+              return (
+                <Pressable
+                  key={h}
+                  style={[s.durOptChip, on && s.durOptChipOn, disabled && s.durOptChipOff]}
+                  onPress={() => !disabled && handleDurationSelect(h)}
+                  disabled={disabled}
+                >
+                  <Text
+                    style={[
+                      s.durOptTxt,
+                      on && s.durOptTxtOn,
+                      disabled && s.durOptTxtOff,
+                    ]}
+                  >
+                    {durLabel(h)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* Legend */}
@@ -543,6 +586,19 @@ const s = StyleSheet.create({
   sectionTitle: { fontSize: 15, fontWeight: "700", color: COLORS.text1, flex: 1 },
   sectionDate: { fontSize: 13, color: COLORS.text3 },
   sectionAction: { fontSize: 13, fontWeight: "600", color: COLORS.brandNavy },
+
+  durOptRow: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 16 },
+  durOptChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: COLORS.greyLight,
+  },
+  durOptChipOn: { backgroundColor: COLORS.brandNavy },
+  durOptChipOff: { opacity: 0.4 },
+  durOptTxt: { fontSize: 13, fontWeight: "500", color: COLORS.brandNavy },
+  durOptTxtOn: { color: "#fff", fontWeight: "700" },
+  durOptTxtOff: { color: COLORS.text3 },
 
   legend: { flexDirection: "row", gap: 14, marginBottom: 14 },
   legendItem: { flexDirection: "row", alignItems: "center", gap: 5 },

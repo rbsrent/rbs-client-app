@@ -21,6 +21,7 @@ function toHomeBoat(item: WishlistItem): HomeBoat {
     pier_name: item.pier_name,
     cover_image_url: item.cover_image_url,
     images: null,
+    badge_override: null,
   };
 }
 

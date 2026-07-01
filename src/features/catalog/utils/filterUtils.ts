@@ -69,6 +69,13 @@ const AVAIL_ORDER: Record<AvailStatus, number> = {
   not_available: 2,
 };
 
+export type BoatSortBy = "popular" | "price_asc" | "price_desc";
+
+// Mirrors RBS.RENT's Index.tsx sort: pier distance wins outright when a pier
+// filter is active (no secondary tie-break); otherwise availability status
+// groups the list and price is only a tie-break when the user explicitly
+// asked for it — default order otherwise preserves the curated display_order
+// from the boats query instead of silently re-sorting by price.
 export function sortBoats(
   boats: Boat[],
   opts: {
@@ -77,24 +84,18 @@ export function sortBoats(
     allPiers: PierWithCoords[];
     radiusKm: number;
     dateActive: boolean;
+    sortBy: BoatSortBy;
   },
 ): Boat[] {
-  const { pierIds, availMap, allPiers, radiusKm, dateActive } = opts;
+  const { pierIds, availMap, allPiers, radiusKm, dateActive, sortBy } = opts;
   const hasPierFilter = pierIds.length > 0;
-  const hasAvailData = dateActive && Object.keys(availMap).length > 0;
 
-  if (!hasPierFilter && !hasAvailData) return boats;
-
-  const piersInRadius = hasPierFilter
-    ? findPiersInRadius(allPiers, pierIds, radiusKm)
-    : null;
-
-  const distCache = new Map<string, number>();
   if (hasPierFilter) {
     const activePiers = allPiers.filter(
       (p) =>
         pierIds.includes(p.id) && p.latitude != null && p.longitude != null,
     );
+    const distCache = new Map<string, number>();
     for (const boat of boats) {
       const boatPier = allPiers.find((p) => p.id === boat.pier_id);
       if (!boatPier?.latitude || !boatPier?.longitude) {
@@ -113,20 +114,23 @@ export function sortBoats(
       }
       distCache.set(boat.id, minDist);
     }
+    return [...boats].sort(
+      (a, b) => (distCache.get(a.id) ?? Infinity) - (distCache.get(b.id) ?? Infinity),
+    );
   }
 
+  const hasAvailData = dateActive && Object.keys(availMap).length > 0;
+  if (!hasAvailData && sortBy === "popular") return boats;
+
   return [...boats].sort((a, b) => {
-    if (hasPierFilter) {
-      const da = distCache.get(a.id) ?? Infinity;
-      const db = distCache.get(b.id) ?? Infinity;
-      if (da !== db) return da - db;
-    }
     if (hasAvailData) {
       const aa = AVAIL_ORDER[availMap[a.id]?.status ?? "not_available"];
       const ab = AVAIL_ORDER[availMap[b.id]?.status ?? "not_available"];
       if (aa !== ab) return aa - ab;
     }
-    return a.price_per_hour - b.price_per_hour;
+    if (sortBy === "price_asc") return a.price_per_hour - b.price_per_hour;
+    if (sortBy === "price_desc") return b.price_per_hour - a.price_per_hour;
+    return 0;
   });
 }
 
