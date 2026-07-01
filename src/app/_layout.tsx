@@ -13,8 +13,10 @@ import { PendingPaymentProvider } from '@/shared/context/PendingPaymentContext';
 import { WishlistToastProvider } from '@/shared/context/WishlistToastContext';
 import { BookingSuccessProvider } from '@/shared/context/BookingSuccessContext';
 import { SharePreviewProvider } from '@/shared/context/SharePreviewContext';
+import { PromoProvider, usePromo, PromoData } from '@/shared/context/PromoContext';
 import { BookingSuccessModalGlobal } from '@/shared/components/BookingSuccessModalGlobal';
 import { SharePreviewModalGlobal } from '@/shared/components/SharePreviewModalGlobal';
+import { PromoModalGlobal } from '@/shared/components/PromoModalGlobal';
 import { PendingPaymentOverlay } from '@/shared/components/PendingPaymentOverlay';
 import { WishlistToast } from '@/shared/components/WishlistToast';
 import { WishlistPickerProvider } from '@/shared/components/WishlistPickerContext';
@@ -58,31 +60,57 @@ function PushRegistrar() {
   return null;
 }
 
+function extractPromo(content: Notifications.NotificationContent): PromoData | null {
+  const raw = content.data?.promo as Record<string, any> | undefined;
+  if (!raw) return null;
+  return {
+    title: content.title ?? '',
+    body: content.body ?? '',
+    imageUrl: raw.image_url ?? null,
+    description: raw.description ?? null,
+    code: raw.code ?? null,
+    expiresAt: raw.expires_at ?? null,
+    ctaText: raw.cta_text ?? null,
+    ctaUrl: raw.cta_url ?? null,
+  };
+}
+
 function NotificationColdStart() {
   const router = useRouter();
   const navState = useRootNavigationState();
   const segments = useSegments();
+  const { show: showPromo } = usePromo();
   const handled = useRef(false);
   const pendingRoute = useRef<string | null>(null);
+  const pendingPromo = useRef<PromoData | null>(null);
 
-  // Step 1: read notification URL as soon as navigation is ready
+  // Step 1: read notification payload as soon as navigation is ready
   useEffect(() => {
     if (!navState?.key || handled.current) return;
     Notifications.getLastNotificationResponseAsync().then((response) => {
       if (!response || handled.current) return;
-      const raw = response.notification.request.content.data?.url as string | undefined;
+      const content = response.notification.request.content;
+      const promo = extractPromo(content);
+      if (promo) { pendingPromo.current = promo; return; }
+      const raw = content.data?.url as string | undefined;
       if (!raw) return;
       const route = resolveNotifUrl(raw);
       if (route) pendingRoute.current = route;
     });
   }, [navState?.key]);
 
-  // Step 2: push only once SplashScreen has naturally navigated away to (tabs).
+  // Step 2: act only once SplashScreen has naturally navigated away to (tabs).
   // Avoids race where SplashScreen's MIN_MS timer fires after our push and replaces the target screen.
   useEffect(() => {
-    if (handled.current || !pendingRoute.current) return;
+    if (handled.current) return;
+    if (!pendingRoute.current && !pendingPromo.current) return;
     if (segments[0] !== '(tabs)') return;
     handled.current = true;
+    if (pendingPromo.current) {
+      showPromo(pendingPromo.current);
+      pendingPromo.current = null;
+      return;
+    }
     const route = pendingRoute.current;
     pendingRoute.current = null;
     router.push(route as any);
@@ -108,12 +136,16 @@ function resolveNotifUrl(url: string): string | null {
 function NotificationNavigator() {
   const router = useRouter();
   const navState = useRootNavigationState();
+  const { show: showPromo } = usePromo();
   const listenerRef = useRef<Notifications.EventSubscription | null>(null);
 
   useEffect(() => {
     listenerRef.current = Notifications.addNotificationResponseReceivedListener((response) => {
       if (!navState?.key) return;
-      const raw = response.notification.request.content.data?.url as string | undefined;
+      const content = response.notification.request.content;
+      const promo = extractPromo(content);
+      if (promo) { showPromo(promo); return; }
+      const raw = content.data?.url as string | undefined;
       if (!raw) return;
       const route = resolveNotifUrl(raw);
       if (route) router.push(route as any);
@@ -210,6 +242,7 @@ export default function RootLayout() {
             <WishlistToastProvider>
           <BookingSuccessProvider>
           <SharePreviewProvider>
+          <PromoProvider>
           <PendingPaymentProvider>
             <WishlistPickerProvider>
             <RouteWishlistPickerProvider>
@@ -258,9 +291,11 @@ export default function RootLayout() {
             <PendingPaymentOverlay />
             <BookingSuccessModalGlobal />
             <SharePreviewModalGlobal />
+            <PromoModalGlobal />
             </RouteWishlistPickerProvider>
             </WishlistPickerProvider>
             </PendingPaymentProvider>
+          </PromoProvider>
           </SharePreviewProvider>
           </BookingSuccessProvider>
           </WishlistToastProvider>
